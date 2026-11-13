@@ -7,7 +7,10 @@
     "index:load": "wrangler d1 execute DB --local --file .data/valio/build/products.sql",
     "index:load:remote": "wrangler d1 execute DB --remote --file .data/valio/build/products.sql",
     "acceptance": "tsx test/acceptance/run.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "pretest": "bash scripts/check-secrets.sh",
+    "replies:build": "tsx scripts/load-replies.ts",
+    "replies:load": "wrangler d1 execute DB --local --file .data/valio/build/replies.sql"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.23.0",
@@ -22,5 +25,12 @@
     "@hono/zod-openapi": "^1.6.3",
     "hono": "^4.13.18",
     "zod": "^4.6.7"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
   }
 }

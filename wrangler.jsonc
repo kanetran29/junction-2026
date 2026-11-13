@@ -14,6 +14,6 @@
   "vars": {
     "VALIO_API_BASE": "https://junction26.valioaimo.fi",
     "DEMO_MODE": "1",
-    "GEMINI_MODEL": "gemini-3.5-flash"
+    "GEMINI_MODEL": "gemini-3.8-flash"
   }
 }
