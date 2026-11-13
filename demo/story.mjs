@@ -115,6 +115,6 @@ export function stateAt(t) {
 
 /** The story's gateway events only, as the gateway would log them: the recorded fixture. */
 export function gatewayEvents() {
-  return STORY.map((item) => item.ev).filter((ev) => !ev.type.startsWith("story."));
+  return STORY.map((item) => item.ev).filter((ev) => !ev.type.startsWith("story.")).map((ev, i) => ({ ...ev, seq: i + 1 }));
 }
 

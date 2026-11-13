@@ -73,9 +73,8 @@ function overlays(state) {
 }
 
 let last = performance.now();
-function frame(now) {
-  const dt = Math.max(0, (now - last) / 1000);
-  last = now;
+/** Draws one frame dt seconds after the previous one. */
+function render(dt) {
   if (mode === "story") {
     advance(dt);
     scene.draw(story.state, story.t, dt, story.snap || still.matches);
@@ -85,9 +84,15 @@ function frame(now) {
     if (document.activeElement !== scrub) scrub.value = story.t.toFixed(1);
     $("time").textContent = `${clock(story.t)} / ${clock(DURATION)}`;
   } else {
-    scene.draw(live.state, now / 1000 - live.t0, dt, still.matches);
+    scene.draw(live.state, performance.now() / 1000 - live.t0, dt, still.matches);
     overlays(live.state);
   }
+}
+
+/** The frame loop; with ?manual=1 a recorder calls window.__step(dt) instead, one deterministic frame per call. */
+function frame(now) {
+  render(Math.max(0, (now - last) / 1000));
+  last = now;
   requestAnimationFrame(frame);
 }
 
@@ -176,4 +181,5 @@ $("ask").addEventListener("submit", async (e) => {
 seek(Number(params.get("t")) || 0);
 setMode(mode);
 if (params.get("autoplay") === "1" && mode === "story") setPlaying(true);
-requestAnimationFrame(frame);
+if (params.get("manual") === "1") window.__step = (dt) => render(dt);
+else requestAnimationFrame(frame);
