@@ -125,7 +125,8 @@ or tag; the register of decisions is served at `GET /v1/rules`.
    deliveryDate), buyerId and mandate version; single use; expires at the cut-off. The phone page shows the diff against the request,
    the `understoodAs` draft, the agent's reason for its choice, totals net and gross, "not reserved: N available now", a countdown,
    Approve / Reject.
-9. **Receipt and log**: plain-language receipt written from reason codes (templates, no model), event log of every step.
+9. **Receipt and log**: plain-language receipt written from reason codes (templates, no model), event log of every step, readable live
+   (`GET /v1/events`, SSE `GET /v1/events/stream`; schema in `docs/events.md`) so the animated demo shows the door's real events.
 10. **Interfaces**: one schema → OpenAPI (HTTP) and MCP tools (each with `outputSchema`; business refusals set `isError`); reason-code
     catalogue `GET /v1/reason-codes` with `resolution` (recoverable | requires_buyer_input | requires_buyer_review) and `retryable` per
     code; `GET /v1/rules`, static JSON built from the constants module: `decisions[] {id, rule, owner: seller|buyer|agent|approver,
