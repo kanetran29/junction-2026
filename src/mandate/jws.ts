@@ -42,8 +42,8 @@ async function importKey(jwk: JsonWebKey, usage: 'sign' | 'verify'): Promise<Cry
 export async function generateBuyerKeys(): Promise<{ privateJwk: JsonWebKey; publicJwk: JsonWebKey }> {
   const kp = (await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify'])) as CryptoKeyPair;
   return {
-    privateJwk: await crypto.subtle.exportKey('jwk', kp.privateKey),
-    publicJwk: await crypto.subtle.exportKey('jwk', kp.publicKey),
+    privateJwk: (await crypto.subtle.exportKey('jwk', kp.privateKey)) as JsonWebKey,
+    publicJwk: (await crypto.subtle.exportKey('jwk', kp.publicKey)) as JsonWebKey,
   };
 }
 
