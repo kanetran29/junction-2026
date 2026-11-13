@@ -13,3 +13,11 @@ export function halfUp(x: number): number {
 export function lineNetCents(unitPrice: number, salesUnits: number): number {
   return halfUp(halfUp(unitPrice * 100) * salesUnits);
 }
+
+/**
+ * Gross cents of a basket from its net cents per VAT rate (percent): each rate's net is grossed up and rounded half up
+ * on its own, then summed, which is how the oracle computes a multi-rate basket.
+ */
+export function grossCents(netByRate: Map<number, number>): number {
+  return [...netByRate].reduce((s, [rate, net]) => s + Math.floor((net * Math.round((100 + rate) * 100) + 5000) / 10000), 0);
+}

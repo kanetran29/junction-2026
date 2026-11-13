@@ -46,6 +46,7 @@ export const REASONS = {
   PRICE_CHANGED: r('The price changed since the quote.', 'recoverable', true),
   PARTIAL_BASKET: r('Only part of the basket could be quoted.', 'requires_buyer_review'),
   SUBTYPE_UNVERIFIED: r('The product type could not be confirmed against a reviewed subtype.', 'requires_buyer_review'),
+  NOT_SELECTED: r('The basket offered options for this need but none was chosen.', 'requires_buyer_review'),
   BRAND_NOT_CARRIED: r('Valio does not carry the requested brand.', 'requires_buyer_input'),
 } as const satisfies Record<string, ReasonInfo>;
 
