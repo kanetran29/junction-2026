@@ -1,3 +1,4 @@
+import { REVIEWED_SUBTYPES } from '../catalog/subtypes';
 import { helsinkiIso, now } from '../clock';
 import type { Env } from '../env';
 import { logEvent } from '../events/log';
@@ -50,13 +51,6 @@ interface Raw {
 }
 
 const UNITS = ['l', 'kg', 'pcs'];
-
-/** The reviewed subtypes of the three demo families (src/catalog/subtypes.ts); any other category has none a model may name. */
-const REVIEWED_SUBTYPES: Record<string, string[]> = {
-  '10400': ['coffee milk', 'milk coffee drink', 'buttermilk', 'portion milk', 'other', 'drinking milk'],
-  '18750': ['chicken breast fillet', 'other poultry'],
-  '10500': ['plant spread', 'clarified butter', 'butter'],
-};
 const FIELDS = ['category', 'subtype', 'claims', 'quantity', 'deliverBy', 'brand', 'packLitres'];
 const str = { type: 'STRING' };
 

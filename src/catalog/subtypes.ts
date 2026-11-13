@@ -23,6 +23,11 @@ const RULES: Record<string, { rules: [RegExp, string][]; fallback: string }> = {
   },
 };
 
+/** The reviewed subtype names per demo category code (every rule's subtype plus the fallback), from the same table that tags products. */
+export const REVIEWED_SUBTYPES: Record<string, string[]> = Object.fromEntries(
+  Object.entries(RULES).map(([category, { rules, fallback }]) => [category, [...rules.map(([, subtype]) => subtype), fallback]]),
+);
+
 /**
  * Tags a product with its subtype from the reviewed name rules of the three demo families; every other
  * category gets no subtype and tagSource 'model' until the offline model tagging fills it in.
