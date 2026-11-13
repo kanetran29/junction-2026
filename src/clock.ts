@@ -24,12 +24,15 @@ export async function now(env: Env): Promise<Date> {
 
 /**
  * Sets (ISO string) or clears (null) the demo clock override; the override only takes effect when DEMO_MODE is "1".
+ * The string must end in `Z` or an explicit offset (a bare local time would silently land hours off, so it throws);
+ * the stored value is normalised to UTC `Z`.
  */
 export async function setClock(env: Env, iso: string | null): Promise<void> {
   if (iso === null) {
     await env.DB.prepare("DELETE FROM settings WHERE key = 'clock'").run();
     return;
   }
+  if (!/(Z|[+-]\d{2}:?\d{2})$/.test(iso)) throw new Error(`clock needs Z or an offset: ${iso}`);
   const t = new Date(iso);
   if (Number.isNaN(t.getTime())) throw new Error(`invalid clock: ${iso}`);
   await env.DB.prepare("INSERT INTO settings(key, value) VALUES('clock', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
