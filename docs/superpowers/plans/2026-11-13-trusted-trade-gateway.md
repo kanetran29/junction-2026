@@ -23,6 +23,26 @@
 - Every function/class has a leading doc comment; in-body comments only for non-obvious steps, single line (user CLAUDE.md).
 - UI text in English. Secrets only via `wrangler secret`; deploy with the hackathon account (`source ~/.config/junction2026/cf.env`).
 
+## Acceptance contract (written first)
+
+28 black-box cases live in `~/junction26-valio/acceptance/cases.json` (local only: they contain Valio data). Expected values were
+computed by an independent Python oracle (`~/junction26-valio/scripts/acceptance/oracle.py`) from replies recorded on Fri 13 Nov 21:08
+(`~/junction26-valio/recordings/replies_2026-11-16.json`). The work is done when every case passes against `wrangler dev` and against
+the deployed Worker. Rules the cases pin that the tasks below must follow:
+- Offers are ranked by **net total for the requested quantity**, then cents per litre/kg, then reliability (AC09: 472673, 150 kg in 2 kg
+  lots, 1,155.00 € beats 462281, 154 kg, 1,185.80 €).
+- Subtypes inside a category are a hard filter: coffee milk, buttermilk (piimä), barista and portion milk are SUBTYPE_MISMATCH for
+  drinking milk (AC03, AC06).
+- `pcs` is accepted only with a `referenceProduct` (then it means that product's sales units); otherwise a volume or weight category
+  answers NOT_CONVERTIBLE (AC11, AC18).
+- Substitutes: only for a `referenceProduct` that cannot be met; official pairs are candidates; missing required claim → CLAIM_MISSING,
+  new CONTAINS allergen → NEW_ALLERGEN (both rejected), reference without allergen data → offer kept with ALLERGEN_UNKNOWN and needs
+  approval (AC17–AC19).
+- Variable-weight products set `offer.estimate = true`; quotes report `coverage.reliability` ("17 of 35"), `carbonLabel`
+  ("product-group average"), `deliveryDate`, `valioCalls` and `liveValioCalls`.
+- Extra reason codes: `MANDATE_INVALID`, `ALLERGEN_UNKNOWN`, `TEMP_CLASS_CHANGED`.
+- Replay supports scenario variants (`replayVariant: { "<id>": "out_of_stock" }`) applied on top of a recording.
+
 ## Review Focus
 
 1. A product whose `closingTime` equals `now()` exactly must be NOT orderable (CUTOFF_PASSED); test pins the boundary in Task 3.
@@ -94,6 +114,13 @@ type OrderState = 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED'
 ```
 
 ---
+
+### Task 0: Acceptance runner (RED first)
+
+**Files:** Create `test/acceptance/run.ts`, `test/acceptance/matcher.ts`, `test/acceptance/matcher.test.ts`; script `pnpm acceptance` (`tsx test/acceptance/run.ts`), env `ACCEPTANCE_DIR` (default `~/junction26-valio/acceptance`), `GATEWAY_URL`, `ADMIN_KEY`.
+**Produces:** `match(reply: unknown, [path, op, value]): { ok: boolean; got: unknown }` implementing the ops in `cases.json` (`=`, `!=`, `contains`, `not_contains`, `>=`, `<=`, `count=`, `matches`, selector paths `a[field=X].b`, `a[*].b`, `count(a[field=X])`); a runner that, per case, resets state through admin routes (clock, replay recording and variant, mandate, prior orders), runs the steps over HTTP, prints `PASS/FAIL id title` with the first failing expectation, exits non-zero on any failure. Step `call` names map to the HTTP routes of Task 10 and the admin routes of Tasks 1 and 4.
+- [ ] Matcher tests: each op on small JSON samples, including selector paths and `count(...)`. FAIL → implement → PASS.
+- [ ] Run `pnpm acceptance` against nothing → every case FAILS with "gateway unreachable" (RED recorded). Commit `test: acceptance runner over the local case set`.
 
 ### Task 1: Scaffold, schema, clock
 
@@ -192,4 +219,4 @@ type OrderState = 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED'
 **Files:** Modify `README.md`; create `docs/reason-codes.md`.
 - [ ] README: what it is (door + reference agent), how to run, OpenAPI/MCP endpoints, reason codes, "what is simulated" (order acceptance, replay after Sun 17:00), "what Valio must add" (order endpoint with reservation, category names, cut-off calendar, date-aware availability).
 - [ ] `wrangler secret put VALIO_API_KEY` and `GEMINI_API_KEY`; apply migrations remote; load index, categories, mandates, replies; create agent and judge keys; `wrangler deploy`.
-- [ ] Run `agent/scenarios.ts` against the deployed URL → all PASS; run `pnpm vitest run` → all PASS. Commit `docs: README and reason codes`.
+- [ ] Run `agent/scenarios.ts` against the deployed URL → all PASS; run `pnpm vitest run` → all PASS; run `pnpm acceptance` against `wrangler dev` and against the deployed URL → 28/28 PASS. Commit `docs: README and reason codes`.
