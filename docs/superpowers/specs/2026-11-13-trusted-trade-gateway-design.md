@@ -117,6 +117,19 @@ an allergen-adding substitute is REJECTED; approval after the cut-off expires; a
 Stack: Cloudflare Workers (TypeScript) + D1 on the dedicated hackathon Cloudflare account; Gemini API for `interpret`, catalogue
 tagging and the purchasing agent. Code in this public MIT repo; Valio data, keys and the Valio API key stay outside it.
 
+## Decisions after REVIEW-2 (accepted by Kane, Sat 14 Nov)
+
+Source: `~/junction26-valio/REVIEW-2.md` section 12 (local only). Every recommendation was accepted.
+
+| | Decision |
+|---|---|
+| D1 | Per-delivery-day auto limit = 500 € net, cumulative over the buyer's accepted and held orders for that day, so splitting an order cannot dodge approval. |
+| D2 | Held orders do not reserve stock. Only accepted orders take stock; the first authorised order wins, in one atomic statement. |
+| D3 | A vague request gets a typed form (`needs_input` + `missing[]`), the catalogue map (`/v1/families`) and an occasion evidence search over supplier text. The door never invents a need or a quantity. |
+| D4 | Unknown delivery reliability is the buyer's choice in the mandate (`reliabilityUnknown: allow | approve`); the default `allow` only flags the offer. |
+| D5 | The approval link goes only to the approver inbox (a QR code on screen in the demo), never back to the agent. |
+| D6 | REVIEW-2 section 11 is applied to this spec and to the plan before any code. |
+
 ## Calls made by Claude (check these)
 
 Limits have auto and hard values (500 / 5,000 € per order, 1,500 / 10,000 € per day); split orders go to approval, not rejection;
