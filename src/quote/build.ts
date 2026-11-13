@@ -101,7 +101,7 @@ export interface BuildInput {
 /** The order offer `changes` are listed in. */
 const CHANGE_ORDER: ReasonCode[] = ['SUBSTITUTE', 'ALLERGEN_UNKNOWN', 'SUBTYPE_UNVERIFIED', 'PACK_SIZE_CHANGED', 'BRAND_CHANGED', 'SHORTFALL'];
 const RELIABILITY_FLOOR = 0.9;
-const QUOTE_TTL_MS = 30 * 60_000;
+export const QUOTE_TTL_MS = 30 * 60_000;
 
 /** Rounds to `dp` decimals (tames float noise such as 4.4 x 5). */
 const round = (x: number, dp: number) => Math.round(x * 10 ** dp) / 10 ** dp;

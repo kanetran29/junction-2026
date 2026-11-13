@@ -52,3 +52,30 @@ export const IdParam = z.object({ id: z.string().min(1) });
 
 /** `POST /v1/orders` header; the handler reads it directly and the order layer answers 400 when it is missing. */
 export const IdempotencyHeader = z.object({ 'Idempotency-Key': z.string().optional().openapi({ description: 'Unique per order attempt; a retry with the same key and body returns the same order' }) });
+
+/** Exactly one of a product id, a sales-unit GTIN, a brand or a name. */
+export const ResolveBody = z.union([z.object({ productId: z.string().min(1) }), z.object({ gtin: z.string().min(1) }), z.object({ brand: z.string().min(1) }), z.object({ name: z.string().min(1) })]).openapi('ResolveRequest');
+export const ResolveReply = z
+  .looseObject({
+    status: z.enum(['RESOLVED', 'AMBIGUOUS', 'NO_MATCH', 'BRAND_NOT_CARRIED', 'TYPE_RESOLVED']),
+    product: z.looseObject({ id: z.string(), salesUnit: z.string().nullable() }).optional(),
+    brand: z.string().optional(),
+    didYouMean: z.array(z.string()).optional(),
+    candidates: z.array(z.looseObject({ id: z.string(), salesUnit: z.string().nullable() })).optional(),
+    category: z.string().optional(),
+    subtype: z.string().nullable().optional(),
+    valioCalls: z.literal(0),
+  })
+  .openapi('ResolveReply');
+
+export const FamiliesQuery = z.object({ terms: z.string().optional().openapi({ description: 'Comma-separated occasion words; omit for the whole catalogue map' }) });
+export const Family = z.looseObject({ category: z.string(), name: z.string().nullable(), subtypes: z.array(z.string()), claims: z.array(z.string()), productCount: z.number(), tagSource: z.enum(['reviewed', 'model']), evidence: z.object({ terms: z.array(z.string()), mentions: z.number(), of: z.number() }).optional() }).openapi('Family');
+export const FamiliesReply = z.object({ families: z.array(Family), valioCalls: z.literal(0) }).openapi('FamiliesReply');
+
+export const RulesReply = z.object({ decisions: z.array(z.object({ id: z.string(), rule: z.string(), owner: z.string(), model: z.boolean(), constants: z.record(z.string(), z.unknown()) })) }).openapi('Rules');
+export const ReasonCodesReply = z.object({ codes: z.array(z.object({ code: z.string(), text: z.string(), resolution: z.string(), retryable: z.boolean() })) }).openapi('ReasonCodes');
+
+export const EventsQuery = z.object({ since: z.coerce.number().int().min(0).optional(), buyer: z.string().optional() });
+export const Event = z.looseObject({ seq: z.number(), ts: z.string(), type: z.string(), buyerId: z.string(), data: z.record(z.string(), z.unknown()) }).openapi('Event');
+export const EventsReply = z.object({ events: z.array(Event), next: z.number() }).openapi('EventsReply');
+export const EventStream = z.string().openapi({ description: 'Server-Sent Events: `id: <seq>`, `event: <type>`, `data: <Event as JSON>`' });

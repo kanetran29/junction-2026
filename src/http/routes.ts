@@ -1,8 +1,10 @@
 import { OpenAPIHono, createRoute, type z } from '@hono/zod-openapi';
 import { ZodError } from 'zod';
+import { listFamilies, resolve } from '../catalog/open';
 import { searchProducts } from '../catalog/search';
 import { helsinkiIso, now, replayOn } from '../clock';
 import type { Env } from '../env';
+import { decisionRegister, reasonCodes } from '../domain/rules';
 import { logEvent } from '../events/log';
 import { InterpretError, confirmDraft, interpret } from '../interpret/gemini';
 import { OrderError, createBasket, getOrder, placeOrder } from '../orders/store';
@@ -11,6 +13,7 @@ import { productName } from '../receipt/render';
 import { uiRoutes, receiptText } from '../ui/approve';
 import { adminRoutes } from './admin';
 import { HttpError, rateLimit, requireBuyer } from './auth';
+import { readEvents, streamEvents } from './events';
 import * as S from './schemas';
 
 const INTERPRET_PER_MINUTE = 20;
@@ -50,6 +53,19 @@ const orderRoute = createRoute({
 });
 const getOrderRoute = createRoute({ method: 'get', path: '/v1/orders/{id}', summary: "Read the buyer's own order", request: { params: S.IdParam }, security: SECURITY, responses: ok(S.Order) });
 const receiptRoute = createRoute({ method: 'get', path: '/v1/orders/{id}/receipt', summary: "The order's plain-text receipt", request: { params: S.IdParam }, security: SECURITY, responses: ok(S.Receipt) });
+const resolveRoute = createRoute({ method: 'post', path: '/v1/resolve', summary: 'Resolve a product id, sales-unit GTIN, brand or name from the catalogue; never corrects input, no Valio call', request: body(S.ResolveBody), security: SECURITY, responses: ok(S.ResolveReply) });
+const familiesRoute = createRoute({ method: 'get', path: '/v1/families', summary: 'The catalogue map by category, or with terms the families that mention them, with evidence (no products, no Valio call)', request: { query: S.FamiliesQuery }, security: SECURITY, responses: ok(S.FamiliesReply) });
+const rulesRoute = createRoute({ method: 'get', path: '/v1/rules', summary: 'The published decision register: who decides what, and the constants behind it', responses: { 200: json(S.RulesReply, 'OK') } });
+const reasonCodesRoute = createRoute({ method: 'get', path: '/v1/reason-codes', summary: 'Every reason code with its text, resolution and whether a retry may help', responses: { 200: json(S.ReasonCodesReply, 'OK') } });
+const eventsRoute = createRoute({ method: 'get', path: '/v1/events', summary: 'Events after `since` (exclusive), oldest first, at most 500; judge and admin keys read every buyer, an agent key only its own', request: { query: S.EventsQuery }, security: SECURITY, responses: ok(S.EventsReply) });
+const streamRoute = createRoute({
+  method: 'get',
+  path: '/v1/events/stream',
+  summary: 'The same events as Server-Sent Events (`id`, `event`, `data`), `: ping` every 15 s, closed after about 60 s; resume with `since` or `Last-Event-ID`',
+  request: { query: S.EventsQuery },
+  security: SECURITY,
+  responses: { 200: { description: 'text/event-stream', content: { 'text/event-stream': { schema: S.EventStream } } }, 401: json(S.ErrorBody, 'Missing or unknown API key'), 403: json(S.ErrorBody, "Another buyer's events") },
+});
 const healthRoute = createRoute({ method: 'get', path: '/health', summary: 'Liveness, the gateway clock, replay mode and whether a Gemini key is configured', responses: { 200: json(S.Health, 'OK') } });
 
 /**
@@ -135,6 +151,22 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
     if (text === null) throw new HttpError(404, 'ORDER_NOT_FOUND', 'no such order');
     return c.json({ text }, 200);
   });
+
+  app.openapi(resolveRoute, async (c) => {
+    await requireBuyer(c);
+    return c.json((await resolve(c.env, c.req.valid('json'))) as never, 200);
+  });
+
+  app.openapi(familiesRoute, async (c) => {
+    await requireBuyer(c);
+    const terms = (c.req.valid('query').terms ?? '').split(',');
+    return c.json({ families: await listFamilies(c.env, terms), valioCalls: 0 as const }, 200);
+  });
+
+  app.openapi(rulesRoute, (c) => c.json({ decisions: decisionRegister() }, 200));
+  app.openapi(reasonCodesRoute, (c) => c.json({ codes: reasonCodes() }, 200));
+  app.openapi(eventsRoute, async (c) => c.json(await readEvents(c), 200));
+  app.openapi(streamRoute, (c) => streamEvents(c) as never);
 
   app.doc('/openapi.json', { openapi: '3.0.3', info: { title: 'Lazydoor', version: '0.1.0', description: 'Lazy at the order, strict at the border.' } });
 
