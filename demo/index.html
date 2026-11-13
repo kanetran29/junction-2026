@@ -7,10 +7,10 @@
 <link rel="stylesheet" href="kit/iso.css">
 <link rel="stylesheet" href="demo.css">
 </head>
-<body class="iso" data-theme="light">
+<body class="iso" data-theme="dark">
 <main class="page">
   <header class="bar">
-    <div class="brand"><b>Lazydoor</b><span>a door where every decision is a published rule</span></div>
+    <div class="brand"><b>Lazydoor</b><span>a door where every decision is a published rule</span><span class="for">for <span class="logo-chip"><img src="assets/valio-aimo-logo.svg" alt="Valio Aimo"></span> Junction 2026</span></div>
     <div class="modes" role="group" aria-label="Mode">
       <button type="button" data-mode="story" aria-pressed="true">Story</button>
       <button type="button" data-mode="live" aria-pressed="false">Live</button>
@@ -23,6 +23,7 @@
 
   <section class="stage" id="stage" aria-live="polite">
     <div class="sun" aria-hidden="true"></div>
+    <div class="ground" aria-hidden="true"></div>
     <div id="scene"></div>
     <div class="dusk" aria-hidden="true"></div>
     <div class="corner tl">Fig 1 · Lazydoor · Valio Aimo</div>
@@ -30,6 +31,7 @@
     <ol id="ticker" class="ticker" aria-label="Gateway events"></ol>
     <div id="caption" class="caption"></div>
     <div id="endcard" class="endcard" hidden>
+      <div class="brands"><span class="lazy">Lazydoor</span><span class="x">for</span><span class="logo-plate"><img src="assets/valio-aimo-logo.svg" alt="Valio Aimo"></span></div>
       <div class="plugs">
         <div class="plug"><svg viewBox="0 0 60 44" aria-hidden="true"><path d="M8 14h44v22a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4z"/><path class="prong" d="M20 2h5v12h-5zM35 2h5v12h-5z"/></svg>OpenAPI</div>
         <div class="plug"><svg viewBox="0 0 60 44" aria-hidden="true"><path d="M8 14h44v22a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4z"/><path class="prong" d="M20 2h5v12h-5zM35 2h5v12h-5z"/></svg>MCP</div>

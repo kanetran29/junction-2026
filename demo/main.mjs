@@ -11,7 +11,7 @@ const store = {
   set: (name, value) => { try { localStorage.setItem(`lazydoor.${name}`, value); } catch { /* storage blocked: keep the value for this page only */ } },
 };
 
-document.body.dataset.theme = params.get("theme") ?? store.get("theme") ?? "light";
+document.body.dataset.theme = params.get("theme") ?? store.get("theme") ?? "dark";
 if (params.get("kiosk") === "1") document.body.classList.add("kiosk");
 const scene = buildScene($("scene"));
 const still = matchMedia("(prefers-reduced-motion: reduce)");

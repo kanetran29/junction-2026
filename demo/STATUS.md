@@ -50,6 +50,14 @@ Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 - Hiệu năng: đo trên Chrome có GPU (Metal, M4 Pro) ở 1920×1080 đoạn bận nhất (giây 58–62): 108 khung/giây headless, 144 có cửa sổ. Lớp WebGL chỉ vẽ lại khi độ sáng đèn đổi.
 - Video `demo/story.mp4` quay lại ở 60 khung/giây.
 
+### 8. Thế giới đậm màu + logo Valio Aimo (theo phản hồi "it's all white")
+- Bỏ giao diện giấy trắng của anatomy cho demo này: nền trời xanh thẫm → tím (chuyển sang tím hồng, cam lúc gần hạn chót, đỏ thẫm khi phê duyệt hết hạn), "đảo" nền xanh ngọc trên mặt đất tím, sàn kho xanh dương, tường kho gạch cam có cửa sổ sáng đèn, kệ mã màu theo nhóm hàng (tím: hộp 10 l, vàng: Arla, xanh dương: Valio 1 l, xanh lá: hàng thay thế), chef áo đỏ, robot thân xanh ngọc đầu vàng, xe tải thùng vàng cabin xanh, điện thoại tím có màn hình phát sáng theo trạng thái.
+- Bóng và sáng có màu: mặt khuất pha về chàm `#1d1452`, mặt trên pha về ánh vàng ấm `#fff3d1` (vẫn 4 tông của kit nhưng trên màu bão hòa). Bóng đổ dưới vật màu chàm.
+- Đèn kho: vùng sáng vàng đặt có chủ đích (một vũng sáng trước mỗi kệ, một vệt hắt xuống tường dưới mỗi đèn) thay cho suy giảm 1/r², vì cách cũ phủ cam lên sàn xanh thành màu xám tím.
+- Khung trang tối và có màu (nền chàm, nút tím thương hiệu); trang mặc định `theme=dark`.
+- Logo Valio Aimo chính thức: `demo/assets/valio-aimo-logo.svg`, lấy từ logo đầu trang https://www.valioaimo.fi/ (liên kết "Valio Aimo" trỏ tới file SVG trên CDN của Valio; trang tải về không có `<svg>` nội tuyến mà dùng `<img>` tới file này, cùng viewBox `0 0 537.17 179.06`, 2.8 KB). Giữ nguyên từng byte, chỉ thêm một dòng chú thích nguồn và ngày ở đầu. Dùng không sửa (chỉ thu phóng, không nghiêng): biển trên tường kho (đặt trên tấm trắng, quay thẳng về người xem), màn kết "Lazydoor for [logo]", và chip nhỏ ở đầu trang "for [logo] Junction 2026".
+- Valio Aimo logo © Valio Ltd, used for the Junction 2026 Trusted Trade Agents challenge demo.
+
 ## Còn lại / cần làm sau
 - Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

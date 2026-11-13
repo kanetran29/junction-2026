@@ -25,6 +25,8 @@ const SPLASH = { x: -304, y: -120, w: 128, d: 7, r: 1, h: 74 };
 const WALL_Y = WALL.y + WALL.d;
 const LAMP_Z = 88;
 const LAMPS = RACK_X.map((x) => x + RACK.w / 2);
+const WINDOWS = [[-44, 24], [244, 22], [272, 22]];
+const LOGO = { at: [18, WALL_Y, 116], width: 132, ratio: 179.06 / 537.17 };
 
 const P = k.fitProjection(
   [...k.boxCorners(PLATE, -24, 0), [PLATE.x + 262, PLATE.y, WALL.h], [PLATE.x + PLATE.w, PLATE.y, WALL.h], [GATE_X, 0, 128]],
@@ -86,14 +88,14 @@ function plate() {
   base.push(slab(strip, 0, 0.6, { tone: "lo", crease: "none" }, 3, 0));
   const ticks = k.topTicks(strip.x + 4, strip.x + strip.w - 4, 8, 6, strip.y + 0.8, 0.6, [2, 3.8], P);
   base.push(L(ticks.minor, { tone: "lo" }), L(ticks.major, { tone: "mid" }));
-  out.push(M("base", base.join("")));
+  out.push(M("island", base.join("")));
   const kitchen = { x: -300, y: -112, w: 214, d: 174, r: 3 };
   const tiles = [];
   for (let x = kitchen.x + 20; x < kitchen.x + kitchen.w; x += 20) tiles.push(k.lineOnTop([x, kitchen.y], [x, kitchen.y + kitchen.d], 0.6, P));
   for (let y = kitchen.y + 20; y < kitchen.y + kitchen.d; y += 20) tiles.push(k.lineOnTop([kitchen.x, y], [kitchen.x + kitchen.w, y], 0.6, P));
   out.push(M("tile", slab(kitchen, 0, 0.6, { tone: "lo", crease: "none" }, 3, 0) + L(tiles.join(""), { tone: "faint" })));
   const floor = { x: -60, y: -113, w: 362, d: 220, r: 3 };
-  out.push(M("concrete", slab(floor, 0, 0.6, { tone: "lo", crease: "none" }, 3, 0) + L(k.lineOnTop([floor.x, LANE + 2], [floor.x + floor.w, LANE + 2], 0.6, P), { tone: "mid", dashed: true })));
+  out.push(M("floor", slab(floor, 0, 0.6, { tone: "lo", crease: "none" }, 3, 0) + L(k.lineOnTop([floor.x, LANE + 2], [floor.x + floor.w, LANE + 2], 0.6, P), { tone: "mid", dashed: true })));
   const road = { x: 112, y: 44, w: 196, d: 66, r: 2 };
   const edges = k.lineOnTop([road.x, road.y + 4], [road.x + road.w, road.y + 4], 0.8, P) + k.lineOnTop([road.x, road.y + road.d - 4], [road.x + road.w, road.y + road.d - 4], 0.8, P);
   out.push(M("asphalt", slab(road, 0, 0.8, { tone: "lo", crease: "none" }, 3, 0) + `<path class="road-line" d="${k.lineOnTop([road.x, road.y + road.d / 2], [road.x + road.w, road.y + road.d / 2], 0.8, P)}"/>` + L(edges, { tone: "faint" })));
@@ -107,22 +109,22 @@ function backWalls() {
   for (let x = SPLASH.x + 16; x < SPLASH.x + SPLASH.w; x += 16) grid.push(seg([x, WALL_Y, 0], [x, WALL_Y, SPLASH.h]));
   for (let z = 16; z < SPLASH.h; z += 16) grid.push(seg([SPLASH.x, WALL_Y, z], [SPLASH.x + SPLASH.w, WALL_Y, z]));
   out.push(M("splash", slab(SPLASH, 0, SPLASH.h, { tone: "mid" }, 3, 0.8) + L(grid.join(""), { tone: "faint" })));
-  const seams = [];
-  for (let x = WALL.x + 44; x < WALL.x + WALL.w; x += 44) seams.push(seg([x, WALL_Y, 0], [x, WALL_Y, WALL.h]));
-  const label = `<g transform="${face(-38, WALL_Y + 0.1, 122)}">${text("", 0, 0, 7, "wall-label", "start", "VALIO AIMO · WAREHOUSE")}</g>`;
-  out.push(M("navy", slab(WALL, 0, WALL.h, { tone: "mid" }, 3, 0.8) + L(seams.join(""), { tone: "faint" }) + label));
+  const courses = [];
+  for (let z = 7; z < WALL.h; z += 7) courses.push(seg([WALL.x, WALL_Y, z], [WALL.x + WALL.w, WALL_Y, z]));
+  const windows = WINDOWS.map(([x, w]) => `<g transform="${face(x, WALL_Y + 0.1, 126)}"><rect class="win-glow" x="-3" y="-3" width="${w + 6}" height="28" rx="3" filter="url(#glow-back)"/><rect class="win-frame" x="0" y="0" width="${w}" height="22" rx="1.5"/><rect class="win-glass" x="1.6" y="1.6" width="${w - 3.2}" height="18.8" rx="1"/><path class="win-bar" d="M${w / 2} 1.6V20.4M1.6 11H${w - 1.6}"/></g>`).join("");
+  out.push(M("brick", slab(WALL, 0, WALL.h, { tone: "mid" }, 3, 0.8) + L(courses.join(""), { tone: "faint" }) + windows));
   return out.join("");
 }
 
 /** The hotel kitchen in front of its wall: plate shelf, counter with stove, knobs and copper pots. */
 function kitchen() {
   const out = [];
-  const shelf = [slab({ x: -298, y: -113, w: 116, d: 7, r: 1 }, 52, 3, { tone: "mid" }, 3)];
-  for (let i = 0; i < 5; i++) shelf.push(cyl(-288 + i * 22, -110, 7, 55, 1.4, { tone: "hi" }, 24));
-  out.push(M("steel", shelf.join("")));
+  const shelf = [M("sun", slab({ x: -298, y: -113, w: 116, d: 7, r: 1 }, 52, 3, { tone: "mid" }, 3))];
+  for (let i = 0; i < 5; i++) shelf.push(M(["pink", "teal", "sun", "violetLight", "pink"][i], cyl(-288 + i * 22, -110, 7, 55, 1.4, { tone: "hi" }, 24)));
+  out.push(shelf.join(""));
   const counter = { x: -300, y: -112, w: 120, d: 34, r: 2 };
-  out.push(M("cabinet", slab(counter, 0, 32, { tone: "mid" }, 3, 0.6) + L(k.segment([counter.x + 60, counter.y + counter.d, 0], [counter.x + 60, counter.y + counter.d, 32], P), { tone: "lo" }) + dots([[-290, -78, 26], [-282, -78, 26], [-274, -78, 26], [-232, -78, 26], [-224, -78, 26]], { size: 1.3, tone: "hi" })));
-  out.push(M("steel", slab(k.insetPlan(counter, -1.5), 32, 3, { tone: "hi" }, 3, 0.6)));
+  out.push(M("sun", slab(counter, 0, 32, { tone: "mid" }, 3, 0.6) + L(k.segment([counter.x + 60, counter.y + counter.d, 0], [counter.x + 60, counter.y + counter.d, 32], P), { tone: "lo" }) + dots([[-290, -78, 26], [-282, -78, 26], [-274, -78, 26], [-232, -78, 26], [-224, -78, 26]], { size: 1.3, tone: "hi" })));
+  out.push(M("lilac", slab(k.insetPlan(counter, -1.5), 32, 3, { tone: "hi" }, 3, 0.6)));
   for (const [x, r, h] of [[-276, 9, 13], [-250, 7, 9], [-206, 8, 16]]) {
     out.push(M("dark", L(k.ring(x, -95, r + 3, 35, P, 28), { tone: "mid" })));
     out.push(M("copper", cyl(x, -95, r, 35, h, { tone: "hi" }, 28) + L(k.sideArc(x, -95, r, 35 + h - 2.5, P, 20), { tone: "faint" }) + slab({ x: x + r - 1, y: -96.5, w: 7, d: 3, r: 1 }, 35 + h - 4, 2, { tone: "mid" }, 2, 0)));
@@ -135,10 +137,10 @@ function chef() {
   const [x, y] = CHEF;
   const out = [`<path class="iso-halo" d="${k.haloOf({ x: x - 13, y: y - 11, w: 26, d: 22, r: 10 }, 0, 0.1, P)}" style="filter:blur(4px)"/>`];
   out.push(M("dark", slab({ x: x - 9, y: y - 3, w: 7, d: 10, r: 2 }, 0, 3, { tone: "mid" }, 2) + slab({ x: x + 2, y: y - 3, w: 7, d: 10, r: 2 }, 0, 3, { tone: "mid" }, 2) + cyl(x, y, 8, 3, 16, { tone: "mid" }, 28)));
-  out.push(M("white", slab({ x: x - 16, y: y - 4, w: 5, d: 8, r: 2 }, 24, 22, { tone: "hi" }, 2) + slab({ x: x + 11, y: y - 4, w: 5, d: 8, r: 2 }, 24, 22, { tone: "hi" }, 2) + cyl(x, y, 11, 19, 30, { tone: "hi" }, 36)));
-  out.push(M("apron", slab({ x: x - 8, y: y + 9, w: 16, d: 2.4, r: 1 }, 14, 24, { tone: "hi", crease: "lo" }, 2, 0)));
-  out.push(M("white", dots([[x - 3, y + 11.4, 44], [x + 3, y + 11.4, 44], [x - 3, y + 11.4, 39], [x + 3, y + 11.4, 39]], { size: 1.2, tone: "hi" })));
-  out.push(M("red", cyl(x, y, 6.5, 49, 3, { tone: "mid" }, 24)));
+  out.push(M("chef", slab({ x: x - 16, y: y - 4, w: 5, d: 8, r: 2 }, 24, 22, { tone: "hi" }, 2) + slab({ x: x + 11, y: y - 4, w: 5, d: 8, r: 2 }, 24, 22, { tone: "hi" }, 2) + cyl(x, y, 11, 19, 30, { tone: "hi" }, 36)));
+  out.push(M("sun", slab({ x: x - 8, y: y + 9, w: 16, d: 2.4, r: 1 }, 14, 24, { tone: "hi", crease: "lo" }, 2, 0)));
+  out.push(M("chef", dots([[x - 3, y + 11.4, 44], [x + 3, y + 11.4, 44], [x - 3, y + 11.4, 39], [x + 3, y + 11.4, 39]], { size: 1.2, tone: "hi" })));
+  out.push(M("teal", cyl(x, y, 6.5, 49, 3, { tone: "mid" }, 24)));
   const head = at([x, y, 58]);
   out.push(`<circle class="skin" cx="${f1(head[0])}" cy="${f1(head[1])}" r="${f1(8 * KS)}"/>`);
   const eye = (dx) => at([x + dx, y + 7.4, 59]);
@@ -157,7 +159,7 @@ function robot(material) {
   out.push(M(material, slab({ x: -14.5, y: -2.5, w: 4, d: 12, r: 1.5 }, 17, 4, { tone: "mid" }, 2) + slab({ x: 10.5, y: -2.5, w: 4, d: 12, r: 1.5 }, 17, 4, { tone: "mid" }, 2) + slab(body, 8, 26, { tone: "hi" }, 5, 0.8) + L(k.sideSeam(body, 30, P, 5), { tone: "faint" }) + dots([[-6, 9, 26], [-2, 9, 26], [2, 9, 26]], { size: 1, tone: "hi" })));
   out.push(M("dark", cyl(0, 0, 3.2, 34, 3, { tone: "mid" }, 20)));
   const head = { x: -10, y: -8, w: 20, d: 16, r: 4 };
-  out.push(M(material === "teal" ? "white" : material, slab(head, 37, 15, { tone: "hi" }, 5, 0.8)));
+  out.push(M(material === "teal" ? "sun" : material, slab(head, 37, 15, { tone: "hi" }, 5, 0.8)));
   out.push(`<g transform="${face(-7, 8.05, 48)}"><rect class="visor" x="0" y="0" width="14" height="6" rx="2.5"/><circle class="eye-lit" cx="4" cy="3" r="1.3"/><circle class="eye-lit" cx="10" cy="3" r="1.3"/></g>`);
   out.push(M("dark", L(seg([0, 0, 52], [0, 0, 61]), { tone: "mid" })));
   const tip = at([0, 0, 62]);
@@ -185,7 +187,7 @@ function rack(i) {
   const { y, d, w, h } = RACK;
   const out = [];
   const posts = [[x0, y], [x0 + w - 4, y], [x0, y + d - 4], [x0 + w - 4, y + d - 4]];
-  out.push(M("blue", posts.slice(0, 2).map(([px, py]) => slab({ x: px, y: py, w: 4, d: 4, r: 0.6 }, 0, h, { tone: "mid" }, 2, 0)).join("")));
+  out.push(M(`fam${i}`, posts.slice(0, 2).map(([px, py]) => slab({ x: px, y: py, w: 4, d: 4, r: 0.6 }, 0, h, { tone: "mid" }, 2, 0)).join("")));
   [4, 25, 46].forEach((z, level) => {
     out.push(M("orange", slab({ x: x0, y, w, d, r: 1 }, z, 2.4, { tone: "mid" }, 2, 0.4)));
     const crates = [];
@@ -193,9 +195,9 @@ function rack(i) {
       const plan = { x: x0 + 5 + c * 18.5, y: y + 5, w: 15.5, d: 19, r: 1 };
       crates.push(slab(plan, z + 2.4, 14, { tone: "hi" }, 2, 0.5) + L(k.sideSeam(plan, z + 2.4 + 10, P, 2), { tone: "mid" }));
     }
-    out.push(`<g class="crates lv${level}">${M("crate", crates.join(""))}</g>`);
+    out.push(`<g class="crates lv${level}">${M(`crate${i}`, crates.join(""))}</g>`);
   });
-  out.push(M("blue", posts.slice(2).map(([px, py]) => slab({ x: px, y: py, w: 4, d: 4, r: 0.6 }, 0, h + 2, { tone: "mid" }, 2, 0)).join("")));
+  out.push(M(`fam${i}`, posts.slice(2).map(([px, py]) => slab({ x: px, y: py, w: 4, d: 4, r: 0.6 }, 0, h + 2, { tone: "mid" }, 2, 0)).join("")));
   const tag = { x: x0 + 1, y: y + d - 3, w: w - 2, d: 3, r: 0.8 };
   out.push(M("dark", slab(tag, h + 2, 20, { tone: "hi", crease: "lo" }, 2, 0.4)));
   const tw = tag.w - 3;
@@ -215,9 +217,20 @@ function clockBoard() {
   return `${body}<g transform="${face(CLOCK.x, CLOCK.y + CLOCK.d + 0.1, CLOCK.z + CLOCK.h)}"><rect class="screen" x="5" y="2.5" width="${CLOCK.w - 10}" height="${CLOCK.h - 5}" rx="2"/>${icon("clock", 9, 8, 14, "clock-icon")}${text("", 27, 10.5, 4.8, "dim", "start", "VALIO CUT-OFF · SUN 15 NOV 17:00")}${text("countdown", 27, 22.5, 11, "big", "start")}${text("now", 27, 28.3, 4.4, "dim", "start")}</g>`;
 }
 
+/** Valio Aimo's official logo on a light plate fixed to the warehouse wall, facing the viewer so it is only scaled. */
+function logoSign() {
+  const [cx, cy] = at(LOGO.at);
+  const w = LOGO.width;
+  const h = w * LOGO.ratio;
+  const pad = 9;
+  const x = cx - w / 2 - pad;
+  const y = cy - h / 2 - pad;
+  return `<g class="logo-sign"><rect class="logo-shadow" x="${f1(x + 3)}" y="${f1(y + 4)}" width="${f1(w + 2 * pad)}" height="${f1(h + 2 * pad)}" rx="7"/><rect class="logo-plate" x="${f1(x)}" y="${f1(y)}" width="${f1(w + 2 * pad)}" height="${f1(h + 2 * pad)}" rx="7"/><image href="assets/valio-aimo-logo.svg" x="${f1(cx - w / 2)}" y="${f1(cy - h / 2)}" width="${f1(w)}" height="${f1(h)}" preserveAspectRatio="xMidYMid meet"/><circle class="logo-screw" cx="${f1(x + 5)}" cy="${f1(y + 5)}" r="1.6"/><circle class="logo-screw" cx="${f1(x + w + 2 * pad - 5)}" cy="${f1(y + 5)}" r="1.6"/><circle class="logo-screw" cx="${f1(x + 5)}" cy="${f1(y + h + 2 * pad - 5)}" r="1.6"/><circle class="logo-screw" cx="${f1(x + w + 2 * pad - 5)}" cy="${f1(y + h + 2 * pad - 5)}" r="1.6"/></g>`;
+}
+
 /** Border fence along x = GATE_X: panels, caps and brand-coloured posts. */
 function fence(from, to) {
-  const panel = M("steel", slab({ x: GATE_X - 3, y: from, w: 6, d: to - from, r: 0.6 }, 0, 30, { tone: "mid" }, 2, 0.4));
+  const panel = M("lilac", slab({ x: GATE_X - 3, y: from, w: 6, d: to - from, r: 0.6 }, 0, 30, { tone: "mid" }, 2, 0.4));
   const cap = M("violet", slab({ x: GATE_X - 4, y: from, w: 8, d: to - from, r: 1 }, 30, 3, { tone: "mid" }, 2, 0.4));
   const posts = [];
   for (let y = from; y <= to - 6; y += Math.max(20, (to - from - 6) / Math.round((to - from) / 28))) posts.push(slab({ x: GATE_X - 5, y, w: 10, d: 6, r: 1 }, 0, 38, { tone: "mid" }, 2, 0.4) + dots([[GATE_X, y + 3, 38]], { size: 0.9, tone: "hi" }));
@@ -260,7 +273,9 @@ function phone() {
   const table = M("wood", slab({ x: p.x - 8, y: p.y - 12, w: p.w + 16, d: 22, r: 2 }, 0, 26, { tone: "mid" }, 3, 0.6) + slab({ x: p.x - 9, y: p.y - 13, w: p.w + 18, d: 24, r: 2 }, 26, 2.4, { tone: "hi" }, 3, 0.6));
   const dock = M("dark", slab({ x: p.x + 8, y: p.y - 5, w: p.w - 16, d: 9, r: 2 }, 28.4, 3, { tone: "mid" }, 3, 0.4));
   const screen = `<g transform="${face(p.x, p.y + p.d + 0.1, p.z + p.h)}"><rect class="phone-screen" x="3" y="5" width="${p.w - 6}" height="${p.h - 10}" rx="2.5"/><rect class="phone-notch" x="${p.w / 2 - 5}" y="2" width="10" height="1.6" rx=".8"/>${text("", 7, 12.5, 4.2, "dim", "start", "Approvals")}<g class="phone-icon" data-id="phonei"></g>${text("ph1", p.w / 2, 26, 7, "big", "middle")}${text("ph2", p.w / 2, 33.5, 4.2, "mono", "middle")}${text("ph3", p.w / 2, 39.5, 4.2, "mono", "middle")}<g class="ph-buttons"><rect class="btn-ok" x="6" y="45" width="19" height="9" rx="2"/><rect class="btn-no" x="${p.w - 25}" y="45" width="19" height="9" rx="2"/>${text("", 15.5, 51.2, 4, "btn-text", "middle", "Approve")}${text("", p.w - 15.5, 51.2, 4, "btn-text", "middle", "Reject")}</g>${text("ph4", p.w / 2, 59.5, 3.4, "dim", "middle")}</g>`;
-  return table + dock + `<g data-id="phone">${M("dark", slab({ x: p.x, y: p.y, w: p.w, d: p.d, r: 2.5 }, p.z, p.h, { tone: "hi", crease: "lo" }, 4, 0.6))}${screen}</g>`;
+  const [gx, gy] = at([p.x + p.w / 2, p.y + p.d, p.z + p.h / 2]);
+  const glow = `<ellipse class="phone-glow" cx="${f1(gx)}" cy="${f1(gy)}" rx="${f1(p.w * 0.62 * KS)}" ry="${f1(p.h * 0.62 * KS)}" filter="url(#glow)"/>`;
+  return table + dock + `<g data-id="phone">${glow}${M("phone", slab({ x: p.x, y: p.y, w: p.w, d: p.d, r: 2.5 }, p.z, p.h, { tone: "hi", crease: "lo" }, 4, 0.6))}${screen}</g>`;
 }
 
 /** Truck slot of crate i (world centre of its top), shared by the drawing and the fly-in. */
@@ -272,17 +287,17 @@ function truck() {
   const back = [];
   const front = [];
   back.push(M("dark", slab({ x, y, w: 142, d, r: 1.5 }, 8, 6, { tone: "lo" }, 2, 0.4)));
-  back.push(M("steel", slab({ x, y, w: 96, d, r: 1 }, 14, 4, { tone: "mid" }, 2, 0.4)));
-  back.push(M("cavity", slab({ x, y, w: 96, d: 3, r: 0.6 }, 18, 48, { tone: "mid" }, 2, 0.4)));
-  back.push(M("white", slab({ x, y, w: 3, d, r: 0.6 }, 18, 48, { tone: "mid" }, 2, 0.4) + slab({ x: x + 93, y, w: 3, d, r: 0.6 }, 18, 48, { tone: "mid" }, 2, 0.4)));
+  back.push(M("lilac", slab({ x, y, w: 96, d, r: 1 }, 14, 4, { tone: "mid" }, 2, 0.4)));
+  back.push(M("deep", slab({ x, y, w: 96, d: 3, r: 0.6 }, 18, 48, { tone: "mid" }, 2, 0.4)));
+  back.push(M("sun", slab({ x, y, w: 3, d, r: 0.6 }, 18, 48, { tone: "mid" }, 2, 0.4) + slab({ x: x + 93, y, w: 3, d, r: 0.6 }, 18, 48, { tone: "mid" }, 2, 0.4)));
   const crates = [];
   for (let i = 0; i < 8; i++) {
     const cx = x + 6 + (i % 4) * 21.5;
     const z = 18 + Math.floor(i / 4) * 16;
     const plan = { x: cx, y: y + 8, w: 18, d: 22, r: 1 };
-    crates.push(`<g class="tcrate" data-i="${i}" style="opacity:0">${M("crate", slab(plan, z, 15, { tone: "hi" }, 2, 0.5) + L(k.sideSeam(plan, z + 11, P, 2), { tone: "mid" }))}</g>`);
+    crates.push(`<g class="tcrate" data-i="${i}" style="opacity:0">${M("crate2", slab(plan, z, 15, { tone: "hi" }, 2, 0.5) + L(k.sideSeam(plan, z + 11, P, 2), { tone: "mid" }))}</g>`);
   }
-  front.push(M("white", [x, x + 93].map((px) => slab({ x: px, y: y + d - 3, w: 3, d: 3, r: 0.6 }, 18, 48, { tone: "mid" }, 2, 0)).join("") + slab({ x: x - 1, y: y - 1, w: 98, d: d + 2, r: 1.5 }, 66, 4, { tone: "mid" }, 2, 0.6)));
+  front.push(M("sun", [x, x + 93].map((px) => slab({ x: px, y: y + d - 3, w: 3, d: 3, r: 0.6 }, 18, 48, { tone: "mid" }, 2, 0)).join("") + slab({ x: x - 1, y: y - 1, w: 98, d: d + 2, r: 1.5 }, 66, 4, { tone: "mid" }, 2, 0.6)));
   front.push(M("valio", slab({ x: x + 3, y: y + d - 2, w: 90, d: 4, r: 2 }, 61, 5, { tone: "lo" }, 4, 0)));
   const cab = { x: x + 98, y, w: 44, d, r: 4 };
   front.push(M("valio", slab(cab, 14, 44, { tone: "hi" }, 4, 0.8)));
@@ -305,16 +320,10 @@ function asks() {
 const LAMP_FRAGMENT = `
 uniform float uLamp;
 const float WALLY=${WALL_Y.toFixed(1)};
-const float LY=${(WALL_Y + 9).toFixed(1)};
 const float LZ=${(LAMP_Z + 1).toFixed(1)};
-float lampAt(vec3 p,vec3 n,float lx){
-  vec3 l=vec3(lx,LY,LZ);
-  vec3 d=l-p;
-  float r2=dot(d,d)+60.;
-  vec3 dir=normalize(-d);
-  float spot=smoothstep(.2,.8,dot(dir,normalize(vec3(0.,.55,-1.))));
-  return max(dot(normalize(d),n),0.)*spot*5200./r2;
-}
+const float POOLY=${(RACK.y + RACK.d + 12).toFixed(1)};
+float pool(vec3 p,float lx){vec2 q=vec2((p.x-lx)/26.,(p.y-POOLY)/22.);return exp(-dot(q,q));}
+float wash(vec3 p,float lx){float drop=LZ-p.z;float w=7.+max(drop,0.)*.32;return exp(-pow((p.x-lx)/w,2.))*smoothstep(-4.,6.,drop)*exp(-max(drop,0.)/70.);}
 void main(){
   vec2 vb=viewOf(gl_FragCoord.xy);
   float px=pixelOf();
@@ -323,19 +332,19 @@ void main(){
   vec3 pf=onFloor(vb,.6);
   float floorIn=window(pf.x,-60.,302.,.7*px)*window(pf.y,WALLY,107.,.7*px/uCam.z)*(1.-wall);
   float e=0.;
-  ${LAMPS.map((x) => `e+=wall*lampAt(pw,vec3(0.,1.,0.),${x.toFixed(1)})+floorIn*lampAt(pf,vec3(0.,0.,1.),${x.toFixed(1)});`).join("\n  ")}
+  ${LAMPS.map((x) => `e+=wall*wash(pw,${x.toFixed(1)})+floorIn*pool(pf,${x.toFixed(1)});`).join("\n  ")}
   e*=uLamp;
-  float a=.62*(1.-exp(-1.7*e));
-  vec3 warm=mix(vec3(1.,.62,.28),vec3(1.,.9,.7),smoothstep(.4,1.4,e));
-  gl_FragColor=vec4(warm*a,a);
+  float a=.58*(1.-exp(-1.8*e));
+  vec3 gold=mix(vec3(1.,.72,.3),vec3(1.,.93,.66),smoothstep(.5,1.2,e));
+  gl_FragColor=vec4(gold*a,a);
 }`;
 
 /** Sky stops as [top, middle, bottom] colours: day, golden hour, evening, and the red sky after the approval expires. */
 const SKY = {
-  day: [[111, 182, 255], [191, 226, 255], [242, 248, 255]],
-  gold: [[96, 132, 214], [255, 197, 154], [255, 231, 199]],
-  eve: [[43, 42, 110], [224, 96, 126], [255, 178, 122]],
-  red: [[26, 3, 6], [92, 13, 23], [143, 29, 38]],
+  day: [[22, 44, 140], [58, 82, 214], [132, 104, 255]],
+  gold: [[30, 26, 118], [118, 62, 206], [255, 132, 156]],
+  eve: [[20, 10, 66], [118, 28, 160], [255, 102, 64]],
+  red: [[20, 2, 10], [92, 10, 38], [196, 22, 46]],
 };
 const mix3 = (a, b, u) => a.map((c, i) => c.map((v, j) => v + (b[i][j] - v) * u));
 const rgb = (c) => `rgb(${c.map((v) => Math.round(v)).join(",")})`;
@@ -356,17 +365,17 @@ const RAIN = Array.from({ length: 18 }, () => ({ x: (RNG() - 0.5) * 2, phase: RN
 
 /** Builds the scene into host (back SVG, lamp canvas, front SVG) and returns draw(state, t, dt, options). */
 export function buildScene(host) {
-  const back = `<svg class="iso-svg scene-back" viewBox="0 0 ${W} ${H}" role="img" aria-label="Isometric scene: a hotel chef, the buyer agent robot, Lazydoor's gate with its stamp, Valio's warehouse racks, the manager's phone, the cut-off clock and the delivery truck.">${plate()}${backWalls()}</svg>`;
+  const back = `<svg class="iso-svg scene-back" viewBox="0 0 ${W} ${H}" role="img" aria-label="Isometric scene: a hotel chef, the buyer agent robot, Lazydoor's gate with its stamp, Valio's warehouse racks, the manager's phone, the cut-off clock and the delivery truck."><defs><filter id="glow-back" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="5"/></filter></defs>${plate()}${backWalls()}</svg>`;
   const front = `<svg class="iso-svg scene-front" viewBox="0 0 ${W} ${H}" aria-hidden="true">
 <defs><filter id="glow" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="7"/></filter></defs>
-<g>${kitchen()}${clockBoard()}${LAMPS.map(lamp).join("")}${[3, 2, 1, 0].map(rack).join("")}${fence(-120, -28)}${post(-28, true)}</g>
+<g>${kitchen()}${clockBoard()}${logoSign()}${LAMPS.map(lamp).join("")}${[3, 2, 1, 0].map(rack).join("")}${fence(-120, -28)}${post(-28, true)}</g>
 <g data-id="asks" style="opacity:0">${asks()}</g>
 <g data-id="leaf"></g>
 <g>${chef()}</g>
 <g data-id="agent">${robot("teal")}${card()}</g>
 <g data-id="naive-back"></g>
 <g>${post(36, false)}${beam()}</g>
-<g data-id="naive-front"><g data-id="naive" class="naive" style="opacity:0">${robot("grey")}<g class="ncrate" style="opacity:0">${M("crate", slab({ x: -8, y: 8, w: 16, d: 12, r: 1 }, 20, 12, { tone: "mid" }, 2, 0.4))}</g></g></g>
+<g data-id="naive-front"><g data-id="naive" class="naive" style="opacity:0">${robot("grey")}<g class="ncrate" style="opacity:0">${M("crate0", slab({ x: -8, y: 8, w: 16, d: 12, r: 1 }, 20, 12, { tone: "mid" }, 2, 0.4))}</g></g></g>
 <g data-id="load" style="opacity:0"></g>
 <g data-id="trail"></g>
 ${truck()}
@@ -865,7 +874,7 @@ ${truck()}
       "--sun-size": `${(7 + 3 * u).toFixed(2)}cqw`,
       "--sun-hot": rgb([255, 222 - 110 * u, 90 - 40 * u]),
       "--sun-o": (1 - live.red).toFixed(3),
-      "--dusk": (0.2 * u * (1 - live.red) + 0.14 * live.red).toFixed(3),
+      "--dusk": (0.12 * u * (1 - live.red) + 0.1 * live.red).toFixed(3),
       "--dusk-c": rgb(mix3([[70, 40, 130]], [[120, 0, 24]], live.red)[0]),
     };
     for (const [name, value] of Object.entries(vars)) if (stage.style.getPropertyValue(name) !== value) stage.style.setProperty(name, value);
