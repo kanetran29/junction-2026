@@ -48,6 +48,14 @@ describe('GET /approve/:token', () => {
     for (const s of ['QS', 'Requested 200 l, delivered 200 l', 'OVER_ORDER_AUTO', 'Need, as understood', '&quot;deliverBy&quot;', 'Net 600.00 EUR', 'Gross 681.00 EUR', 'not reserved: 250 available now', 'data-cutoff="2026-11-15T17:00:00+02:00"', `action="/approve/${token}"`, `action="/reject/${token}"`]) expect(html).toContain(s);
   });
 
+  it('is write-free: the order stays HELD and no event is logged', async () => {
+    const { token, orderId } = await hold('QS');
+    const before = (await e.DB.prepare('SELECT COUNT(*) AS c FROM events').first<{ c: number }>())!.c;
+    await get(`/approve/${token}`);
+    expect((await e.DB.prepare('SELECT state FROM orders WHERE id = ?').bind(orderId).first<{ state: string }>())!.state).toBe('HELD');
+    expect((await e.DB.prepare('SELECT COUNT(*) AS c FROM events').first<{ c: number }>())!.c).toBe(before);
+  });
+
   it('escapes the agent reason and product names', async () => {
     const { token } = await hold('QS');
     const html = await (await get(`/approve/${token}`)).text();
@@ -114,7 +122,9 @@ describe('GET /approver/:approverKey', () => {
 
   it('an unknown approver key is 404', async () => {
     expect((await get('/approver/nope', 'application/json')).status).toBe(404);
-    expect((await get('/approver/nope')).status).toBe(404);
+    const html = await get('/approver/nope');
+    expect(html.status).toBe(404);
+    expect(html.headers.get('content-type')).toContain('text/html');
   });
 });
 
@@ -127,5 +137,15 @@ describe('GET /receipt/:orderId', () => {
     const text = await res.text();
     for (const s of ['QS', '200 × 1 l', 'Net 600.00 EUR', 'Gross 681.00 EUR', 'Approved by Kitchen manager']) expect(text).toContain(s);
     expect((await get('/receipt/nope')).status).toBe(404);
+  });
+
+  it('says who rejected an order and why an expired one ended', async () => {
+    const a = await hold('QS');
+    await post(`/reject/${a.token}`);
+    expect(await (await get(`/receipt/${a.orderId}`, 'text/plain')).text()).toContain('Rejected by Kitchen manager');
+    const b = await hold('QS');
+    await setClock(e, '2026-11-15T17:05:00+02:00');
+    await post(`/approve/${b.token}`, 'application/json');
+    expect(await (await get(`/receipt/${b.orderId}`, 'text/plain')).text()).toContain('Ended: The approval was not given in time and has expired.');
   });
 });

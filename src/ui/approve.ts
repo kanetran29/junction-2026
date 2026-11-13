@@ -1,15 +1,13 @@
 import { Hono } from 'hono';
 import qrcode from 'qrcode-generator';
-import { getProducts, type CatalogProduct } from '../catalog/search';
+import { getProducts } from '../catalog/search';
 import { now } from '../clock';
 import { REASONS } from '../domain/reasons';
 import type { Env } from '../env';
-import { orderable } from '../offers/orderable';
-import { OrderError, approve, approverInbox, getOrder, reject, type ApproveReply, type OrderView } from '../orders/store';
+import { OrderError, approve, approverInbox, freeStock, getOrder, limitKey, reject, type ApproveReply, type OrderView } from '../orders/store';
 import type { Draft, OfferLine } from '../quote/build';
 import { getQuote } from '../quote/store';
-import { eur, qty, renderReceipt } from '../receipt/render';
-import { ValioError, fetchOffers } from '../valio/client';
+import { eur, lineNet, productName, qty, renderReceipt } from '../receipt/render';
 
 /** Escapes a value for HTML text and double-quoted attributes; every interpolated value goes through it. */
 export function escapeHtml(s: unknown): string {
@@ -50,29 +48,14 @@ async function draftsOf(env: Env, m: Meta): Promise<Draft[]> {
   return quotes.flatMap((q) => (q ? [q.understoodAs] : []));
 }
 
-/** The Valio free stock of each product now: limit less accepted lines, null when unlimited, undefined when unknown. */
-async function freeStock(env: Env, lines: OfferLine[], fetchFn: typeof fetch): Promise<Map<string, number | null | undefined>> {
-  const ids = [...new Set(lines.map((l) => l.productId))];
-  const out = new Map<string, number | null | undefined>();
-  const at = await now(env);
+/** The free stock of each product and day now, from the shared `freeStock` rule; empty when Valio does not answer (the page then says unknown). */
+async function pageStock(env: Env, lines: OfferLine[], fetchFn: typeof fetch): Promise<Map<string, number | null>> {
   try {
-    const offers = await fetchOffers(env, ids, lines.map((l) => l.deliveryDate).sort()[0], fetchFn);
-    const products = new Map((await getProducts(env, ids)).map((p) => [p.id, p]));
-    for (const id of ids) {
-      const line = lines.find((l) => l.productId === id)!;
-      const av = offers.availability.get(id);
-      const ord = av && products.get(id) ? orderable(av, offers.price.get(id), at, line.deliveryDate, products.get(id)!) : null;
-      if (!ord?.ok) out.set(id, 0);
-      else if (ord.limit === null) out.set(id, null);
-      else {
-        const taken = await env.DB.prepare("SELECT COALESCE(SUM(sales_units), 0) AS u FROM order_lines WHERE product_id = ? AND delivery_date = ? AND state = 'ACCEPTED'").bind(id, line.deliveryDate).first<{ u: number }>();
-        out.set(id, Math.max(0, Math.round((ord.limit - taken!.u) * 1000) / 1000));
-      }
-    }
+    return await freeStock(env, lines, await now(env), fetchFn);
   } catch (err) {
-    if (!(err instanceof ValioError)) throw err;
+    if (err instanceof OrderError && err.status === 502) return new Map();
+    throw err;
   }
-  return out;
 }
 
 /** A not-found page. */
@@ -91,15 +74,14 @@ export async function renderApprovePage(env: Env, token: string, fetchFn: typeof
   const { order, decision } = view;
   const drafts = await draftsOf(env, m);
   const live = order.state === 'HELD' && (await now(env)).getTime() < Date.parse(m.expires_at!);
-  const stock = live ? await freeStock(env, order.lines, fetchFn) : new Map<string, number | null | undefined>();
-  const products = new Map((await getProducts(env, order.lines.map((l) => l.productId))).map((p: CatalogProduct) => [p.id, p]));
+  const stock = live ? await pageStock(env, order.lines, fetchFn) : new Map<string, number | null>();
+  const products = await getProducts(env, order.lines.map((l) => l.productId));
 
   const lineHtml = order.lines.map((l) => {
-    const free = stock.get(l.productId);
+    const free = stock.get(limitKey(l));
     const note = !live ? '' : free === undefined ? 'availability unknown right now' : free === null ? 'not stock-limited' : `not reserved: ${qty(free)} available now`;
-    const names = products.get(l.productId)?.names ?? [];
-    const nm = (names.find((n) => n.language === 'en') ?? names[0])?.value ?? '';
-    return `<div class="card"><b>${escapeHtml(l.productId)}</b> ${escapeHtml(nm)}<br>${qty(l.salesUnits)} × ${qty(l.contentPerSalesUnit)} ${escapeHtml(l.contentUnit)} · ${eur(l.netCentsPerSalesUnit * l.salesUnits)} EUR<br><span class="muted">${escapeHtml(note)}</span></div>`;
+    const nm = productName(products, l.productId);
+    return `<div class="card"><b>${escapeHtml(l.productId)}</b> ${escapeHtml(nm)}<br>${qty(l.salesUnits)} × ${qty(l.contentPerSalesUnit)} ${escapeHtml(l.contentUnit)} · ${eur(lineNet(l))} EUR<br><span class="muted">${escapeHtml(note)}</span></div>`;
   }).join('');
   const delivered = order.lines.reduce((s, l) => s + l.salesUnits * l.contentPerSalesUnit, 0);
   const diff = drafts.length === 1 ? `<div class="card">Requested ${qty(drafts[0].quantity.value)} ${escapeHtml(drafts[0].quantity.unit)}, delivered ${qty(Math.round(delivered * 1000) / 1000)} ${escapeHtml(order.lines[0]?.contentUnit ?? '')}</div>` : '';
@@ -136,11 +118,11 @@ function renderInboxHtml(inbox: Awaited<ReturnType<typeof approverInbox>>, origi
 }
 
 /** The result page shown after the Approve or Reject form is posted. */
-function resultPage(r: ApproveReply, reasonText?: string): string {
+function resultPage(r: ApproveReply): string {
   const text = r.state === 'ACCEPTED' ? 'The order is accepted: binding, invoiced on delivery (simulated).' : r.state === 'REJECTED' ? 'The order was rejected.' : 'The order expired and nothing was placed.';
   const why = r.reason && r.reason in REASONS ? `<p>${escapeHtml(REASONS[r.reason as keyof typeof REASONS].text)}</p>` : '';
   const avail = r.available !== undefined ? `<p>${qty(r.available)} available now.</p>` : '';
-  return page('Lazydoor – approval result', `<h1>${escapeHtml(r.state)}</h1><p>${text}</p>${why}${avail}${reasonText ?? ''}`);
+  return page('Lazydoor – approval result', `<h1>${escapeHtml(r.state)}</h1><p>${text}</p>${why}${avail}`);
 }
 
 /**
@@ -175,7 +157,9 @@ export function uiRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }>
     try {
       inbox = await approverInbox(c.env, c.req.param('key'));
     } catch (err) {
-      if (err instanceof OrderError && err.status === 401) return c.json({ error: 'APPROVER_KEY_UNKNOWN', message: 'unknown approver key' }, 404);
+      if (err instanceof OrderError && err.status === 401) {
+        return wantsJson(c.req.header('Accept')) ? c.json({ error: 'APPROVER_KEY_UNKNOWN', message: 'unknown approver key' }, 404) : c.html(notFound('Unknown approver key.').html, 404);
+      }
       throw err;
     }
     const origin = new URL(c.req.url).origin;
@@ -188,7 +172,7 @@ export function uiRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }>
     const view: OrderView | null = m && (await getOrder(c.env, m.buyer_id, c.req.param('orderId')));
     if (!m || !view) return c.json({ error: 'ORDER_NOT_FOUND', message: 'no such order' }, 404);
     const products = await getProducts(c.env, view.order.lines.map((l) => l.productId));
-    const text = renderReceipt(view.order, [], await draftsOf(c.env, m), view.decision, { products, approver: view.approval.approver });
+    const text = renderReceipt(view.order, [], await draftsOf(c.env, m), view.decision, { products, approver: view.approval.approver, reason: view.reason });
     return c.text(text);
   });
 

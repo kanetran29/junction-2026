@@ -166,7 +166,7 @@ const INSERT_LINES = `INSERT INTO order_lines(order_id, buyer_id, product_id, de
   SELECT ?1, ?2, json_extract(j.value, '$.productId'), json_extract(j.value, '$.deliveryDate'), json_extract(j.value, '$.salesUnits'), 'ACCEPTED' FROM json_each(?3) j`;
 
 /** The key of a Valio limit: one per product and delivery day. */
-const limitKey = (l: Pick<OfferLine, 'productId' | 'deliveryDate'>) => `${l.productId}|${l.deliveryDate}`;
+export const limitKey = (l: Pick<OfferLine, 'productId' | 'deliveryDate'>) => `${l.productId}|${l.deliveryDate}`;
 
 /** Sums needed units per product and delivery day, with the limit Valio showed at commit. */
 function toChecks(lines: OfferLine[], limits: Map<string, number | null>): Check[] {
@@ -181,27 +181,22 @@ function toChecks(lines: OfferLine[], limits: Map<string, number | null>): Check
   return [...m.values()];
 }
 
-/**
- * Reads Valio's current availability and price for the lines' products (live or replay), logs the two `valio.called`
- * events, and returns each product's limit (null = unlimited; a product that is no longer orderable counts as 0) and
- * whether every product is still orderable.
- */
-async function readLimits(env: Env, lines: OfferLine[], at: Date, ref: Ref, fetchFn: typeof fetch): Promise<{ limits: Map<string, number | null>; allOrderable: boolean; offers: Offers }> {
-  const ids = [...new Set(lines.map((l) => l.productId))];
-  const date = lines.map((l) => l.deliveryDate).sort()[0];
-  let offers: Offers;
+/** Fetches Valio's availability and price for the lines' products (live or replay); a Valio failure is a 502 UPSTREAM_ERROR. */
+async function fetchLineOffers(env: Env, lines: OfferLine[], fetchFn: typeof fetch): Promise<Offers> {
   try {
-    offers = await fetchOffers(env, ids, date, fetchFn);
+    return await fetchOffers(env, [...new Set(lines.map((l) => l.productId))], lines.map((l) => l.deliveryDate).sort()[0], fetchFn);
   } catch (err) {
     if (err instanceof ValioError) throw new OrderError(502, 'UPSTREAM_ERROR', err.message);
     throw err;
   }
-  for (const endpoint of ['availability', 'price']) await logEvent(env, { ...ref, type: 'valio.called', data: { endpoint, ids: offers.ids, replay: offers.replay } });
-  const products = new Map((await getProducts(env, ids)).map((p) => [p.id, p]));
+}
+
+/** Each line's limit per product and delivery day from Valio's rows (null = unlimited; a product no longer orderable counts as 0) and whether all are orderable. Writes nothing. */
+async function limitsFrom(env: Env, lines: OfferLine[], at: Date, offers: Offers): Promise<{ limits: Map<string, number | null>; allOrderable: boolean }> {
+  const products = new Map((await getProducts(env, [...new Set(lines.map((l) => l.productId))])).map((p) => [p.id, p]));
   const limits = new Map<string, number | null>();
   let allOrderable = true;
-  const seen = new Map(lines.map((l) => [limitKey(l), l]));
-  for (const [k, l] of seen) {
+  for (const [k, l] of new Map(lines.map((l) => [limitKey(l), l]))) {
     const av = offers.availability.get(l.productId);
     const p = products.get(l.productId);
     const ord = av && p ? orderable(av, offers.price.get(l.productId), at, l.deliveryDate, p) : null;
@@ -211,7 +206,35 @@ async function readLimits(env: Env, lines: OfferLine[], at: Date, ref: Ref, fetc
       allOrderable = false;
     }
   }
-  return { limits, allOrderable, offers };
+  return { limits, allOrderable };
+}
+
+/** Reads Valio's limits for the lines, logging the two `valio.called` events (the commit path; see `freeStock` for the write-free read). */
+async function readLimits(env: Env, lines: OfferLine[], at: Date, ref: Ref, fetchFn: typeof fetch): Promise<{ limits: Map<string, number | null>; allOrderable: boolean; offers: Offers }> {
+  const offers = await fetchLineOffers(env, lines, fetchFn);
+  for (const endpoint of ['availability', 'price']) await logEvent(env, { ...ref, type: 'valio.called', data: { endpoint, ids: offers.ids, replay: offers.replay } });
+  return { ...(await limitsFrom(env, lines, at, offers)), offers };
+}
+
+/** Sales units of ACCEPTED ledger lines for a product on a delivery day. */
+async function acceptedUnits(env: Env, productId: string, deliveryDate: string): Promise<number> {
+  const r = await env.DB.prepare("SELECT COALESCE(SUM(sales_units), 0) AS u FROM order_lines WHERE product_id = ? AND delivery_date = ? AND state = 'ACCEPTED'").bind(productId, deliveryDate).first<{ u: number }>();
+  return r!.u;
+}
+
+/**
+ * The free stock now per `limitKey` (product and delivery day): Valio's limit less the ACCEPTED ledger lines, never below 0,
+ * null when unlimited. The rule `approve` enforces, read without events or writes (the approval page uses it). A Valio
+ * failure is an OrderError 502.
+ */
+export async function freeStock(env: Env, lines: OfferLine[], at: Date, fetchFn: typeof fetch = fetch): Promise<Map<string, number | null>> {
+  const { limits } = await limitsFrom(env, lines, at, await fetchLineOffers(env, lines, fetchFn));
+  const out = new Map<string, number | null>();
+  for (const [k, limit] of limits) {
+    const [productId, deliveryDate] = k.split('|');
+    out.set(k, limit === null ? null : Math.max(0, round3(limit - (await acceptedUnits(env, productId, deliveryDate)))));
+  }
+  return out;
 }
 
 /** The checks whose free stock (limit less accepted lines, now) is below what the order needs, with what is left. */
@@ -219,10 +242,7 @@ async function shortChecks(env: Env, checks: Check[]): Promise<{ productId: stri
   const out: { productId: string; needed: number; remaining: number }[] = [];
   for (const c of checks) {
     if (c.limit === null) continue;
-    const taken = await env.DB.prepare("SELECT COALESCE(SUM(sales_units), 0) AS u FROM order_lines WHERE product_id = ? AND delivery_date = ? AND state = 'ACCEPTED'")
-      .bind(c.productId, c.deliveryDate)
-      .first<{ u: number }>();
-    const remaining = c.limit - taken!.u;
+    const remaining = c.limit - (await acceptedUnits(env, c.productId, c.deliveryDate));
     if (remaining < c.needed - EPS) out.push({ productId: c.productId, needed: c.needed, remaining: Math.max(0, round3(remaining)) });
   }
   return out;
