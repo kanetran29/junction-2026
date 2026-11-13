@@ -1,8 +1,10 @@
-# Trusted Trade Gateway Implementation Plan
+# Lazydoor Implementation Plan
+
+*Lazy at the order, strict at the border.*
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A Valio-side gateway (search, quote, mandate-enforced order, phone approval, receipts; HTTP + MCP) and a Gemini purchasing agent that uses it, demonstrable end to end against the Valio mock API and in replay mode.
+**Goal:** Lazydoor, a Valio-side gateway (search, quote, mandate-enforced order, phone approval, receipts; HTTP + MCP) and a Gemini purchasing agent that uses it, demonstrable end to end against the Valio mock API and in replay mode.
 
 **Architecture:** One Cloudflare Worker (Hono router) over D1. Pure domain modules (orderable, conversion, quote, policy, substitution, receipt) are unit-tested; handlers wire them to D1, the Valio client and Gemini. One set of zod schemas generates OpenAPI and the MCP tool definitions. The buyer agent is a separate Node script calling the gateway over MCP or HTTP.
 
@@ -13,7 +15,7 @@
 ## Global Constraints
 
 - No Valio dataset, recorded replies or API key in this repo. `research/fetch_data.sh` downloads the public challenge files into gitignored `.data/valio/data/` and, with `VALIO_API_KEY` set, records replies into `.data/valio/recordings/`; scripts load them into D1. `research/` holds only derived material (acceptance cases, oracle, analysis), approved by Kane. Unit-test fixtures are synthetic (made-up ids `T0001`…, made-up prices) with the real shapes.
-- Valio client: header `X-API-Key` from Worker secret `VALIO_API_KEY`; header `User-Agent: trusted-trade-gateway/0.1`; at most 1,000 ids per call; base URL from var `VALIO_API_BASE`.
+- Valio client: header `X-API-Key` from Worker secret `VALIO_API_KEY`; header `User-Agent: lazydoor/0.1`; at most 1,000 ids per call; base URL from var `VALIO_API_BASE`.
 - Mock facts to encode: `requestedDate` is ignored; unlimited sentinels are `>= 999999`; orderable = schedule line exists AND `closingTime > now` AND amount > 0 AND no `salesBlock` AND line unit understood; timestamps `+0200` normalised to `+02:00`.
 - Money: compute in integer cents; budgets compare **net** amounts; VAT from the price API's `tax.taxRate`.
 - Mandate default (seeded): per order auto 500 €, hard 5,000 €; per delivery day auto 500 €, hard 10,000 € counting accepted + held orders (D1); required claim `FREE_FROM_LACTOSE` only when the draft asks for it; no new allergen; reliability floor 0.9; `reliabilityUnknown: 'allow'` (D4: unknown reliability is a flag on the offer, not an approval reason); approver "Kitchen manager"; `exp`, `aud` (the gateway's URL).
@@ -24,6 +26,7 @@
 - Clock: `now()` reads a D1-stored override when `DEMO_MODE=1`, else real time. Replay mode serves recorded Valio replies from D1 table `valio_replies` and is the default when `now() >= 2026-11-15T15:00:00Z`.
 - No model output reaches policy: policy reads only typed, confirmed fields.
 - Every function/class has a leading doc comment; in-body comments only for non-obvious steps, single line (user CLAUDE.md).
+- Product name **Lazydoor** (package and Worker `lazydoor`, OpenAPI title, MCP server name, page titles); punchline "Lazy at the order, strict at the border." File paths and the repo name stay.
 - UI text in English. Secrets only via `wrangler secret`; deploy with the hackathon account (`source ~/.config/junction2026/cf.env`).
 
 ## Acceptance contract (written first)
@@ -175,7 +178,7 @@ type OrderState = 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED'
 
 ### Task 1: Scaffold, schema, clock
 
-**Files:** Create `package.json`, `wrangler.jsonc` (D1 binding `DB`, vars `VALIO_API_BASE`, `DEMO_MODE`, `GEMINI_MODEL`), `tsconfig.json`, `vitest.config.ts`, `src/index.ts`, `src/env.ts`, `src/clock.ts`, `migrations/0001_init.sql`, `.gitignore` (`.dev.vars`, `node_modules`, `.wrangler`), `README.md` stub. Test: `test/clock.test.ts`.
+**Files:** Create `package.json` (name `lazydoor`), `wrangler.jsonc` (Worker name `lazydoor`; D1 binding `DB`, vars `VALIO_API_BASE`, `DEMO_MODE`, `GEMINI_MODEL`), `tsconfig.json`, `vitest.config.ts`, `src/index.ts`, `src/env.ts`, `src/clock.ts`, `migrations/0001_init.sql`, `.gitignore` (`.dev.vars`, `node_modules`, `.wrangler`), `README.md` stub. Test: `test/clock.test.ts`.
 **Produces:** `now(env): Promise<Date>`, `setClock(env, iso | null): Promise<void>`; tables `products, category_names, valio_replies, drafts, quotes, baskets, orders, order_lines(order_id, product_id, delivery_date, sales_units, state), events, mandates, buyer_keys, api_keys, approver_keys, settings` (clock, replay recording, replay variant).
 - [ ] Scaffold with `pnpm create cloudflare@latest` (Worker, TypeScript), add hono, zod, @hono/zod-openapi, vitest, @cloudflare/vitest-pool-workers.
 - [ ] Test `now returns override in demo mode`: `DEMO_MODE=1`, `setClock('2026-11-15T15:05:00Z')` → `now()` equals it; `setClock(null)` → within 5 s of `Date.now()`; with `DEMO_MODE=0` the override is ignored. Run `pnpm vitest run test/clock.test.ts` → FAIL.
@@ -247,13 +250,13 @@ the substitute and basket products; recorded by `research/scripts/record_replies
 ### Task 10: HTTP API, auth, OpenAPI
 
 **Files:** Create `src/http/routes.ts`, `src/http/auth.ts`; modify `src/index.ts`. Test: `test/http.test.ts`.
-**Produces:** routes `POST /v1/interpret`, `POST /v1/drafts/{id}/confirm`, `POST /v1/search`, `POST /v1/quotes`, `GET /v1/quotes/{id}`, `POST /v1/baskets`, `POST /v1/orders` (`Idempotency-Key`: missing → 400, in flight → 409, same key with another body → 422), `GET /v1/orders/{id}`, `GET /v1/orders/{id}/receipt`, `POST /v1/resolve`, `GET /v1/families`, `GET /v1/rules`, `GET /v1/reason-codes` (with `resolution` and `retryable` per code), `GET /openapi.json`, `GET /health`; admin routes of the contract table (demo mode only); bearer API keys hashed in `api_keys` with role `agent | judge | admin` and `buyerId`; `interpret` rate limit 20/min per key. `resolve` and `families` per spec §10a–10b (Resolve, Families) with zero Valio calls; `/v1/rules` built from `domain/constants.ts`.
+**Produces:** routes `POST /v1/interpret`, `POST /v1/drafts/{id}/confirm`, `POST /v1/search`, `POST /v1/quotes`, `GET /v1/quotes/{id}`, `POST /v1/baskets`, `POST /v1/orders` (`Idempotency-Key`: missing → 400, in flight → 409, same key with another body → 422), `GET /v1/orders/{id}`, `GET /v1/orders/{id}/receipt`, `POST /v1/resolve`, `GET /v1/families`, `GET /v1/rules`, `GET /v1/reason-codes` (with `resolution` and `retryable` per code), `GET /openapi.json` (title `Lazydoor`), `GET /health`; admin routes of the contract table (demo mode only); bearer API keys hashed in `api_keys` with role `agent | judge | admin` and `buyerId`; `interpret` rate limit 20/min per key. `resolve` and `families` per spec §10a–10b (Resolve, Families) with zero Valio calls; `/v1/rules` built from `domain/constants.ts`.
 - [ ] Tests: no key → 401; agent key cannot read another buyer's quote → 404; full happy path over HTTP with fixtures and replay: interpret (stub) → confirm → search → quote → order → HELD → approver inbox → approve → receipt; `/openapi.json` lists every route with schemas; 21st interpret in a minute → 429; idempotency 400 / 422; resolve by sales-unit GTIN, shared name → AMBIGUOUS, brand not carried with `didYouMean`; families ranked by evidence. Run → FAIL, implement, PASS. Commit `feat: HTTP API with OpenAPI and API keys`.
 
 ### Task 11: MCP
 
 **Files:** Create `src/mcp/tools.ts`; modify `src/index.ts`. Test: `test/mcp.test.ts`.
-**Produces:** MCP endpoint `/mcp` (stateless) with 9 tools `interpret_request, confirm_draft, search_products, get_quote, quote_basket, place_order, get_order, resolve_product, list_families` whose input and output schemas come from the same zod schemas (`outputSchema` on every tool; business refusals set `isError`); auth by the same API key.
+**Produces:** MCP endpoint `/mcp` (stateless, server name `lazydoor`) with 9 tools `interpret_request, confirm_draft, search_products, get_quote, quote_basket, place_order, get_order, resolve_product, list_families` whose input and output schemas come from the same zod schemas (`outputSchema` on every tool; business refusals set `isError`); auth by the same API key.
 - [ ] Test with an MCP client: `tools/list` returns 9 tools with input schemas equal to the HTTP request schemas and an `outputSchema` each; `place_order` via MCP returns the same JSON as via HTTP; a REJECT sets `isError`. Run → FAIL, implement (Cloudflare `agents` MCP handler; check docs via `cloudflare:agents-sdk`), PASS. Commit `feat: MCP tools over the gateway`.
 
 ### Task 12: Category tagging (offline)

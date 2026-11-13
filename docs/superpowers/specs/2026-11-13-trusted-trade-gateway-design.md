@@ -1,4 +1,6 @@
-# Trusted Trade Gateway – design
+# Lazydoor – design
+
+*Lazy at the order, strict at the border.*
 
 Junction 2026, Valio Aimo challenge "Trusted Trade Agents". Agreed in conversation with Kane on Fri 13 Nov 2026 (solo build; scope is
 decided on merit, not on hours). Evidence for every data claim: `research/NOTES.md`, `research/ANALYSIS.md`; acceptance cases in
@@ -15,7 +17,7 @@ to a human.
 So the prototype has two equal parts:
 - **Purchasing agent** (buyer side, Gemini): understands the need, searches, compares offers, chooses within its authority, asks a
   human when it must, handles exceptions. This is where *autonomy* is shown.
-- **Trusted trade gateway** (Valio side; decides by published rules, each with a named owner; models translate and tag, and no model
+- **Lazydoor**, the trusted trade gateway (Valio side; called "the gateway" or "the door" below; decides by published rules, each with a named owner; models translate and tag, and no model
   output is a decision): structured lookup, quotes, the mandate and its enforcement, approval, receipts, on open interfaces. This is
   where *controls* and *openness* are shown.
 
