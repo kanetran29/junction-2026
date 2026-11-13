@@ -73,6 +73,17 @@ function eq(got: Json, want: Json): boolean {
 }
 
 /**
+ * Membership for `contains`: array element (deep equal), substring of a string, or key of a plain object
+ * (OpenAPI `paths`); undefined when `got` is none of those, so both `contains` and `not_contains` fail.
+ */
+function has(got: Json, want: Json): boolean | undefined {
+  if (Array.isArray(got)) return got.some((x) => equal(x, want));
+  if (typeof got === 'string') return got.includes(String(want));
+  if (got !== null && typeof got === 'object') return Object.hasOwn(got, String(want));
+  return undefined;
+}
+
+/**
  * Checks one acceptance expectation `[path, op, value]` against a reply and returns the verdict
  * together with the value the path resolved to, so the runner can print what it saw.
  */
@@ -88,10 +99,10 @@ export function match(reply: unknown, [path, op, want]: [string, string, unknown
       ok = !eq(got, want);
       break;
     case 'contains':
-      ok = Array.isArray(got) ? got.some((x) => equal(x, want)) : typeof got === 'string' && got.includes(String(want));
+      ok = has(got, want) === true;
       break;
     case 'not_contains':
-      ok = Array.isArray(got) ? !got.some((x) => equal(x, want)) : typeof got === 'string' && !got.includes(String(want));
+      ok = has(got, want) === false;
       break;
     case '>=':
       ok = num((a, b) => a >= b);

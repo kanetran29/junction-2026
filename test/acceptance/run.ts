@@ -26,6 +26,7 @@ type Handler = (ctx: Ctx, step: Step, buyer: string, given: Json) => Promise<Jso
 const GATEWAY = (process.env.GATEWAY_URL ?? 'http://localhost:8787').replace(/\/$/, '');
 const ADMIN_KEY = process.env.ADMIN_KEY ?? 'dev-admin-key';
 const DIR = process.env.ACCEPTANCE_DIR ?? 'research/acceptance';
+/** Authorization header for a key, or nothing when there is no key. */
 const bearer = (key?: string): Record<string, string> => (key ? { Authorization: `Bearer ${key}` } : {});
 
 /**
@@ -49,13 +50,14 @@ async function http(path: string, { method, key, body, headers }: Req = {}): Pro
   return { ...obj, httpStatus: res.status };
 }
 
+/** Calls the gateway with the admin key (GET, or POST when a body is given). */
 const admin = (path: string, body?: Json) => http(path, { key: ADMIN_KEY, body });
 
-/** Posts to the gateway as a buyer's agent. */
+/** Calls the gateway as a buyer's agent (GET, or POST when a body is given). */
 const agent = (ctx: Ctx, buyer: string, path: string, body?: Json, headers?: Record<string, string>) =>
   http(path, { key: ctx.agentKeys[buyer], body, headers });
 
-/** Quotes the step's draft (or basket need) for a buyer and remembers the quote as the buyer's latest. */
+/** Quotes the step's draft for a buyer and remembers the quote as the buyer's latest. */
 async function quote(ctx: Ctx, step: Step, buyer: string, given: Json): Promise<Json> {
   const input = step.input ?? {};
   let body: Json;
@@ -76,8 +78,25 @@ async function place(ctx: Ctx, buyer: string, offer: number, o: { agentReason?: 
   const headers: Record<string, string> = {};
   if (o.key !== null) headers['Idempotency-Key'] = o.key ?? randomUUID();
   const reply = await agent(ctx, buyer, '/v1/orders', { quoteId: q?.id, offerId: q?.offers?.[offer]?.offerId, agentReason: o.agentReason }, headers);
-  if (reply.orderId) ctx.lastOrderId[buyer] = reply.orderId;
+  await remember(ctx, buyer, reply);
   return reply;
+}
+
+/**
+ * Records a place reply's order id and, when the order is HELD, reads its approval token from the approver
+ * inbox right away (the inbox lists HELD orders regardless of cut-off), so a later clock change cannot hide it.
+ */
+async function remember(ctx: Ctx, buyer: string, reply: Json): Promise<void> {
+  if (!reply.orderId) return;
+  ctx.lastOrderId[buyer] = reply.orderId;
+  if (reply.state === 'HELD') await fetchToken(ctx, buyer, reply.orderId);
+}
+
+/** Reads the approver inbox of a buyer and caches the token of `orderId` if listed. */
+async function fetchToken(ctx: Ctx, buyer: string, orderId: string): Promise<void> {
+  const inbox = await http(`/approver/${ctx.approverKeys[buyer]}`, { headers: { Accept: 'application/json' } });
+  const hit = (inbox.pending ?? []).find((p: Json) => p.orderId === orderId);
+  if (hit) ctx.tokens[orderId] = hit.token;
 }
 
 /** Counts rows of an admin list endpoint (`{ count }`). */
@@ -85,16 +104,12 @@ const adminCount = async (path: string) => (await admin(path)).count;
 
 /**
  * Finds the approval token of a buyer's latest order in the approver inbox (cached so a second `approve`
- * reuses it) and posts the approval, with the agent key when `asAgent` (which must be refused).
+ * reuses it, normally captured when the order was placed) and posts the approval, with the agent key when `asAgent` (which must be refused).
  */
 async function approve(ctx: Ctx, buyer: string, asAgent: boolean): Promise<Json> {
   const orderId = ctx.lastOrderId[buyer];
-  if (!ctx.tokens[orderId]) {
-    const inbox = await http(`/approver/${ctx.approverKeys[buyer]}`, { headers: { Accept: 'application/json' } });
-    const hit = (inbox.pending ?? []).find((p: Json) => p.orderId === orderId);
-    if (!hit) throw new Error(`no pending approval for order ${orderId} in the approver inbox`);
-    ctx.tokens[orderId] = hit.token;
-  }
+  if (!ctx.tokens[orderId]) await fetchToken(ctx, buyer, orderId);
+  if (!ctx.tokens[orderId]) throw new Error(`no pending approval for order ${orderId} in the approver inbox`);
   return http(`/approve/${ctx.tokens[orderId]}`, { method: 'POST', key: asAgent ? ctx.agentKeys[buyer] : undefined });
 }
 
@@ -105,8 +120,8 @@ function rpcResult(text: string): Json {
 }
 
 /** Lists the MCP server's tools over streamable HTTP: initialize, initialized, tools/list. */
-async function mcpTools(ctx: Ctx): Promise<Json> {
-  const base = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' };
+async function mcpTools(ctx: Ctx, buyer: string): Promise<Json> {
+  const base = { ...bearer(ctx.agentKeys[buyer]), 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' };
   const send = async (msg: Json) => {
     const res = await fetch(`${GATEWAY}/mcp`, { method: 'POST', headers: { ...base, ...(ctx.mcpSession ? { 'Mcp-Session-Id': ctx.mcpSession } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', ...msg }) });
     ctx.mcpSession = res.headers.get('mcp-session-id') ?? ctx.mcpSession;
@@ -175,7 +190,7 @@ const handlers: Record<string, Handler> = {
       offers[i] === null ? [] : [{ quoteId: b?.quotes?.[i]?.id, offerId: b?.quotes?.[i]?.offers?.[offers[i]!]?.offerId }],
     );
     const reply = await agent(ctx, buyer, '/v1/orders', { basketId: b?.basketId, selections }, { 'Idempotency-Key': randomUUID() });
-    if (reply.orderId) ctx.lastOrderId[buyer] = reply.orderId;
+    await remember(ctx, buyer, reply);
     return { ...reply, acceptedLinesForBuyer: await adminCount(`/admin/ledger?buyer=${buyer}`) };
   },
   approve: (ctx, _step, buyer) => approve(ctx, buyer, false),
@@ -186,7 +201,7 @@ const handlers: Record<string, Handler> = {
   set_clock: (_ctx, step) => admin('/admin/clock', { clock: step.input.clock }),
   set_replay_variant: (_ctx, step) => admin('/admin/replay', { variant: step.input }),
   http_get: (ctx, step, buyer) => http(step.input.path, { key: ctx.agentKeys[buyer] }),
-  mcp_list_tools: (ctx) => mcpTools(ctx),
+  mcp_list_tools: (ctx, _step, buyer) => mcpTools(ctx, buyer),
 };
 
 /** Resets gateway state for a case from `defaults` plus the case `given`; returns the minted keys. */
@@ -210,11 +225,13 @@ async function runCase(c: Case, defaults: Json): Promise<{ status: 'PASS' | 'FAI
     return { status: 'FAIL', detail: 'gateway unreachable' };
   }
   if (c.steps.some((s) => s.call === 'interpret') && health.models?.gemini === false) return { status: 'BLOCKED_ON_GEMINI' };
+  let at = 'reset';
   try {
     const r = await reset(defaults, c.given ?? {});
     if (!r.agentKeys) return { status: 'FAIL', detail: `reset failed: HTTP ${r.httpStatus}` };
     const ctx: Ctx = { agentKeys: r.agentKeys, approverKeys: r.approverKeys, given: c.given ?? {}, defaultBuyer: defaults.buyer, lastQuote: {}, lastOrderId: {}, basket: {}, tokens: {} };
     for (const [i, step] of c.steps.entries()) {
+      at = `step ${i + 1} ${step.call}`;
       const handler = handlers[step.call];
       if (!handler) return { status: 'FAIL', detail: `step ${i + 1}: unknown step "${step.call}"` };
       for (let n = 0; n < (step.repeat ?? 1); n++) {
@@ -227,7 +244,7 @@ async function runCase(c: Case, defaults: Json): Promise<{ status: 'PASS' | 'FAI
     }
     return { status: 'PASS' };
   } catch (err) {
-    return { status: 'FAIL', detail: String((err as Error).message ?? err) };
+    return { status: 'FAIL', detail: `${at}: ${(err as Error).message ?? err}` };
   }
 }
 
@@ -235,6 +252,11 @@ async function runCase(c: Case, defaults: Json): Promise<{ status: 'PASS' | 'FAI
 async function main(): Promise<void> {
   const spec = JSON.parse(readFileSync(join(DIR, 'cases.json'), 'utf8'));
   const only = process.env.CASES?.split(',').map((s) => s.trim());
+  const unknown = only?.filter((id) => !spec.cases.some((c: Case) => c.id === id));
+  if (unknown?.length) {
+    console.error(`unknown case id in CASES: ${unknown.join(', ')}`);
+    process.exit(1);
+  }
   const cases: Case[] = spec.cases.filter((c: Case) => !only || only.includes(c.id));
   const tally = { PASS: 0, FAIL: 0, BLOCKED_ON_GEMINI: 0 };
   for (const c of cases) {

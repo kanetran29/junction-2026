@@ -7,9 +7,10 @@ const reply = {
   nothing: null,
   draft: { claims: ['FREE_FROM_LACTOSE'], quantity: { value: 1000 } },
   text: 'Total 666.00 EUR',
+  paths: { '/v1/quotes': {}, '/v1/orders': {} },
   rejections: [
     { productId: '1', code: 'CUTOFF_PASSED' },
-    { productId: '2', code: 'SUBTYPE_MISMATCH' },
+    { productId: 2, code: 'SUBTYPE_MISMATCH' },
     { productId: '3', code: 'CUTOFF_PASSED' },
   ],
   offers: [
@@ -17,6 +18,7 @@ const reply = {
     { lines: [{ productId: 'c' }], netCents: 9 },
   ],
 };
+/** Shorthand: does the sample reply satisfy `[path, op, v]`? */
 const ok = (path: string, op: string, v: unknown) => match(reply, [path, op, v]).ok;
 
 describe('match', () => {
@@ -37,6 +39,10 @@ describe('match', () => {
     expect(ok('text', 'contains', '666.00')).toBe(true);
     expect(ok('text', 'not_contains', '999')).toBe(true);
     expect(ok('missing', 'contains', 'x')).toBe(false);
+    expect(ok('paths', 'contains', '/v1/quotes')).toBe(true);
+    expect(ok('paths', 'contains', '/nope')).toBe(false);
+    expect(ok('paths', 'not_contains', '/nope')).toBe(true);
+    expect(ok('paths', 'not_contains', '/v1/orders')).toBe(false);
   });
   it('numeric and regex ops', () => {
     expect(ok('draft.quantity.value', '>=', 1000)).toBe(true);
