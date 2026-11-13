@@ -55,7 +55,7 @@ tasks below must follow:
 - Subtype when the draft names none: the category's default subtype (drinking milk in 10400), so coffee milk, barista, buttermilk and
   portion milk are SUBTYPE_MISMATCH for a plain milk request (AC03, AC06).
 - Rejection precedence (first failing code wins): PRICE_UNAVAILABLE, NOT_ORDERABLE, SALES_BLOCKED, CUTOFF_PASSED, DATE_NOT_MET, then
-  CLAIM_MISSING, BRAND_EXCLUDED, SUBTYPE_MISMATCH, NOT_CONVERTIBLE, STOCK_LIMITED (AC03 counts 20 CUTOFF_PASSED among 35).
+  NEW_ALLERGEN, CLAIM_MISSING, TEMP_CLASS_CHANGED (substitute checks; a new allergen outranks a lost claim, AC17), BRAND_EXCLUDED, SUBTYPE_MISMATCH, NOT_CONVERTIBLE, STOCK_LIMITED (AC03 counts 20 CUTOFF_PASSED among 35).
 - Content per sales unit = catalogPrice / comparisonPrice (unit L or KG), snapped to the name/Synkka value or to one decimal when within
   2 % (4.998 kg → 5 kg); fill = ceil(qty / step) × step with step = real lot size or content; net = half-up(cents per unit × units);
   gross = Σ over tax rates of half-up(net × (1 + rate)); `available` is in the product's sales units, rounded to 3 decimals (AC34: 136.4).

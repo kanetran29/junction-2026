@@ -97,7 +97,8 @@ or tag; the register of decisions is served at `GET /v1/rules`.
    BRAND_EXCLUDED, UPSTREAM_ERROR…). A brand `only` rule is a hard filter; `prefer` only ranks. If no offer covers the quantity, the best
    partial offer is marked SHORTFALL. The quote also carries `summary {candidates, offered, rejected, unaccounted}` (unaccounted is
    always 0) and `understoodAs` (the confirmed draft). Each candidate gets the first failing code in this published precedence:
-   PRICE_UNAVAILABLE, NOT_ORDERABLE, SALES_BLOCKED, CUTOFF_PASSED, DATE_NOT_MET, then CLAIM_MISSING, BRAND_EXCLUDED, SUBTYPE_MISMATCH,
+   PRICE_UNAVAILABLE, NOT_ORDERABLE, SALES_BLOCKED, CUTOFF_PASSED, DATE_NOT_MET, then NEW_ALLERGEN, CLAIM_MISSING, TEMP_CLASS_CHANGED
+   (substitute checks; a new allergen outranks a lost claim, AC17), BRAND_EXCLUDED, SUBTYPE_MISMATCH,
    NOT_CONVERTIBLE, STOCK_LIMITED. Available stock = Valio amount − accepted lines for that product and delivery day (section 7).
    A quote is immutable, reserves nothing, and expires at the earliest of cut-off, price `validTo`, 30 minutes.
 5. **Mandate**: per buyer, versioned, a JWS (EdDSA) signed with the **buyer's** key; the gateway stores the buyer's public key and verifies
