@@ -2,6 +2,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { defaultMandate } from '../src/domain/constants';
 import { generateBuyerKeys, signMandate } from '../src/mandate/jws';
 
+/** Renders a value as a SQL string literal, doubling single quotes. */
+const lit = (v: string): string => `'${v.replaceAll("'", "''")}'`;
+
 const KEYS_DIR = '.data/valio/keys';
 const OUT = '.data/valio/build/mandates.sql';
 
@@ -19,8 +22,8 @@ async function main(): Promise<void> {
     const [h, p, s] = (await signMandate(defaultMandate(buyerId), keys.privateJwk)).split('.');
     const pub = JSON.stringify(keys.publicJwk);
     sql.push(
-      `INSERT OR REPLACE INTO buyer_keys(buyer_id, public_key) VALUES('${buyerId}', '${pub}');`,
-      `INSERT OR REPLACE INTO mandates(buyer_id, payload, signature) VALUES('${buyerId}', '${h}.${p}', '${s}');`,
+      `INSERT OR REPLACE INTO buyer_keys(buyer_id, public_key) VALUES(${lit(buyerId)}, ${lit(pub)});`,
+      `INSERT OR REPLACE INTO mandates(buyer_id, payload, signature) VALUES(${lit(buyerId)}, ${lit(`${h}.${p}`)}, ${lit(s)});`,
     );
     console.log(`${buyerId}: key saved to ${KEYS_DIR}/${buyerId}.private.jwk.json, mandate signed`);
   }

@@ -7,6 +7,7 @@ const NOW = new Date('2026-11-13T21:10:00+02:00');
 const ctx = { now: NOW, aud: MANDATE_AUD };
 const m = defaultMandate('hotel-a');
 
+/** Awaits a promise and returns the `code` of the error it throws, or 'OK' when it resolves. */
 async function code(p: Promise<unknown>): Promise<string> {
   try {
     await p;
@@ -16,8 +17,17 @@ async function code(p: Promise<unknown>): Promise<string> {
   return 'OK';
 }
 
+/** Unpadded base64url of a string, for hand-building token parts. */
 function b64u(s: string): string {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** Signs an arbitrary payload with a valid EdDSA header, to test that shape validation runs after the signature check. */
+async function signRaw(privateJwk: JsonWebKey, payload: unknown): Promise<string> {
+  const key = await crypto.subtle.importKey('jwk', privateJwk, { name: 'Ed25519' }, false, ['sign']);
+  const input = `${b64u(JSON.stringify({ alg: 'EdDSA', kid: 'hotel-a' }))}.${b64u(JSON.stringify(payload))}`;
+  const sig = new Uint8Array(await crypto.subtle.sign('Ed25519', key, new TextEncoder().encode(input)));
+  return `${input}.${btoa(String.fromCharCode(...sig)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
 }
 
 describe('mandate jws', () => {
@@ -68,15 +78,40 @@ describe('mandate jws', () => {
     expect(await code(verifyMandate(jws, k.publicJwk, { ...ctx, buyerId: 'hotel-b' }))).toBe('MANDATE_INVALID');
   });
 
-  it('rejects alg none and any non-EdDSA alg, even with a valid signature', async () => {
+  it('rejects alg none and any non-EdDSA alg even when signed with the real key', async () => {
     const k = await generateBuyerKeys();
-    const [, p, s] = (await signMandate(m, k.privateJwk)).split('.');
+    const key = await crypto.subtle.importKey('jwk', k.privateJwk, { name: 'Ed25519' }, false, ['sign']);
+    const [, p] = (await signMandate(m, k.privateJwk)).split('.');
     for (const alg of ['none', 'HS256', 'ES256']) {
       const h = b64u(JSON.stringify({ alg, kid: 'hotel-a' }));
-      expect(await code(verifyMandate(`${h}.${p}.${s}`, k.publicJwk, ctx))).toBe('MANDATE_INVALID');
+      const sig = new Uint8Array(await crypto.subtle.sign('Ed25519', key, new TextEncoder().encode(`${h}.${p}`)));
+      const s = btoa(String.fromCharCode(...sig)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const token = `${h}.${p}.${s}`;
+      expect(await code(verifyMandate(token, k.publicJwk, ctx))).toBe('MANDATE_INVALID');
+      // same token with the header swapped to EdDSA must fail the signature, proving the alg check is what rejected it
+      expect(await verifyMandate(`${b64u(JSON.stringify({ alg: 'EdDSA', kid: 'hotel-a' }))}.${p}.${s}`, k.publicJwk, ctx).catch((e) => e.code)).toBe('MANDATE_INVALID');
     }
-    const h = b64u(JSON.stringify({ alg: 'none' }));
-    expect(await code(verifyMandate(`${h}.${p}.`, k.publicJwk, ctx))).toBe('MANDATE_INVALID');
+  });
+
+  it('rejects non-canonical base64url and bad payload shapes even when signed', async () => {
+    const k = await generateBuyerKeys();
+    const [h, p, s] = (await signMandate(m, k.privateJwk)).split('.');
+    expect(await code(verifyMandate(`${h}.${p}.${s}A`, k.publicJwk, ctx))).toBe('MANDATE_INVALID');
+    const bad: unknown[] = [
+      null,
+      { ...m, perOrder: { autoCents: 10, hardCents: 5 } },
+      { ...m, perDay: { autoCents: -1, hardCents: 5 } },
+      { ...m, perOrder: { autoCents: 1.5, hardCents: 5 } },
+      { ...m, reliabilityFloor: 2 },
+      { ...m, reliabilityUnknown: 'maybe' },
+      { ...m, approver: { name: '' } },
+      { ...m, exp: 'not a date' },
+      { ...m, version: 0 },
+    ];
+    for (const payload of bad) {
+      const jws = await signRaw(k.privateJwk, payload);
+      expect(await code(verifyMandate(jws, k.publicJwk, ctx))).toBe('MANDATE_INVALID');
+    }
   });
 
   it('rejects malformed tokens', async () => {
@@ -108,6 +143,34 @@ describe('mandate store', () => {
     const v1 = await signMandate({ ...m, version: 1 }, k.privateJwk);
     expect(await code(saveMandate(env, 'hotel-a', v1, k.publicJwk))).toBe('MANDATE_INVALID');
     expect((await loadMandate(env, 'hotel-a', ctx)).version).toBe(2);
+  });
+
+  it('saving a wrong-aud mandate is refused', async () => {
+    const k = await generateBuyerKeys();
+    const jws = await signMandate({ ...m, aud: 'someone-else' }, k.privateJwk);
+    expect(await code(saveMandate(env, 'hotel-a', jws, k.publicJwk))).toBe('MANDATE_INVALID');
+    expect(await code(loadMandate(env, 'hotel-a', ctx))).toBe('MANDATE_INVALID');
+  });
+
+  it('an unparseable stored row makes the save fail, not pass', async () => {
+    const k = await generateBuyerKeys();
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO buyer_keys(buyer_id, public_key) VALUES('hotel-a', '{}')"),
+      env.DB.prepare("INSERT INTO mandates(buyer_id, payload, signature) VALUES('hotel-a', 'x.y', 'z')"),
+    ]);
+    expect(await code(saveMandate(env, 'hotel-a', await signMandate(m, k.privateJwk), k.publicJwk))).toBe('MANDATE_INVALID');
+  });
+
+  it('an unparseable stored public key loads as MANDATE_INVALID', async () => {
+    await seedMandate(env, 'hotel-a');
+    await env.DB.prepare("UPDATE buyer_keys SET public_key = 'not json' WHERE buyer_id = 'hotel-a'").run();
+    expect(await code(loadMandate(env, 'hotel-a', ctx))).toBe('MANDATE_INVALID');
+  });
+
+  it('seedMandate keeps hardCents when only autoCents is overridden', async () => {
+    await seedMandate(env, 'hotel-a', { perOrder: { autoCents: 1000 } });
+    const loaded = await loadMandate(env, 'hotel-a', ctx);
+    expect(loaded.perOrder).toEqual({ autoCents: 1000, hardCents: 500000 });
   });
 
   it('seedMandate with tamper stores a mandate that fails verification', async () => {
