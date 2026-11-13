@@ -7,7 +7,7 @@ const OUTCOMES = new Set(["AUTO", "NEEDS_APPROVAL", "REJECT"]);
 const CROSSING = new Set(["NEW_ALLERGEN", "SUBTYPE_MISMATCH", "CLAIM_MISSING", "TEMP_CLASS_CHANGED", "UNIT_MISMATCH", "BRAND_EXCLUDED"]);
 
 /** Empty shelf slot; productId null means nothing is shown on its tag. */
-const emptyShelf = () => ({ productId: null, status: "idle", remaining: null, code: null, more: 0 });
+const emptyShelf = () => ({ productId: null, status: "idle", remaining: null, code: null, more: 0, since: 0 });
 
 /** The scene before any event: agent docked by the chef, door idle, truck parked. */
 export function initialState() {
@@ -67,9 +67,9 @@ export function summary(ev) {
 }
 
 /** Puts product rows on the shelf slots in order; the last slot counts any overflow in `more`. */
-function shelvesFor(rows) {
+function shelvesFor(rows, t = 0) {
   const shelves = Array.from({ length: SHELVES }, emptyShelf);
-  rows.slice(0, SHELVES).forEach((row, i) => Object.assign(shelves[i], row));
+  rows.slice(0, SHELVES).forEach((row, i) => Object.assign(shelves[i], row, { since: t }));
   if (rows.length > SHELVES) shelves[SHELVES - 1].more = rows.length - SHELVES;
   return shelves;
 }
@@ -115,7 +115,7 @@ export function reduce(state, ev, t) {
       s.quote = { offers, rejections };
       const rows = rejections.filter((r) => r?.productId).map((r) => ({ productId: String(r.productId), status: shelfStatus(r.code), remaining: r.remaining ?? r.limit ?? null, code: r.code ?? null }));
       for (const line of offers[0]?.lines ?? []) if (line?.productId && !rows.some((r) => r.productId === String(line.productId))) rows.push({ productId: String(line.productId), status: "ok", remaining: null, code: null });
-      s.shelves = shelvesFor(rows);
+      s.shelves = shelvesFor(rows, t);
       s.door = { ...s.door, scan: false, since: t };
       s.agent.carry = "quote";
       break;
@@ -148,7 +148,7 @@ export function reduce(state, ev, t) {
     case "stock.denied": {
       const id = String(d.productId ?? "");
       let shelf = s.shelves.find((x) => x.productId === id) ?? s.shelves.find((x) => !x.productId) ?? s.shelves[SHELVES - 1];
-      Object.assign(shelf, { productId: id, status: "limited", remaining: d.remaining ?? null, code: "STOCK_LIMITED" });
+      Object.assign(shelf, { productId: id, status: "limited", remaining: d.remaining ?? null, code: "STOCK_LIMITED", since: t });
       break;
     }
     case "clock.set":

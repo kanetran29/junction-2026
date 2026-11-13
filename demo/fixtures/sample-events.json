@@ -158,6 +158,15 @@
  },
  {
   "seq": 11,
+  "ts": "2026-11-14T08:16:09.800Z",
+  "type": "clock.set",
+  "buyerId": "hotel-aurora",
+  "data": {
+   "now": "2026-11-14T16:40:00+02:00"
+  }
+ },
+ {
+  "seq": 12,
   "ts": "2026-11-14T08:16:11.000Z",
   "type": "draft.created",
   "buyerId": "hotel-aurora",
@@ -176,7 +185,7 @@
   "draftId": "drf_2"
  },
  {
-  "seq": 12,
+  "seq": 13,
   "ts": "2026-11-14T08:16:12.500Z",
   "type": "draft.confirmed",
   "buyerId": "hotel-aurora",
@@ -184,7 +193,7 @@
   "draftId": "drf_2"
  },
  {
-  "seq": 13,
+  "seq": 14,
   "ts": "2026-11-14T08:16:14.000Z",
   "type": "quote.created",
   "buyerId": "hotel-aurora",
@@ -208,7 +217,7 @@
   "quoteId": "qte_2"
  },
  {
-  "seq": 14,
+  "seq": 15,
   "ts": "2026-11-14T08:16:14.800Z",
   "type": "policy.decided",
   "buyerId": "hotel-aurora",
@@ -220,7 +229,7 @@
   "quoteId": "qte_2"
  },
  {
-  "seq": 15,
+  "seq": 16,
   "ts": "2026-11-14T08:16:15.600Z",
   "type": "order.accepted",
   "buyerId": "hotel-aurora",
@@ -238,7 +247,7 @@
   "orderId": "ord_2"
  },
  {
-  "seq": 16,
+  "seq": 17,
   "ts": "2026-11-14T08:16:18.500Z",
   "type": "draft.created",
   "buyerId": "hotel-aurora",
@@ -257,7 +266,7 @@
   "draftId": "drf_3"
  },
  {
-  "seq": 17,
+  "seq": 18,
   "ts": "2026-11-14T08:16:19.600Z",
   "type": "draft.confirmed",
   "buyerId": "hotel-aurora",
@@ -265,7 +274,7 @@
   "draftId": "drf_3"
  },
  {
-  "seq": 18,
+  "seq": 19,
   "ts": "2026-11-14T08:16:20.800Z",
   "type": "quote.created",
   "buyerId": "hotel-aurora",
@@ -289,7 +298,7 @@
   "quoteId": "qte_3"
  },
  {
-  "seq": 19,
+  "seq": 20,
   "ts": "2026-11-14T08:16:21.600Z",
   "type": "policy.decided",
   "buyerId": "hotel-aurora",
@@ -305,7 +314,7 @@
   "quoteId": "qte_3"
  },
  {
-  "seq": 20,
+  "seq": 21,
   "ts": "2026-11-14T08:16:23.000Z",
   "type": "approval.requested",
   "buyerId": "hotel-aurora",
@@ -318,7 +327,16 @@
   "orderId": "ord_3"
  },
  {
-  "seq": 21,
+  "seq": 22,
+  "ts": "2026-11-14T08:16:25.800Z",
+  "type": "clock.set",
+  "buyerId": "hotel-aurora",
+  "data": {
+   "now": "2026-11-15T11:20:00+02:00"
+  }
+ },
+ {
+  "seq": 23,
   "ts": "2026-11-14T08:16:26.400Z",
   "type": "draft.created",
   "buyerId": "hotel-aurora",
@@ -337,7 +355,7 @@
   "draftId": "drf_4"
  },
  {
-  "seq": 22,
+  "seq": 24,
   "ts": "2026-11-14T08:16:27.600Z",
   "type": "draft.confirmed",
   "buyerId": "hotel-aurora",
@@ -345,7 +363,7 @@
   "draftId": "drf_4"
  },
  {
-  "seq": 23,
+  "seq": 25,
   "ts": "2026-11-14T08:16:28.800Z",
   "type": "quote.created",
   "buyerId": "hotel-aurora",
@@ -369,7 +387,7 @@
   "quoteId": "qte_4"
  },
  {
-  "seq": 24,
+  "seq": 26,
   "ts": "2026-11-14T08:16:29.600Z",
   "type": "policy.decided",
   "buyerId": "hotel-aurora",
@@ -385,7 +403,16 @@
   "quoteId": "qte_4"
  },
  {
-  "seq": 25,
+  "seq": 27,
+  "ts": "2026-11-14T08:16:33.300Z",
+  "type": "clock.set",
+  "buyerId": "hotel-aurora",
+  "data": {
+   "now": "2026-11-15T15:50:00+02:00"
+  }
+ },
+ {
+  "seq": 28,
   "ts": "2026-11-14T08:16:33.800Z",
   "type": "draft.created",
   "buyerId": "hotel-aurora",
@@ -404,7 +431,7 @@
   "draftId": "drf_5"
  },
  {
-  "seq": 26,
+  "seq": 29,
   "ts": "2026-11-14T08:16:35.000Z",
   "type": "draft.confirmed",
   "buyerId": "hotel-aurora",
@@ -412,7 +439,7 @@
   "draftId": "drf_5"
  },
  {
-  "seq": 27,
+  "seq": 30,
   "ts": "2026-11-14T08:16:36.200Z",
   "type": "quote.created",
   "buyerId": "hotel-aurora",
@@ -429,7 +456,7 @@
   "quoteId": "qte_5"
  },
  {
-  "seq": 28,
+  "seq": 31,
   "ts": "2026-11-14T08:16:37.000Z",
   "type": "policy.decided",
   "buyerId": "hotel-aurora",
@@ -445,7 +472,7 @@
   "quoteId": "qte_5"
  },
  {
-  "seq": 29,
+  "seq": 32,
   "ts": "2026-11-14T08:16:41.000Z",
   "type": "clock.set",
   "buyerId": "hotel-aurora",
@@ -454,7 +481,7 @@
   }
  },
  {
-  "seq": 30,
+  "seq": 33,
   "ts": "2026-11-14T08:16:42.500Z",
   "type": "approval.expired",
   "buyerId": "hotel-aurora",

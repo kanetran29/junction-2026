@@ -141,3 +141,10 @@ test("reduce: an outcome outside the schema is ignored", () => {
   const s = run([{ seq: 900, type: "policy.decided", data: { outcome: '"><img src=x onerror=alert(1)>', reasons: [] } }]);
   assert.equal(s.door.stamp, null);
 });
+
+test("reduce: shelves remember when their status was set", () => {
+  const s = reduce(initialState(), { seq: 1, type: "quote.created", data: QUOTE }, 12.5);
+  assert.ok(s.shelves.filter((x) => x.productId).every((x) => x.since === 12.5));
+  const d = reduce(s, { seq: 2, type: "stock.denied", data: { productId: "469363", remaining: 3 } }, 20);
+  assert.equal(d.shelves.find((x) => x.productId === "469363").since, 20);
+});

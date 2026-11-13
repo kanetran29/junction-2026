@@ -77,14 +77,14 @@ let last = performance.now();
 function render(dt) {
   if (mode === "story") {
     advance(dt);
-    scene.draw(story.state, story.t, dt, story.snap || still.matches);
+    scene.draw(story.state, story.t, dt, { snap: story.snap, calm: still.matches });
     story.snap = false;
     overlays(story.state);
     const scrub = $("scrub");
     if (document.activeElement !== scrub) scrub.value = story.t.toFixed(1);
     $("time").textContent = `${clock(story.t)} / ${clock(DURATION)}`;
   } else {
-    scene.draw(live.state, performance.now() / 1000 - live.t0, dt, still.matches);
+    scene.draw(live.state, performance.now() / 1000 - live.t0, dt, { calm: still.matches });
     overlays(live.state);
   }
 }
