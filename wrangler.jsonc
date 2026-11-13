@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lazydoor",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lazydoor",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "VALIO_API_BASE": "https://junction26.valioaimo.fi",
+    "DEMO_MODE": "1",
+    "GEMINI_MODEL": "gemini-3.5-flash"
+  }
+}
