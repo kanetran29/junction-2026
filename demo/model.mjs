@@ -6,7 +6,7 @@ const LOG_KEEP = 9;
 const CROSSING = new Set(["NEW_ALLERGEN", "SUBTYPE_MISMATCH", "CLAIM_MISSING", "TEMP_CLASS_CHANGED", "UNIT_MISMATCH", "BRAND_EXCLUDED"]);
 
 /** Empty shelf slot; productId null means nothing is shown on its tag. */
-const emptyShelf = () => ({ productId: null, status: "idle", remaining: null, more: 0 });
+const emptyShelf = () => ({ productId: null, status: "idle", remaining: null, code: null, more: 0 });
 
 /** The scene before any event: agent docked by the chef, door idle, truck parked. */
 export function initialState() {
@@ -19,6 +19,7 @@ export function initialState() {
     say: null,
     draft: null,
     quote: null,
+    receipt: null,
     agent: { at: "home", carry: null, since: 0 },
     door: { scan: false, stamp: null, reasons: [], since: 0 },
     shelves: Array.from({ length: SHELVES }, emptyShelf),
@@ -111,8 +112,8 @@ export function reduce(state, ev, t) {
       const offers = Array.isArray(d.offers) ? d.offers : [];
       const rejections = Array.isArray(d.rejections) ? d.rejections : [];
       s.quote = { offers, rejections };
-      const rows = rejections.filter((r) => r?.productId).map((r) => ({ productId: String(r.productId), status: shelfStatus(r.code), remaining: r.remaining ?? r.limit ?? null }));
-      for (const line of offers[0]?.lines ?? []) if (line?.productId && !rows.some((r) => r.productId === String(line.productId))) rows.push({ productId: String(line.productId), status: "ok", remaining: null });
+      const rows = rejections.filter((r) => r?.productId).map((r) => ({ productId: String(r.productId), status: shelfStatus(r.code), remaining: r.remaining ?? r.limit ?? null, code: r.code ?? null }));
+      for (const line of offers[0]?.lines ?? []) if (line?.productId && !rows.some((r) => r.productId === String(line.productId))) rows.push({ productId: String(line.productId), status: "ok", remaining: null, code: null });
       s.shelves = shelvesFor(rows);
       s.door = { ...s.door, scan: false, since: t };
       s.agent.carry = "quote";
@@ -139,13 +140,14 @@ export function reduce(state, ev, t) {
     case "order.accepted": {
       const units = (Array.isArray(d.lines) ? d.lines : []).reduce((sum, l) => sum + (Number(l?.salesUnits) || 0), 0);
       s.truck = { status: "loading", crates: Math.min(8, Math.max(1, Math.ceil(units / 125))), naive: false, since: t };
+      s.receipt = { orderId: ev.orderId ?? d.orderId ?? null, netCents: Number.isFinite(d.netCents) ? d.netCents : null };
       goAgent("truck", "receipt");
       break;
     }
     case "stock.denied": {
       const id = String(d.productId ?? "");
       let shelf = s.shelves.find((x) => x.productId === id) ?? s.shelves.find((x) => !x.productId) ?? s.shelves[SHELVES - 1];
-      Object.assign(shelf, { productId: id, status: "limited", remaining: d.remaining ?? null });
+      Object.assign(shelf, { productId: id, status: "limited", remaining: d.remaining ?? null, code: "STOCK_LIMITED" });
       break;
     }
     case "clock.set":

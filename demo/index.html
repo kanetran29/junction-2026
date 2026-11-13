@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lazydoor demo</title>
+<link rel="stylesheet" href="kit/iso.css">
+<link rel="stylesheet" href="demo.css">
+</head>
+<body class="iso" data-theme="light">
+<main class="page">
+  <header class="bar">
+    <div class="brand"><b>Lazydoor</b><span>a door where every decision is a published rule</span></div>
+    <div class="modes" role="group" aria-label="Mode">
+      <button type="button" data-mode="story" aria-pressed="true">Story</button>
+      <button type="button" data-mode="live" aria-pressed="false">Live</button>
+    </div>
+    <div class="right">
+      <span id="chip" class="chip" hidden></span>
+      <button type="button" id="theme" aria-label="Switch theme">Theme</button>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-live="polite">
+    <div id="scene"></div>
+    <div class="corner tl">Fig 1 · Lazydoor · Valio Aimo</div>
+    <div class="corner tr"><span id="replay" class="badge" hidden>Replay</span><span id="mode-tag">Story</span></div>
+    <ol id="ticker" class="ticker" aria-label="Gateway events"></ol>
+    <div id="caption" class="caption"></div>
+    <div id="endcard" class="endcard" hidden>
+      <div class="plugs">
+        <div class="plug"><svg viewBox="0 0 60 44" aria-hidden="true"><path d="M8 14h44v22a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4z"/><path class="prong" d="M20 2h5v12h-5zM35 2h5v12h-5z"/></svg>OpenAPI</div>
+        <div class="plug"><svg viewBox="0 0 60 44" aria-hidden="true"><path d="M8 14h44v22a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4z"/><path class="prong" d="M20 2h5v12h-5zM35 2h5v12h-5z"/></svg>MCP</div>
+      </div>
+      <div class="line" id="endline">Lazy at the order, strict at the border.</div>
+      <div class="sub">No model output decides. Every stamp is a rule with a reason code.</div>
+    </div>
+  </section>
+
+  <section id="story-controls" class="controls" aria-label="Story controls">
+    <button type="button" id="play">Play</button>
+    <button type="button" id="restart">Restart</button>
+    <input type="range" id="scrub" min="0" max="120" step="0.1" value="0" aria-label="Story time">
+    <span class="time" id="time">0:00 / 2:00</span>
+  </section>
+
+  <section id="live-controls" class="controls live-panel" aria-label="Live controls" hidden>
+    <form id="connect">
+      <label>Gateway URL or recorded .json<input type="text" id="gw" spellcheck="false" placeholder="https://… or fixtures/sample-events.json"></label>
+      <label>API key<input type="password" id="key" autocomplete="off"></label>
+      <label>Buyer<input type="text" id="buyer" spellcheck="false" value="hotel-aurora"></label>
+      <button type="submit" id="connect-btn">Connect</button>
+      <button type="button" id="sample">Play recorded file</button>
+    </form>
+    <form id="ask">
+      <input type="text" id="ask-text" placeholder="Type a request, e.g. 1,000 l lactose-free milk by Monday" aria-label="Request to the gateway">
+      <button type="submit">Send to gateway</button>
+    </form>
+    <p id="ask-status" class="ask-status"></p>
+    <p class="hint">The page acts as a minimal buyer agent: interpret, confirm, quote, order offer 0. The gateway decides; its events animate the scene.</p>
+  </section>
+</main>
+<script type="module" src="main.mjs"></script>
+</body>
+</html>
