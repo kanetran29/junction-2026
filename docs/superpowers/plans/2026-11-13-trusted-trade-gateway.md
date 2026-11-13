@@ -8,11 +8,11 @@
 
 **Tech Stack:** TypeScript (strict), pnpm, Cloudflare Workers + D1 (wrangler), Hono + `@hono/zod-openapi`, zod, vitest + `@cloudflare/vitest-pool-workers`, Web Crypto Ed25519 (JWS compact, EdDSA), Cloudflare `agents` package MCP handler (check current API with the `cloudflare:agents-sdk` skill), Gemini API (`GEMINI_MODEL`, default `gemini-3.5-flash`).
 
-**Spec:** `docs/superpowers/specs/2026-11-13-trusted-trade-gateway-design.md`. Evidence: `~/junction26-valio/NOTES.md`, `~/junction26-valio/ANALYSIS.md` (local only).
+**Spec:** `docs/superpowers/specs/2026-11-13-trusted-trade-gateway-design.md`. Evidence: `research/NOTES.md`, `research/ANALYSIS.md` (local only).
 
 ## Global Constraints
 
-- No Valio data in this repo: no product data, no recorded replies, no API key. Test fixtures are synthetic (made-up ids `T0001`…, made-up prices) with the real shapes. Real data and recordings live in `~/junction26-valio/` and reach D1 through scripts.
+- No Valio dataset, recorded replies or API key in this repo. `research/fetch_data.sh` downloads the public challenge files into gitignored `.data/valio/data/` and, with `VALIO_API_KEY` set, records replies into `.data/valio/recordings/`; scripts load them into D1. `research/` holds only derived material (acceptance cases, oracle, analysis), approved by Kane. Unit-test fixtures are synthetic (made-up ids `T0001`…, made-up prices) with the real shapes.
 - Valio client: header `X-API-Key` from Worker secret `VALIO_API_KEY`; header `User-Agent: trusted-trade-gateway/0.1`; at most 1,000 ids per call; base URL from var `VALIO_API_BASE`.
 - Mock facts to encode: `requestedDate` is ignored; unlimited sentinels are `>= 999999`; orderable = schedule line exists AND `closingTime > now` AND amount > 0 AND no `salesBlock` AND line unit understood; timestamps `+0200` normalised to `+02:00`.
 - Money: compute in integer cents; budgets compare **net** amounts; VAT from the price API's `tax.taxRate`.
@@ -25,9 +25,9 @@
 
 ## Acceptance contract (written first)
 
-28 black-box cases live in `~/junction26-valio/acceptance/cases.json` (local only: they contain Valio data). Expected values were
-computed by an independent Python oracle (`~/junction26-valio/scripts/acceptance/oracle.py`) from replies recorded on Fri 13 Nov 21:08
-(`~/junction26-valio/recordings/replies_2026-11-16.json`). The work is done when every case passes against `wrangler dev` and against
+28 black-box cases live in `research/acceptance/cases.json`. Expected values were
+computed by an independent Python oracle (`research/scripts/acceptance/oracle.py`) from replies recorded on Fri 13 Nov 21:08
+(`.data/valio/recordings/replies_2026-11-16.json`). The work is done when every case passes against `wrangler dev` and against
 the deployed Worker. Rules the cases pin that the tasks below must follow:
 - Offers are ranked by **net total for the requested quantity**, then cents per litre/kg, then reliability (AC09: 472673, 150 kg in 2 kg
   lots, 1,155.00 € beats 462281, 154 kg, 1,185.80 €).
@@ -78,7 +78,7 @@ src/
   mcp/tools.ts             MCP tools over the same handlers
   ui/approve.ts            phone approval page + receipt page (server-rendered HTML)
 migrations/0001_init.sql   D1 schema
-scripts/build-index.ts     product_data.json + CSVs → SQL (writes to ~/junction26-valio/build/)
+scripts/build-index.ts     product_data.json + CSVs → SQL (writes to .data/valio/build/)
 scripts/tag-categories.ts  Gemini category names/subtypes → SQL (reviewed before load)
 scripts/mandate-sign.ts    buyer key pair + signed mandate → SQL
 scripts/record-replies.ts  record live Valio replies for demo product sets → SQL
@@ -117,7 +117,7 @@ type OrderState = 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED'
 
 ### Task 0: Acceptance runner (RED first)
 
-**Files:** Create `test/acceptance/run.ts`, `test/acceptance/matcher.ts`, `test/acceptance/matcher.test.ts`; script `pnpm acceptance` (`tsx test/acceptance/run.ts`), env `ACCEPTANCE_DIR` (default `~/junction26-valio/acceptance`), `GATEWAY_URL`, `ADMIN_KEY`.
+**Files:** Create `test/acceptance/run.ts`, `test/acceptance/matcher.ts`, `test/acceptance/matcher.test.ts`; script `pnpm acceptance` (`tsx test/acceptance/run.ts`), env `ACCEPTANCE_DIR` (default `research/acceptance`), `GATEWAY_URL`, `ADMIN_KEY`.
 **Produces:** `match(reply: unknown, [path, op, value]): { ok: boolean; got: unknown }` implementing the ops in `cases.json` (`=`, `!=`, `contains`, `not_contains`, `>=`, `<=`, `count=`, `matches`, selector paths `a[field=X].b`, `a[*].b`, `count(a[field=X])`); a runner that, per case, resets state through admin routes (clock, replay recording and variant, mandate, prior orders), runs the steps over HTTP, prints `PASS/FAIL id title` with the first failing expectation, exits non-zero on any failure. Step `call` names map to the HTTP routes of Task 10 and the admin routes of Tasks 1 and 4.
 - [ ] Matcher tests: each op on small JSON samples, including selector paths and `count(...)`. FAIL → implement → PASS.
 - [ ] Run `pnpm acceptance` against nothing → every case FAILS with "gateway unreachable" (RED recorded). Commit `test: acceptance runner over the local case set`.
@@ -136,7 +136,7 @@ type OrderState = 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED'
 **Files:** Create `scripts/build-index.ts`, `src/catalog/search.ts`, `test/fixtures/products.json` (8 synthetic products covering: lactose-free milk 1 l ST, 10 l box KI of 2, barista milk, a chocolate with "laktoositon" in its name but category 22xxx, chicken by kg with lot 4.4 and variable weight, an allergen-adding substitute pair). Test: `test/catalog.test.ts`, `test/build-index.test.ts`.
 **Produces:** `buildRows(products, reliabilityCsv, carbonCsv): CatalogProduct[]` (pure, exported from the script); `searchProducts(env, f: { category: string; claims: string[]; tempClasses?: number[]; brand?: { rule; names } }): Promise<CatalogProduct[]>`; `getProducts(env, ids)`.
 - [ ] Tests: `buildRows` maps claims from `nutritionalClaim`, allergens from `allergen`/`nonAllergen`, labels from `packagingMarkedLabel`, `baseUnitsPerSalesUnit` from `units[unitId==salesUnit].sizeInBaseUnits`, `lotStep` null when `allowedLotSize` is 0.01, `nameContent` parsed from "1 l", "2,5 dl", "100x2 cl", "10 kg"; missing reliability stays null. `searchProducts({category:'10400', claims:['FREE_FROM_LACTOSE']})` returns the milks and not the chocolate; `brand {rule:'only', names:['Arla']}` filters, `prefer` does not. Run → FAIL.
-- [ ] Implement; the script writes `~/junction26-valio/build/products.sql` (never into the repo) and loads it with `wrangler d1 execute DB --file` (local and remote). Read the real attribute paths from `~/junction26-valio/data/product_data_schema.json` and `ANALYSIS.md` §2.1.
+- [ ] Implement; the script writes `.data/valio/build/products.sql` (never into the repo) and loads it with `wrangler d1 execute DB --file` (local and remote). Read the real attribute paths from `.data/valio/data/product_data_schema.json` and `ANALYSIS.md` §2.1.
 - [ ] Run tests → PASS; run the script on the real data; spot-check 35 rows for category 10400 + lactose-free. Commit `feat: catalogue index and search`.
 
 ### Task 3: Valio client and offer normalisation
@@ -151,7 +151,7 @@ type OrderState = 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED'
 **Files:** Create `scripts/record-replies.ts`. Test: `test/replay.test.ts`.
 **Consumes:** `fetchOffers`, `searchProducts`.
 - [ ] Test `replay returns recorded reply verbatim`: insert a synthetic recording, `fetchOffers` with replay on returns it and `replay: true`. Run → FAIL, implement, PASS.
-- [ ] Script: for each demo family (lactose-free milk 10400, chicken 18750 by kg, butter 10500) call the live API once per family, write `~/junction26-valio/build/replies.sql`, load to local and remote D1. Run it now and again Sat morning (recordings keep the original `timeNow`). Commit `feat: record and replay Valio replies`.
+- [ ] Script: for each demo family (lactose-free milk 10400, chicken 18750 by kg, butter 10500) call the live API once per family, write `.data/valio/build/replies.sql`, load to local and remote D1. Run it now and again Sat morning (recordings keep the original `timeNow`). Commit `feat: record and replay Valio replies`.
 
 ### Task 5: Quote builder
 
@@ -165,7 +165,7 @@ type OrderState = 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED'
 **Files:** Create `src/mandate/jws.ts`, `scripts/mandate-sign.ts`. Test: `test/mandate.test.ts`.
 **Produces:** `signMandate(m: Mandate, privateJwk: JsonWebKey): Promise<string>` (compact JWS, `alg: EdDSA`, `kid`), `verifyMandate(jws: string, publicJwk: JsonWebKey): Promise<Mandate>` (throws on bad signature, wrong `buyerId`, older version than stored).
 - [ ] Tests: round trip returns the same mandate; one changed byte in payload → throws; a key from another buyer → throws; version 2 then version 1 → throws. Run → FAIL, implement with Web Crypto Ed25519, PASS.
-- [ ] Script generates the buyer key pair (private key saved to `~/junction26-valio/keys/`, never the repo), signs the default mandate, writes SQL for `mandates` and `buyer_keys`. Commit `feat: signed buyer mandates`.
+- [ ] Script generates the buyer key pair (private key saved to `.data/valio/keys/`, never the repo), signs the default mandate, writes SQL for `mandates` and `buyer_keys`. Commit `feat: signed buyer mandates`.
 
 ### Task 7: Policy, substitution check, orders and approval
 
@@ -205,7 +205,7 @@ type OrderState = 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED'
 
 **Files:** Create `scripts/tag-categories.ts`. Test: `test/tag-categories.test.ts` (parser only).
 - [ ] Test the parser that turns Gemini JSON into `category_names` rows and rejects codes not in the index. FAIL → implement → PASS.
-- [ ] Run on the 349 codes with ten sample names each; write `~/junction26-valio/build/categories.sql`; review the demo families by hand; load. Commit `feat: offline category naming`.
+- [ ] Run on the 349 codes with ten sample names each; write `.data/valio/build/categories.sql`; review the demo families by hand; load. Commit `feat: offline category naming`.
 
 ### Task 13: Purchasing agent and scenarios
 

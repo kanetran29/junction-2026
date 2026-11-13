@@ -1,8 +1,8 @@
 # Trusted Trade Gateway – design
 
 Junction 2026, Valio Aimo challenge "Trusted Trade Agents". Agreed in conversation with Kane on Fri 13 Nov 2026 (solo build; scope is
-decided on merit, not on hours). Evidence for every data claim: local-only repo `~/junction26-valio` (`NOTES.md`, `ANALYSIS.md`);
-challenge data is never committed here.
+decided on merit, not on hours). Evidence for every data claim: `research/NOTES.md`, `research/ANALYSIS.md`; acceptance cases in
+`research/acceptance/`. The Valio dataset itself is never committed: `research/fetch_data.sh` downloads it into gitignored `.data/valio/`.
 
 ## Intent
 
@@ -71,7 +71,7 @@ Principle: **the model proposes, rules decide.** The agent (a model) proposes ne
 ### Gateway (Valio side)
 1. **Catalogue index** (offline script → D1): id, names fi/en/sv, category, sales/base units, lot size, temperature class, claims,
    allergens (contains / may contain / free from), labels (organic, MSC, Finnish origin…), brand, origin, reliability, carbon, official
-   substitutes; Gemini-assisted category names and subtypes, hand-checked for the demo families. Loaded from `~/junction26-valio/data`.
+   substitutes; Gemini-assisted category names and subtypes, hand-checked for the demo families. Loaded from `.data/valio/data`.
 2. **`interpret(text)` → draft**: Gemini turns a sentence into a typed draft (type, claims, quantity + unit, deliver-by, brand rule
    `only` or `prefer`, pack preference) plus `unclear` fields. Rules validate it against the schema and the catalogue. The buyer's
    agent fills the `unclear` fields and confirms with `confirm_draft` (no human step). Policy never reads free text.

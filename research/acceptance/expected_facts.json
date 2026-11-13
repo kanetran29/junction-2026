@@ -1,0 +1,982 @@
+{
+ "recordedTimeNow": "2026-11-13T21:08:28+0200",
+ "lf_milk": {
+  "candidates": 35,
+  "orderable": 14,
+  "codes": {
+   "CUTOFF_PASSED": 20,
+   "NOT_ORDERABLE": 1,
+   "OK": 14
+  },
+  "rows": [
+   {
+    "id": "462626",
+    "name": "Valio kahvimaito 5 dl laktoositon",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     5.0,
+     "l"
+    ],
+    "eurPerUnit": 2.6,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "462775",
+    "name": "Arla Maitojuoma 1L laktoositon rasvaton UHT Suomesta",
+    "brand": "Arla ",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": 51.0,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 2.57,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "462921",
+    "name": "Valio Eila® Luomu™ kevytmaitojuoma 1 l laktoositon",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     5.009,
+     "l"
+    ],
+    "eurPerUnit": 2.19,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "463038",
+    "name": "Valio Eila® kevytmaitojuoma 10 l novobox laktoositon",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     19.943,
+     "l"
+    ],
+    "eurPerUnit": 1.57,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "463203",
+    "name": "Arla Annosmaito 100x2 cl laktoositon 1,5% UHT",
+    "brand": "Arla ",
+    "salesUnit": "KI",
+    "ok": true,
+    "code": "OK",
+    "limit": 192.0,
+    "content": [
+     1.999,
+     "l"
+    ],
+    "eurPerUnit": 7.55,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "463335",
+    "name": "Valio Eila® 3 % maitojuoma 1 l laktoositon",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": null,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 1.4,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "463380",
+    "name": "Arla Cafè maito 1 L UHT laktoositon",
+    "brand": "Arla",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": 698.0,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 2.65,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "463779",
+    "name": "Valio Eila® kevytmaitojuoma 2,5 dl UHT laktoositon",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": true,
+    "code": "OK",
+    "limit": null,
+    "content": [
+     3.745,
+     "l"
+    ],
+    "eurPerUnit": 2.86,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "464073",
+    "name": "Valio täysmaito 1 l laktoositon UHT",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": null,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 1.64,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "464119",
+    "name": "Valio rasvaton maito 1 l laktoositon UHT",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     10.015,
+     "l"
+    ],
+    "eurPerUnit": 1.33,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "464179",
+    "name": "Arla 10 L Novobox Suomi laktoositon kevytmaitojuoma ESL",
+    "brand": "Arla",
+    "salesUnit": "ST",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     10.007,
+     "l"
+    ],
+    "eurPerUnit": 2.72,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "464198",
+    "name": "Valio Eila® kevytmaitojuoma 5 dl laktoositon",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     2.505,
+     "l"
+    ],
+    "eurPerUnit": 2.2,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "464201",
+    "name": "Valio kevytmaito 1 l laktoositon UHT",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": null,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 1.56,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "464237",
+    "name": "Valio kahvimaito 1 l laktoositon UHT",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": null,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 1.3,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "464306",
+    "name": "Valio Hyvä suomalainen Arki® Eila® kevytmaitojuoma 1 l laktoositon",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": null,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 1.01,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "464398",
+    "name": "Valio Eila® kevytmaitojuoma 1 l UHT laktoositon",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": null,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 1.65,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "464399",
+    "name": "14 x Arla Kevytmaitojuoma 2 dl Suomesta UHT laktoositon",
+    "brand": "Arla ",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     2.799,
+     "l"
+    ],
+    "eurPerUnit": 3.73,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "464401",
+    "name": "Valio Hyvä suomalainen Arki® Eila® rasvaton maitojuoma 1 l laktoositon",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": null,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 1.1,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "464440",
+    "name": "Valio kevytmaito 0,5 l laktoositon UHT",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": false,
+    "code": "NOT_ORDERABLE",
+    "limit": null,
+    "content": [
+     0.5,
+     "l"
+    ],
+    "eurPerUnit": 1.76,
+    "closingTime": null
+   },
+   {
+    "id": "464768",
+    "name": "12 x Arla Täysmaitojuoma 1 L UHT laktoositon",
+    "brand": "Arla",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     11.976,
+     "l"
+    ],
+    "eurPerUnit": 2.54,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "465039",
+    "name": "Valio Eila® kevytmaitojuoma 1 l laktoositon",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     5.007,
+     "l"
+    ],
+    "eurPerUnit": 1.37,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "465149",
+    "name": "6 x Arla 5 dl laktoositon kevytmaitojuoma Suomi ESL",
+    "brand": "Arla",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     3.0,
+     "l"
+    ],
+    "eurPerUnit": 2.58,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "466288",
+    "name": "Valio kevytmaito 2,5 dl laktoositon UHT",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     3.75,
+     "l"
+    ],
+    "eurPerUnit": 2.04,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "469119",
+    "name": "Valio Eila® rasvaton maitojuoma 1,75 l laktoositon",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     1.748,
+     "l"
+    ],
+    "eurPerUnit": 1.19,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "469266",
+    "name": "Valio Latte original maitokahvijuoma 1 l laktoositon",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     5.0,
+     "l"
+    ],
+    "eurPerUnit": 2.53,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "469287",
+    "name": "Valio Eila® kevytmaitojuoma 1,75 l laktoositon",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     21.069,
+     "l"
+    ],
+    "eurPerUnit": 1.3,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "469330",
+    "name": "5 x Arla 1 L laktoositon kevytmaitojuoma Suomesta ESL",
+    "brand": "Arla",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     4.994,
+     "l"
+    ],
+    "eurPerUnit": 1.71,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "469331",
+    "name": "5 x Arla Acidofilus-Bifidus piimä 1 L laktoositon rasvaton Suomi",
+    "brand": "Arla",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     5.009,
+     "l"
+    ],
+    "eurPerUnit": 2.2,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "469363",
+    "name": "Arla Kevytmaitojuoma 1 L UHT laktoositon Suomesta",
+    "brand": "Arla ",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": 384.0,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 2.48,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "469386",
+    "name": "5 x Arla Laktoositon rasvaton maitojuoma 1 L Suomi ESL",
+    "brand": "Arla",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     4.994,
+     "l"
+    ],
+    "eurPerUnit": 1.73,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "472492",
+    "name": "Valio rasvaton piimä 5 kg laktoositon",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     4.986,
+     "kg"
+    ],
+    "eurPerUnit": 1.46,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "473142",
+    "name": "Valio kahvimaitojuoma vanilja 1 l laktoositon UHT",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     9.973,
+     "l"
+    ],
+    "eurPerUnit": 1.88,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "476240",
+    "name": "Valio Eila® rasvaton maitojuoma 1 l laktoositon",
+    "brand": "Valio",
+    "salesUnit": "KI",
+    "ok": false,
+    "code": "CUTOFF_PASSED",
+    "limit": null,
+    "content": [
+     5.013,
+     "l"
+    ],
+    "eurPerUnit": 1.52,
+    "closingTime": "2026-11-12T15:00:00+0200"
+   },
+   {
+    "id": "476957",
+    "name": "Valio Gefilus® AB-piimä 1% 1 l laktoositon",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": null,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 1.47,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   },
+   {
+    "id": "477050",
+    "name": "Valio Eila® rasvaton piimä 1 l laktoositon",
+    "brand": "Valio",
+    "salesUnit": "ST",
+    "ok": true,
+    "code": "OK",
+    "limit": null,
+    "content": [
+     1.0,
+     "l"
+    ],
+    "eurPerUnit": 1.35,
+    "closingTime": "2026-11-15T17:00:00+0200"
+   }
+  ]
+ },
+ "A1": {
+  "product": "464306",
+  "name": "Valio Hyvä suomalainen Arki® Eila® kevytmaitojuoma 1 l laktoositon",
+  "salesUnits": 1000.0,
+  "litres": 1000.0,
+  "netCents": 101000,
+  "grossCents": 114635,
+  "taxRate": 13.5,
+  "closingTime": "2026-11-15T17:00:00+0200",
+  "units": [
+   {
+    "unitId": "KRS",
+    "sizeInBaseUnits": 160.0
+   },
+   {
+    "unitId": "PAL",
+    "gtin": "6408430101016",
+    "sizeInBaseUnits": 160.0
+   },
+   {
+    "unitId": "KI",
+    "gtin": "6408430101009",
+    "sizeInBaseUnits": 20.0
+   },
+   {
+    "unitId": "ST",
+    "gtin": "6408430000487",
+    "sizeInBaseUnits": 1.0
+   }
+  ]
+ },
+ "B6_orderable_after_cutoff": 0,
+ "B1_bulk": [
+  {
+   "id": "463038",
+   "name": "Valio Eila® kevytmaitojuoma 10 l novobox laktoositon",
+   "brand": "Valio",
+   "salesUnit": "KI",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    19.943,
+    "l"
+   ],
+   "eurPerUnit": 1.57,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  },
+  {
+   "id": "464119",
+   "name": "Valio rasvaton maito 1 l laktoositon UHT",
+   "brand": "Valio",
+   "salesUnit": "KI",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    10.015,
+    "l"
+   ],
+   "eurPerUnit": 1.33,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  },
+  {
+   "id": "464179",
+   "name": "Arla 10 L Novobox Suomi laktoositon kevytmaitojuoma ESL",
+   "brand": "Arla",
+   "salesUnit": "ST",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    10.007,
+    "l"
+   ],
+   "eurPerUnit": 2.72,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  },
+  {
+   "id": "464768",
+   "name": "12 x Arla Täysmaitojuoma 1 L UHT laktoositon",
+   "brand": "Arla",
+   "salesUnit": "KI",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    11.976,
+    "l"
+   ],
+   "eurPerUnit": 2.54,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  },
+  {
+   "id": "469287",
+   "name": "Valio Eila® kevytmaitojuoma 1,75 l laktoositon",
+   "brand": "Valio",
+   "salesUnit": "KI",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    21.069,
+    "l"
+   ],
+   "eurPerUnit": 1.3,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  }
+ ],
+ "B2_arla": [
+  {
+   "id": "462775",
+   "name": "Arla Maitojuoma 1L laktoositon rasvaton UHT Suomesta",
+   "brand": "Arla ",
+   "salesUnit": "ST",
+   "ok": true,
+   "code": "OK",
+   "limit": 51.0,
+   "content": [
+    1.0,
+    "l"
+   ],
+   "eurPerUnit": 2.57,
+   "closingTime": "2026-11-15T17:00:00+0200"
+  },
+  {
+   "id": "463203",
+   "name": "Arla Annosmaito 100x2 cl laktoositon 1,5% UHT",
+   "brand": "Arla ",
+   "salesUnit": "KI",
+   "ok": true,
+   "code": "OK",
+   "limit": 192.0,
+   "content": [
+    1.999,
+    "l"
+   ],
+   "eurPerUnit": 7.55,
+   "closingTime": "2026-11-15T17:00:00+0200"
+  },
+  {
+   "id": "463380",
+   "name": "Arla Cafè maito 1 L UHT laktoositon",
+   "brand": "Arla",
+   "salesUnit": "ST",
+   "ok": true,
+   "code": "OK",
+   "limit": 698.0,
+   "content": [
+    1.0,
+    "l"
+   ],
+   "eurPerUnit": 2.65,
+   "closingTime": "2026-11-15T17:00:00+0200"
+  },
+  {
+   "id": "464179",
+   "name": "Arla 10 L Novobox Suomi laktoositon kevytmaitojuoma ESL",
+   "brand": "Arla",
+   "salesUnit": "ST",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    10.007,
+    "l"
+   ],
+   "eurPerUnit": 2.72,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  },
+  {
+   "id": "464399",
+   "name": "14 x Arla Kevytmaitojuoma 2 dl Suomesta UHT laktoositon",
+   "brand": "Arla ",
+   "salesUnit": "KI",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    2.799,
+    "l"
+   ],
+   "eurPerUnit": 3.73,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  },
+  {
+   "id": "464768",
+   "name": "12 x Arla Täysmaitojuoma 1 L UHT laktoositon",
+   "brand": "Arla",
+   "salesUnit": "KI",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    11.976,
+    "l"
+   ],
+   "eurPerUnit": 2.54,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  },
+  {
+   "id": "465149",
+   "name": "6 x Arla 5 dl laktoositon kevytmaitojuoma Suomi ESL",
+   "brand": "Arla",
+   "salesUnit": "KI",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    3.0,
+    "l"
+   ],
+   "eurPerUnit": 2.58,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  },
+  {
+   "id": "469330",
+   "name": "5 x Arla 1 L laktoositon kevytmaitojuoma Suomesta ESL",
+   "brand": "Arla",
+   "salesUnit": "KI",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    4.994,
+    "l"
+   ],
+   "eurPerUnit": 1.71,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  },
+  {
+   "id": "469331",
+   "name": "5 x Arla Acidofilus-Bifidus piimä 1 L laktoositon rasvaton Suomi",
+   "brand": "Arla",
+   "salesUnit": "KI",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    5.009,
+    "l"
+   ],
+   "eurPerUnit": 2.2,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  },
+  {
+   "id": "469363",
+   "name": "Arla Kevytmaitojuoma 1 L UHT laktoositon Suomesta",
+   "brand": "Arla ",
+   "salesUnit": "ST",
+   "ok": true,
+   "code": "OK",
+   "limit": 384.0,
+   "content": [
+    1.0,
+    "l"
+   ],
+   "eurPerUnit": 2.48,
+   "closingTime": "2026-11-15T17:00:00+0200"
+  },
+  {
+   "id": "469386",
+   "name": "5 x Arla Laktoositon rasvaton maitojuoma 1 L Suomi ESL",
+   "brand": "Arla",
+   "salesUnit": "KI",
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "limit": null,
+   "content": [
+    4.994,
+    "l"
+   ],
+   "eurPerUnit": 1.73,
+   "closingTime": "2026-11-12T15:00:00+0200"
+  }
+ ],
+ "B3_sat_orderable": 0,
+ "B5_chicken": {
+  "candidates": 12,
+  "orderable": 4,
+  "feasible": [
+   {
+    "id": "462281",
+    "name": "Kariniemen Kananpojan rintafilee maustamaton 160-185g/n. 4,4 kg",
+    "ok": true,
+    "code": "OK",
+    "limit": 198.0,
+    "content": [
+     1.0,
+     "kg"
+    ],
+    "lot": 4.4,
+    "salesUnit": "KG",
+    "eurPerKg": 7.7,
+    "variable": true
+   },
+   {
+    "id": "472673",
+    "name": "Kariniemen Kananpojan rintafilee miedosti suolattu n. 180g /n. 2kg",
+    "ok": true,
+    "code": "OK",
+    "limit": null,
+    "content": [
+     1.0,
+     "kg"
+    ],
+    "lot": 2.0,
+    "salesUnit": "KG",
+    "eurPerKg": 7.7,
+    "variable": true
+   },
+   {
+    "id": "470908",
+    "name": "Top Choice poultry Kanan rintafilee nahaton luuton tuore 2.5kg",
+    "ok": true,
+    "code": "OK",
+    "limit": 15.0,
+    "content": [
+     2.5,
+     "kg"
+    ],
+    "lot": null,
+    "salesUnit": "ST",
+    "eurPerKg": 8.88,
+    "variable": false
+   },
+   {
+    "id": "470746",
+    "name": "Top Choice poultry Kanan rintafilee 130-150g nahaton luuton tuore 5kg",
+    "ok": true,
+    "code": "OK",
+    "limit": 6.0,
+    "content": [
+     4.998,
+     "kg"
+    ],
+    "lot": null,
+    "salesUnit": "ST",
+    "eurPerKg": 9.55,
+    "variable": false
+   }
+  ]
+ },
+ "C4_new_allergen_open": [
+  [
+   "461697",
+   "471172",
+   "Vaasan Rukiinen Sulhaspiirakka 135x45g",
+   "Vaasan Sulavi Cocktail-Riisipiirakka 90x",
+   [
+    "GB"
+   ],
+   "NOT_ORDERABLE",
+   "OK"
+  ],
+  [
+   "463968",
+   "469648",
+   "CASTELLI PARMESAN REGGIANO 125G PALA PDO",
+   "Castelli parmigiano reggiano 200g pala",
+   [
+    "AM"
+   ],
+   "OK",
+   "OK"
+  ],
+  [
+   "465138",
+   "462300",
+   "PH7 7X1,2KG VAALEA KAURALEIPÄ GTON PAK",
+   "Elovena 400g gluteenittomat kaura-porkka",
+   [
+    "GO"
+   ],
+   "OK",
+   "OK"
+  ],
+  [
+   "468465",
+   "470863",
+   "Oddlygood® kaurajuoma 1 l UHT gluteenito",
+   "Oatly Kaurajuoma Kevyt 1L",
+   [
+    "AW"
+   ],
+   "OK",
+   "OK"
+  ],
+  [
+   "469288",
+   "470341",
+   "Oddlygood® Easy Whipping 2,5 dl UHT",
+   "Oatly iMat Visp 250ml",
+   [
+    "AW",
+    "GO"
+   ],
+   "CUTOFF_PASSED",
+   "OK"
+  ]
+ ],
+ "C5_lost_lf_open": [
+  [
+   "465635",
+   "475722",
+   "Rynkeby Omenatäysmehutiiviste 1+5 10L",
+   "Bonne Omenatäysmehutiiviste 500% 1L",
+   "OK",
+   "OK"
+  ],
+  [
+   "465655",
+   "465623",
+   "Rynkeby Puolukka mehujuomatiiviste 1+7 1",
+   "12 x Bonne Karpalo-puolukkatäysmehu 1L",
+   "OK",
+   "OK"
+  ],
+  [
+   "466375",
+   "466151",
+   "Gran Castelli mozzarella 125g laktoosito",
+   "Pasta Filata Mozzarella 125g",
+   "OK",
+   "OK"
+  ],
+  [
+   "466375",
+   "468526",
+   "Gran Castelli mozzarella 125g laktoosito",
+   "Castelli mozzarella bufala 125g mozzarel",
+   "OK",
+   "OK"
+  ],
+  [
+   "466375",
+   "475908",
+   "Gran Castelli mozzarella 125g laktoosito",
+   "Castelli mozzarella 125g",
+   "OK",
+   "OK"
+  ]
+ ]
+}

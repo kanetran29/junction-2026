@@ -1,0 +1,245 @@
+<title>Trusted Trade Gateway</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: step rail on top, agent console left, the gateway's view (or the manager's phone) right; stacks on phones. */
+:root {
+  --bg: #f3f5f2; --surface: #ffffff; --fg: #17201c; --muted: #5d6a63; --line: #d9dfda;
+  --accent: #1d6b57; --accent-ink: #ffffff; --ok: #1d7a4a; --warn: #a86400; --bad: #b3261e;
+  --ok-bg: #e3f3ea; --warn-bg: #fbefdc; --bad-bg: #fbe4e2; --console: #101814; --console-fg: #d6e4dc; --console-dim: #7f948a;
+  --display: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1412; --surface: #18201c; --fg: #e4ebe7; --muted: #9aa9a1; --line: #2b3631;
+  --accent: #4fb596; --accent-ink: #08130f; --ok: #5ccf92; --warn: #f0a94a; --bad: #ff8a80;
+  --ok-bg: #173325; --warn-bg: #3a2a12; --bad-bg: #3d1a18; --console: #070b09; --console-fg: #cfe0d6; --console-dim: #6f857a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1412; --surface: #18201c; --fg: #e4ebe7; --muted: #9aa9a1; --line: #2b3631;
+  --accent: #4fb596; --accent-ink: #08130f; --ok: #5ccf92; --warn: #f0a94a; --bad: #ff8a80;
+  --ok-bg: #173325; --warn-bg: #3a2a12; --bad-bg: #3d1a18; --console: #070b09; --console-fg: #cfe0d6; --console-dim: #6f857a; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.eyebrow { font: 600 12px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 clamp(26px, 4vw, 38px)/1.1 var(--display); margin: 6px 0 4px; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 70ch; margin: 0; }
+.rail { display: flex; flex-wrap: wrap; gap: 8px; }
+.rail button { font: 500 13px var(--body); border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+.rail button[aria-current="step"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.caption { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 0; }
+.caption b { font-family: var(--display); }
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+.console { background: var(--console); color: var(--console-fg); border-radius: 12px; padding: 14px; font: 13px/1.6 var(--mono); min-height: 340px; overflow-x: auto; }
+.console .hd { color: var(--console-dim); margin-bottom: 8px; font-size: 12px; }
+.console .ln { white-space: pre-wrap; word-break: break-word; }
+.console .ag { color: #9ad1ff; } .console .gw { color: #b8f0cf; } .console .vl { color: #f5d68a; } .console .hm { color: #f7a8c8; }
+.console .new { animation: in .35s ease-out; }
+@keyframes in { from { opacity: .3; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .console .new { animation: none; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel h2 { font: 700 18px/1.2 var(--display); margin: 0; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 12px var(--mono); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; background: var(--bg); }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; }
+tr.sel td { background: var(--ok-bg); }
+.pill { display: inline-block; font: 600 11px/1 var(--mono); padding: 4px 6px; border-radius: 5px; white-space: nowrap; }
+.p-ok { background: var(--ok-bg); color: var(--ok); } .p-warn { background: var(--warn-bg); color: var(--warn); } .p-bad { background: var(--bad-bg); color: var(--bad); }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+.callout { border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.callout.bad { background: var(--bad-bg); } .callout.ok { background: var(--ok-bg); } .callout.warn { background: var(--warn-bg); }
+.toggle { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { font: 600 14px var(--body); border-radius: 8px; padding: 9px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.phone { width: min(330px, 100%); margin: 0 auto; border: 10px solid var(--fg); border-radius: 34px; padding: 18px 14px; background: var(--bg); display: flex; flex-direction: column; gap: 12px; }
+.phone h3 { font: 700 17px/1.25 var(--display); margin: 0; }
+.big { font: 700 26px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.diff { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.diff div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.count { font: 600 14px var(--mono); }
+.nav { display: flex; justify-content: space-between; gap: 10px; }
+.foot { font-size: 12px; color: var(--muted); margin: 0; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Junction 2026 · Valio Aimo challenge · concept mock</div>
+    <h1>Trusted Trade Gateway</h1>
+    <p class="lede">POC phác thảo cánh cửa phía Valio Aimo: agent AI của khách hàng đi qua nó để tìm hàng, nhận báo giá cố định, đặt hàng trong quyền được giao và xin người duyệt khi vượt quyền. Số liệu lấy từ mock API của challenge (ảnh chụp giao hàng thứ Hai 16/11).</p>
+  </header>
+
+  <nav class="rail" id="rail" aria-label="Steps"></nav>
+  <p class="caption" id="cap"></p>
+
+  <main class="stage">
+    <section class="console" aria-label="Agent and gateway calls">
+      <div class="hd">hotel kitchen agent (Gemini) ⇄ gateway ⇄ Valio mock API</div>
+      <div id="log"></div>
+    </section>
+    <section class="panel" id="panel" aria-live="polite"></section>
+  </main>
+
+  <div class="nav">
+    <button class="btn" id="back" type="button">← Back</button>
+    <button class="btn primary" id="next" type="button">Next →</button>
+  </div>
+  <p class="foot">Concept mock for a hackathon entry, not a Valio Aimo product. Product codes, prices, stock and cut-offs come from the challenge's mock API; the hotel, the mandate and the quote id are examples.</p>
+</div>
+
+<script>
+const CUTOFF = Date.UTC(2026, 10, 15, 15, 0, 0);
+const S = { step: 0, naive: false, clockOverride: null, decided: null };
+const steps = [
+  { name: "1 Request", cap: "<b>Yêu cầu bằng văn bản.</b> Agent khách sạn gửi đúng câu ví dụ trong đề. Bước <i>interpret</i> dùng Gemini dịch câu thành bản nháp có cấu trúc và chỉ ra chỗ mơ hồ; bản nháp phải được xác nhận rồi mới sang tìm hàng. Văn bản không bao giờ tự kích hoạt đặt hàng." },
+  { name: "2 Search", cap: "<b>Tìm hàng.</b> Gateway lọc theo nhóm hàng và nhãn trong dữ liệu (không tìm theo tên, nên không lôi socola hay pudding). Chưa gọi API Valio lần nào." },
+  { name: "3 Quote", cap: "<b>Báo giá.</b> Gateway hỏi Valio giá và tồn kho chỉ cho 35 sản phẩm này (2 lần gọi), loại hàng không kịp giao, đổi 1.000 lít ra thùng, khóa giá đến giờ chốt đơn. Bật “Naive agent” để thấy cái bẫy." },
+  { name: "4 Policy", cap: "<b>Kiểm quyền.</b> Ủy quyền có chữ ký của khách sạn cho agent tự đặt tới 500 €. Đơn 1.010 € và đổi quy cách nên phải xin duyệt. Luật quyết định, không có model nào." },
+  { name: "5 Approve", cap: "<b>Duyệt trên điện thoại.</b> Quản lý bếp thấy chỗ khác yêu cầu, tổng tiền và đồng hồ đếm tới giờ chốt đơn. Thử “Set clock to Sun 17:05” để thấy link duyệt hết hạn." },
+  { name: "6 Receipt", cap: "<b>Biên nhận.</b> Đơn được gateway chấp nhận (mô phỏng, vì mock không có API đặt hàng), kèm lời giải thích bằng ngôn ngữ thường và nhật ký sự kiện." },
+];
+const logs = [
+  [["ag", 'agent ▸ interpret("I need 1,000 litres of lactose-free milk by Monday. Bulk packs preferred.")'],
+   ["gw", 'gateway ◂ draft D-21 · drinking milk (10400) · FREE_FROM_LACTOSE · 1000 l · by 2026-11-16 · prefer 10 l packs · unclear: fat level'],
+   ["ag", 'agent ▸ confirm_draft("D-21", { fatLevel: "any" })'],
+   ["ag", 'agent ▸ search_products({ draft: "D-21" })']],
+  [["gw", "gateway ◂ 35 products · category 10400 · claim FREE_FROM_LACTOSE · Valio calls: 0"]],
+  [["ag", 'agent ▸ quote({ products: 35, quantity: { value: 1000, unit: "l" }, deliverBy: "2026-11-16", prefer: "bulk" })'],
+   ["vl", "gateway ▸ Valio POST /api/availability (35 ids)"], ["vl", "gateway ▸ Valio POST /api/price (35 ids)"],
+   ["gw", "gateway ◂ quote Q-7F3A · 1 line · 34 rejected with reasons · expires Sun 15 Nov 17:00"]],
+  [["ag", 'agent ▸ place_order({ quote: "Q-7F3A" })'],
+   ["gw", "gateway ◂ NEEDS_APPROVAL · OVER_ORDER_LIMIT 1,010.00 € > 500.00 € · PACK_SIZE_CHANGED"]],
+  [["gw", "gateway ▸ approval request → kitchen manager · binds lines hash 9c1e…a40 · expires at cut-off"]],
+  [["hm", "manager ✓ approved Q-7F3A"], ["gw", "gateway ◂ ORDER_ACCEPTED (simulated) · receipt R-7F3A · same receipt on retry"]],
+];
+const eur = (n) => n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+const now = () => S.clockOverride ?? Date.now();
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/** Renders the step rail, caption, cumulative console log and the panel for the current step. */
+function render() {
+  const rail = document.getElementById("rail");
+  rail.innerHTML = steps.map((s, i) => `<button type="button" data-i="${i}" ${i === S.step ? 'aria-current="step"' : ""}>${s.name}</button>`).join("");
+  document.getElementById("cap").innerHTML = steps[S.step].cap;
+  document.getElementById("log").innerHTML = logs.slice(0, S.step + 1).flatMap((group, gi) =>
+    group.map(([k, t]) => `<div class="ln ${k}${gi === S.step ? " new" : ""}">${esc(t)}</div>`)).join("");
+  document.getElementById("panel").innerHTML = [panelRequest, panelSearch, panelQuote, panelPolicy, panelApprove, panelReceipt][S.step]();
+  document.getElementById("back").disabled = S.step === 0;
+  document.getElementById("next").disabled = S.step === steps.length - 1 || (S.step === 4 && S.decided !== "approved");
+}
+
+/** Step 1: the buyer agent's request as the gateway receives it. */
+function panelRequest() {
+  return `<h2>Request in plain words → draft</h2>
+  <div class="callout warn">"I need 1,000 litres of lactose-free milk by Monday. Bulk packs preferred."</div>
+  <dl class="kv"><dt>Draft</dt><dd>D-21 (proposed by Gemini, not yet trusted)</dd>
+  <dt>Buyer</dt><dd>Hotel chain kitchen (example), agent key hk-agent-07</dd>
+  <dt>Product type</dt><dd>Drinking milk · category 10400 ✓ exists in catalogue</dd><dt>Must have</dt><dd>FREE_FROM_LACTOSE ✓ known claim</dd>
+  <dt>Quantity</dt><dd>1,000 l ✓ valid unit</dd><dt>Deliver by</dt><dd>Mon 16 Nov 2026</dd><dt>Preference</dt><dd>Bulk packs (10 l)</dd>
+  <dt>Unclear</dt><dd><span class="pill p-warn">fat level?</span> → agent confirms "any"</dd></dl>
+  <p class="note">Rules check the draft against the catalogue and the schema. Only the confirmed draft goes on; the policy never reads the free text, so "ignore your limits" in a message changes nothing.</p>`;
+}
+
+/** Step 2: attribute search over the catalogue index, no Valio calls. */
+function panelSearch() {
+  return `<h2>Search the catalogue index</h2>
+  <div class="chips"><span class="chip">category 10400 (drinking milk)</span><span class="chip">claim FREE_FROM_LACTOSE</span><span class="chip">temperature: chilled or ambient</span></div>
+  <dl class="kv"><dt>Candidates</dt><dd><b>35</b> of 17,546 products</dd><dt>Valio API calls</dt><dd>0</dd></dl>
+  <div class="callout warn">Name search for "laktoositon maito" would also return milk chocolate, pudding and condensed milk, and miss that "vähälaktoosinen" means low-lactose, not lactose-free.</div>`;
+}
+
+/** Step 3: the quote with the selected line and typed rejections, or the naive agent's mistake. */
+function panelQuote() {
+  const toggle = `<div class="toggle"><button type="button" class="btn ${S.naive ? "" : "primary"}" data-naive="0">Gateway quote</button><button type="button" class="btn ${S.naive ? "primary" : ""}" data-naive="1">Naive agent</button></div>`;
+  if (S.naive) {
+    return `<h2>What a naive agent does</h2>${toggle}
+    <div class="tbl"><table><tr><th>Product</th><th>API says</th><th>Agent orders</th></tr>
+    <tr><td>463038 Valio Eila® kevytmaitojuoma 10 l novobox laktoositon</td><td>available 999999 on Mon 16 Nov · 31.31 € per case of 2 × 10 l</td><td>50 cases = 1,000 l · ${eur(50 * 31.31)}</td></tr></table></div>
+    <div class="callout bad"><b>Never arrives.</b> Its order cut-off was Thu 12 Nov 15:00. The API still reports stock and a Monday date, so an agent that reads only the amount and date orders milk Valio cannot deliver.</div>`;
+  }
+  const rej = [
+    ["463038", "Valio Eila® kevytmaitojuoma 10 l novobox", "1.57 €/l", "p-bad", "CUTOFF_PASSED Thu 12 Nov 15:00"],
+    ["464179", "Arla 10 L Novobox laktoositon kevytmaitojuoma ESL", "2.72 €/l", "p-bad", "CUTOFF_PASSED Thu 12 Nov 15:00"],
+    ["469363", "Arla Kevytmaitojuoma 1 L UHT laktoositon", "2.48 €/l", "p-warn", "STOCK_LIMITED 384"],
+    ["462775", "Arla Maitojuoma 1L laktoositon rasvaton UHT", "2.57 €/l", "p-warn", "STOCK_LIMITED 51"],
+    ["463380", "Arla Café maito 1 L UHT laktoositon", "2.65 €/l", "p-warn", "SUBTYPE barista milk"],
+    ["464440", "Valio kevytmaito 0,5 l laktoositon UHT", "1.76 €/l", "p-bad", "NOT_ORDERABLE no schedule line"],
+  ];
+  return `<h2>Quote Q-7F3A</h2>${toggle}
+  <div class="tbl"><table><tr><th>Code</th><th>Product</th><th>Price</th><th>Status</th></tr>
+  <tr class="sel"><td>464306</td><td>Valio Hyvä suomalainen Arki® Eila® kevytmaitojuoma 1 l laktoositon</td><td>1.01 €/l</td><td><span class="pill p-ok">SELECTED</span></td></tr>
+  ${rej.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td><span class="pill ${r[3]}">${r[4]}</span></td></tr>`).join("")}
+  <tr><td colspan="4" class="note">+ 28 more rejected, each with a reason code</td></tr></table></div>
+  <dl class="kv"><dt>Fill</dt><dd>1,000 l = 1,000 cartons = 50 cases of 20</dd><dt>Fixed price</dt><dd>${eur(1010)} net · ${eur(1146.35)} incl. VAT 13.5 %</dd>
+  <dt>Order by</dt><dd>Sun 15 Nov 17:00 (cut-off)</dd><dt>Delivery reliability</dt><dd>1.0 (known for 17 of 35 candidates)</dd>
+  <dt>CO₂</dt><dd>1.1 kg CO₂-eq/kg, product-group average, ≈ 1.1 t for this order</dd><dt>Changed vs request</dt><dd>10 l bulk boxes → 1 l cartons (bulk closed Thu)</dd></dl>`;
+}
+
+/** Step 4: the buyer's signed mandate and the deterministic decision. */
+function panelPolicy() {
+  return `<h2>Mandate check</h2>
+  <dl class="kv"><dt>Mandate</dt><dd>hotel-kitchen v3 · signed JWS (EdDSA) · verified</dd>
+  <dt>Order alone up to</dt><dd>${eur(500)} per order, ${eur(1500)} per delivery day</dd>
+  <dt>Must keep</dt><dd>claim FREE_FROM_LACTOSE, no new allergen</dd>
+  <dt>Needs approval</dt><dd>pack size change, substitute, reliability unknown or below 0.9</dd>
+  <dt>Approver</dt><dd>Kitchen manager</dd></dl>
+  <div class="callout warn"><b>NEEDS_APPROVAL</b><br>OVER_ORDER_LIMIT: ${eur(1010)} is above ${eur(500)}.<br>PACK_SIZE_CHANGED: 10 l boxes were requested, 1 l cartons are offered.</div>
+  <p class="note">Other outcomes the same rules give: a 20 l order is AUTO; three 400 € orders hit the daily cap; a substitute that drops the lactose-free claim is REJECTED.</p>`;
+}
+
+/** Step 5: the manager's phone approval page with a live countdown to the cut-off. */
+function panelApprove() {
+  const left = CUTOFF - now();
+  const expired = left <= 0;
+  const h = Math.floor(Math.max(left, 0) / 3600000), m = Math.floor((Math.max(left, 0) % 3600000) / 60000);
+  const status = S.decided === "approved" ? `<div class="callout ok"><b>Approved.</b> Lines hash 9c1e…a40 locked. Continue to the receipt.</div>`
+    : S.decided === "rejected" ? `<div class="callout bad"><b>Rejected.</b> No order was placed. The agent gets REJECTED_BY_APPROVER.</div>`
+    : expired ? `<div class="callout bad"><b>Expired at the cut-off.</b> No order exists. A Monday delivery is no longer possible.</div>` : "";
+  return `<div class="phone">
+    <div class="eyebrow">Approval request</div>
+    <h3>Milk for Monday 16 Nov</h3>
+    <div class="big">${eur(1010)}</div><div class="note">${eur(1146.35)} incl. VAT · agent limit ${eur(500)}</div>
+    <div class="diff"><div>Asked: 1,000 l in 10 l bulk boxes</div><div>Offered: 1,000 × 1 l cartons (50 cases), bulk closed Thu 15:00</div><div>Valio Arki Eila® kevyt 1 l, lactose-free, 1.01 €/l</div></div>
+    <div class="count">${expired ? "Cut-off passed" : `Approve within ${h} h ${m} min · cut-off Sun 17:00`}</div>
+    <div class="toggle"><button type="button" class="btn primary" data-decide="approved" ${expired || S.decided ? "disabled" : ""}>Approve</button>
+    <button type="button" class="btn" data-decide="rejected" ${expired || S.decided ? "disabled" : ""}>Reject</button></div>
+    ${status}
+  </div>
+  <div class="toggle"><button type="button" class="btn" data-clock="late">Set clock to Sun 17:05</button><button type="button" class="btn" data-clock="real">Real clock</button></div>`;
+}
+
+/** Step 6: the plain-language receipt and the event log. */
+function panelReceipt() {
+  return `<h2>Receipt R-7F3A</h2>
+  <p>The hotel's kitchen agent asked for 1,000 l of lactose-free milk for Monday, preferably in 10 l boxes. The 10 l boxes could not arrive on Monday because their order cut-off was Thursday at 15:00, so the gateway offered 1,000 one-litre cartons of Valio Arki Eila® kevytmaitojuoma at the fixed price of 1.01 € per litre. The order was above the agent's 500 € limit and changed the pack size, so the kitchen manager approved it before Sunday's 17:00 cut-off.</p>
+  <dl class="kv"><dt>Status</dt><dd><span class="pill p-ok">ORDER_ACCEPTED</span> by the gateway (simulated: the mock has no order API)</dd>
+  <dt>Lines</dt><dd>464306 × 1,000 ST (50 cases of 20)</dd><dt>Total</dt><dd>${eur(1010)} net · ${eur(1146.35)} incl. VAT</dd></dl>
+  <div class="tbl"><table><tr><th>Event</th><th>Detail</th></tr>
+  <tr><td>search</td><td>35 candidates, 0 Valio calls</td></tr><tr><td>quote</td><td>2 Valio calls, 1 line, 34 rejected</td></tr>
+  <tr><td>policy</td><td>NEEDS_APPROVAL: OVER_ORDER_LIMIT, PACK_SIZE_CHANGED</td></tr><tr><td>approval</td><td>Kitchen manager, before cut-off</td></tr>
+  <tr><td>order</td><td>accepted; a repeated place_order returns this receipt</td></tr></table></div>`;
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button");
+  if (!t) return;
+  if (t.dataset.i) S.step = +t.dataset.i;
+  else if (t.id === "next") S.step = Math.min(S.step + 1, steps.length - 1);
+  else if (t.id === "back") S.step = Math.max(S.step - 1, 0);
+  else if (t.dataset.naive) S.naive = t.dataset.naive === "1";
+  else if (t.dataset.decide) S.decided = t.dataset.decide;
+  else if (t.dataset.clock) { S.clockOverride = t.dataset.clock === "late" ? CUTOFF + 5 * 60000 : null; if (!S.decided || S.clockOverride) S.decided = S.clockOverride ? null : S.decided; }
+  else return;
+  render();
+});
+setInterval(() => { if (S.step === 4) render(); }, 30000);
+render();
+</script>
