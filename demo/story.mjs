@@ -68,7 +68,7 @@ const BEATS = [
   [88.8, "quote.created", { offers: [offer(20000)], rejections: [] }, "q"],
   [89.6, "policy.decided", { outcome: "REJECT", reasons: why("OVER_ORDER_HARD") }, "q"],
   [89.8, "story.caption", { text: "20,200 € is over the hard order limit: REJECT." }],
-  [93.5, "story.caption", { text: "Valio's official substitute for Oddlygood oat drink, Oatly 470863, adds wheat." }],
+  [93.5, "story.caption", { text: "Valio's official substitute for Oddlygood oat drink, Oatly 470863, adds gluten (AW)." }],
   [93.8, "draft.created", { text: "Oddlygood oat drink 1 l, or its official substitute", category: "10450", claims: ["FREE_FROM_GLUTEN"], quantity: { value: 200, unit: "l" }, unclear: [] }, "d"],
   [95, "draft.confirmed", {}, "d"],
   [96.2, "quote.created", { offers: [], rejections: [{ productId: "470863", code: "NEW_ALLERGEN" }] }, "q"],

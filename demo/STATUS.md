@@ -25,3 +25,7 @@ Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 - `docs/events.md` trên `main` (đã đọc): khớp với code. Chưa test `wrangler dev` vì `main` chưa có route `/v1/events` và `/v1/interpret`.
 - Một chênh lệch nhỏ: rejection `STOCK_LIMITED` trong `docs/events.md` chỉ có `{productId, code}`. Kệ chỉ hiện "384 left" nếu gateway thêm `remaining` (hoặc có `stock.denied`); nếu không, kệ hiện "STOCK LIMITED".
 - Ô yêu cầu gọi `POST /v1/interpret` → `/v1/drafts/{id}/confirm` (fill rỗng) → `/v1/quotes` → `/v1/orders` (Idempotency-Key). Cần đối chiếu lại khi route thật có (tên trường `draft.id`/`quote.id`, có cần `fill` không).
+
+### 5. Cách gắn vào Worker (việc của phiên build, khi merge)
+- `demo/` là file tĩnh thuần, không cần build. Phục vụ tại `/demo` bằng Workers static assets, ví dụ trong `wrangler.jsonc`: `"assets": { "directory": "./demo-public" }` với `demo-public/demo` trỏ (copy) tới `demo/`, hoặc route `/demo/*` đọc từ binding `ASSETS`. Khi cùng origin, ô "Gateway URL" để trống là dùng luôn gateway đó, không cần CORS.
+- Không đưa `demo/dev/` và `demo/test/` ra ngoài (chỉ dùng khi phát triển).
