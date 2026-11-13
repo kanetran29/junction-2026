@@ -71,3 +71,12 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
   cùng draft 10400 / lactose-free / 1000 l / 16-11; AC44 (tiệc) ra `needs_input`. Review tìm 4 lỗi quan trọng (confirm xoá được ô
   "unclear"; bỏ qua nghi ngờ của model; buyer khác confirm được draft; thiếu kiểm hình dạng) → đã sửa, đang re-review.
 - Đang chạy: Task 7 (policy, sổ kho, đơn hàng, duyệt).
+
+### B5. Đơn hàng, sổ kho, duyệt, biên nhận (xong)
+- Task 7 (`ee83c76`, `9b46491`): policy (hạn mức đơn/ngày, D1), sổ kho chỉ đơn ACCEPTED, commit một batch D1, giỏ hàng, token duyệt chỉ ở
+  hộp thư người duyệt, duyệt lại (hết giờ / giá đổi / hết kho). Chứng minh bằng test đua thật: 20 đơn cùng lúc trên 6 đơn vị → đúng 1
+  ACCEPTED; xoá guard thì test đỏ. Review Opus (kiểm SQL sổ kho trên SQLite): an toàn; 1 lỗi quan trọng (key idempotency có thể kẹt 409
+  sau khi đã commit → dễ sinh đơn trùng) đã sửa; agent không thể duyệt (role bắt buộc).
+- Task 8 (`15dad49`, `7f1da7a`): biên nhận văn bản (đúng "1,010.00", "1,146.35", "Kitchen manager"), trang duyệt trên điện thoại, hộp thư
+  người duyệt có QR. Review: quy tắc "còn bao nhiêu hàng" bị lặp ở trang → gộp về một helper.
+- Đang chạy: Task 10a (HTTP API, khoá API, route admin, OpenAPI) → sau đó chạy 49 case nghiệm thu thật lần đầu.
