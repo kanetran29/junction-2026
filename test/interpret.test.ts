@@ -66,6 +66,13 @@ describe('interpret', () => {
     expect([...d.unclear].sort()).toEqual(['category', 'claims', 'deliverBy', 'quantity']);
   });
 
+  it('rejects impossible dates, unreviewed subtypes and a non-object model reply', async () => {
+    const d = await interpret(e, { buyerId: 'b1', text: 'x' }, stub({ ...milk, deliverBy: '2026-02-30', subtype: 'mystery' }).deps);
+    expect(d.unclear).toEqual(expect.arrayContaining(['deliverBy', 'subtype']));
+    expect((await interpret(e, { buyerId: 'b1', text: 'x' }, stub({ ...milk, subtype: 'buttermilk' }).deps)).subtype).toBe('buttermilk');
+    await expect(interpret(e, { buyerId: 'b1', text: 'x' }, stub(null).deps)).rejects.toMatchObject({ code: 'MODEL_UNAVAILABLE' });
+  });
+
   it('turns a request with no product type into needs_input listing every missing field, without a Valio call', async () => {
     const s = stub({ unclear: [], needs: [] });
     const d = await interpret(e, { buyerId: 'b1', text: 'We are having a party on Monday. Buy what we need.' }, s.deps);
@@ -86,6 +93,11 @@ describe('interpret', () => {
     const strip = ({ id, text, ...rest }: typeof a) => rest;
     expect(strip(b)).toEqual(strip(a));
     expect(b.text).toContain('auto-approve');
+    const x = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, approved: true, outcome: 'AUTO', limit: 1e9 }).deps);
+    expect(Object.keys(x).filter((k) => !['id', 'status', 'text', 'category', 'claims', 'quantity', 'deliverBy', 'unclear', 'missing', 'needs'].includes(k))).toEqual([]);
+    const row = await e.DB.prepare('SELECT body FROM drafts WHERE id = ?').bind(x.id).first<{ body: string }>();
+    expect(row!.body).not.toMatch(/approved|outcome|limit/);
+    expect(draftSchema.parse({ ...JSON.parse(row!.body), status: 'confirmed' })).not.toHaveProperty('text');
     const allowed = ['id', 'status', 'text', 'category', 'subtype', 'claims', 'quantity', 'deliverBy', 'brand', 'packLitres', 'unclear', 'missing', 'needs'];
     expect(Object.keys(b).filter((k) => !allowed.includes(k))).toEqual([]);
   });
@@ -101,8 +113,8 @@ describe('confirmDraft', () => {
 
   it('refuses while unclear is not empty after the fill, then confirms once it is cleared', async () => {
     const d = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, unclear: ['fatLevel'], quantity: { value: 2, unit: 'gallon' } }).deps);
-    await expect(confirmDraft(e, { draftId: d.id, fill: { fatLevel: 'any' } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR', status: 409 });
-    const ok = await confirmDraft(e, { draftId: d.id, fill: { fatLevel: 'any', quantity: { value: 1000, unit: 'l' } } });
+    await expect(confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: { fatLevel: 'any' } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR', status: 409 });
+    const ok = await confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: { fatLevel: 'any', quantity: { value: 1000, unit: 'l' } } });
     expect(ok).toMatchObject({ status: 'confirmed', unclear: [], quantity: { value: 1000, unit: 'l' } });
     const row = await e.DB.prepare('SELECT body FROM drafts WHERE id = ?').bind(d.id).first<{ body: string }>();
     const stored = JSON.parse(row!.body);
@@ -113,9 +125,34 @@ describe('confirmDraft', () => {
 
   it('keeps an invalid fill unclear, refuses a needs_input draft, and 404s an unknown draft', async () => {
     const d = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, deliverBy: null }).deps);
-    await expect(confirmDraft(e, { draftId: d.id, fill: { deliverBy: '2026-01-01' } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
+    await expect(confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: { deliverBy: '2026-01-01' } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
     const v = await interpret(e, { buyerId: 'b1', text: 'party' }, stub({ unclear: [], needs: [] }).deps);
-    await expect(confirmDraft(e, { draftId: v.id, fill: { needs: ['x'] } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
-    await expect(confirmDraft(e, { draftId: 'nope', fill: {} })).rejects.toMatchObject({ code: 'DRAFT_NOT_FOUND', status: 404 });
+    await expect(confirmDraft(e, { buyerId: 'b1', draftId: v.id, fill: { needs: ['x'] } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
+    await expect(confirmDraft(e, { buyerId: 'b1', draftId: 'nope', fill: {} })).rejects.toMatchObject({ code: 'DRAFT_NOT_FOUND', status: 404 });
+  });
+
+  it('keeps an unknown-claim doubt through an empty fill, and the model doubts about typed fields', async () => {
+    const d = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, claims: ['MADE_UP'] }).deps);
+    await expect(confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: {} })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
+    const m = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, unclear: ['quantity'] }).deps);
+    expect(m.unclear).toContain('quantity');
+    await expect(confirmDraft(e, { buyerId: 'b1', draftId: m.id, fill: {} })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
+    const ok = await confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: { claims: ['FREE_FROM_LACTOSE'] } });
+    expect(ok.status).toBe('confirmed');
+  });
+
+  it('hides other buyers drafts, refuses a second confirm without a second event', async () => {
+    const d = await interpret(e, { buyerId: 'b1', text: MILK }, stub(milk).deps);
+    await expect(confirmDraft(e, { buyerId: 'b2', draftId: d.id, fill: {} })).rejects.toMatchObject({ code: 'DRAFT_NOT_FOUND', status: 404 });
+    await confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: {} });
+    await expect(confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: {} })).rejects.toMatchObject({ code: 'DRAFT_ALREADY_CONFIRMED', status: 409 });
+    expect((await listEvents(e, { since: 0 })).filter((x) => x.type === 'draft.confirmed')).toHaveLength(1);
+  });
+
+  it('refuses malformed fills instead of saving them as confirmed', async () => {
+    const d = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, unclear: ['x'] }).deps);
+    for (const fill of [{ x: 1, claims: 5 }, { x: 1, brand: { rule: 'only', names: 'Valio' } }, { x: 1, brand: { rule: 'only', names: [''] } }, { x: 1, quantity: 5 }]) {
+      await expect(confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
+    }
   });
 });

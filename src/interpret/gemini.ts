@@ -1,11 +1,13 @@
 import { helsinkiIso, now } from '../clock';
 import type { Env } from '../env';
 import { logEvent } from '../events/log';
+import type { Quantity } from '../offers/conversion';
+import { draftSchema } from '../quote/store';
 
-/** A buyer-facing failure: MODEL_UNAVAILABLE (503), DRAFT_NOT_FOUND (404) or DRAFT_UNCLEAR (409). */
+/** A buyer-facing failure: MODEL_UNAVAILABLE (503), DRAFT_NOT_FOUND (404), DRAFT_UNCLEAR or DRAFT_ALREADY_CONFIRMED (409). */
 export class InterpretError extends Error {
   constructor(
-    public code: 'MODEL_UNAVAILABLE' | 'DRAFT_NOT_FOUND' | 'DRAFT_UNCLEAR',
+    public code: 'MODEL_UNAVAILABLE' | 'DRAFT_NOT_FOUND' | 'DRAFT_UNCLEAR' | 'DRAFT_ALREADY_CONFIRMED',
     public status: 503 | 404 | 409,
     message: string,
   ) {
@@ -13,8 +15,6 @@ export class InterpretError extends Error {
     this.name = 'InterpretError';
   }
 }
-
-export type Quantity = { value: number; unit: 'l' | 'kg' | 'pcs' };
 
 /**
  * A typed need drafted from one sentence. `text` is kept for the record only: nothing here is authority and policy
@@ -50,6 +50,13 @@ interface Raw {
 }
 
 const UNITS = ['l', 'kg', 'pcs'];
+
+/** The reviewed subtypes of the three demo families (src/catalog/subtypes.ts); any other category has none a model may name. */
+const REVIEWED_SUBTYPES: Record<string, string[]> = {
+  '10400': ['coffee milk', 'milk coffee drink', 'buttermilk', 'portion milk', 'other', 'drinking milk'],
+  '18750': ['chicken breast fillet', 'other poultry'],
+  '10500': ['plant spread', 'clarified butter', 'butter'],
+};
 const FIELDS = ['category', 'subtype', 'claims', 'quantity', 'deliverBy', 'brand', 'packLitres'];
 const str = { type: 'STRING' };
 
@@ -88,21 +95,30 @@ function validate(raw: Raw, today: string, categories: Set<string>, claimIds: Se
     if (categories.has(String(raw.category))) out.category = String(raw.category);
     else unclear.push('category');
   }
-  if (raw.subtype) out.subtype = String(raw.subtype);
-  for (const c of raw.claims ?? []) {
+  if (raw.subtype != null) {
+    if (typeof raw.subtype === 'string' && out.category && REVIEWED_SUBTYPES[out.category]?.includes(raw.subtype)) out.subtype = raw.subtype;
+    else unclear.push('subtype');
+  }
+  if (raw.claims != null && !Array.isArray(raw.claims)) unclear.push('claims');
+  for (const c of Array.isArray(raw.claims) ? raw.claims : []) {
     if (claimIds.has(c)) out.claims.push(c);
     else if (!unclear.includes('claims')) unclear.push('claims');
   }
   const q = raw.quantity;
-  if (q && (q.value != null || q.unit != null)) {
-    if (typeof q.value === 'number' && q.value > 0 && UNITS.includes(q.unit ?? '')) out.quantity = { value: q.value, unit: q.unit as Quantity['unit'] };
+  if (q != null) {
+    if (typeof q === 'object' && typeof q.value === 'number' && q.value > 0 && UNITS.includes(q.unit ?? '')) out.quantity = { value: q.value, unit: q.unit as Quantity['unit'] };
     else unclear.push('quantity');
   }
   if (raw.deliverBy != null) {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw.deliverBy) && !Number.isNaN(Date.parse(raw.deliverBy)) && raw.deliverBy >= today) out.deliverBy = raw.deliverBy;
+    const d = raw.deliverBy;
+    if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(d)) && new Date(d).toISOString().slice(0, 10) === d && d >= today) out.deliverBy = d;
     else unclear.push('deliverBy');
   }
-  if (raw.brand?.names?.length && (raw.brand.rule === 'only' || raw.brand.rule === 'prefer')) out.brand = { rule: raw.brand.rule, names: raw.brand.names };
+  const b = raw.brand;
+  if (b != null) {
+    if (typeof b === 'object' && (b.rule === 'only' || b.rule === 'prefer') && Array.isArray(b.names) && b.names.length > 0 && b.names.every((n) => typeof n === 'string' && n)) out.brand = { rule: b.rule, names: b.names };
+    else unclear.push('brand');
+  }
   if (typeof raw.packLitres === 'number' && raw.packLitres > 0) out.packLitres = raw.packLitres;
   return { fields: out, unclear };
 }
@@ -117,6 +133,7 @@ async function askModel(env: Env, text: string, today: string, ref: Awaited<Retu
     `Category codes (code: name):\n${ref.categories.map((c) => `${c.category}: ${c.names}`).join('\n')}`,
     `Claim ids: ${ref.claimIds.join(', ')}`,
     'quantity.unit is one of l, kg, pcs.',
+    `subtype is only set for these reviewed categories, and must be one of: ${Object.entries(REVIEWED_SUBTYPES).map(([c, l]) => `${c}: ${l.join(' | ')}`).join('; ')}. Otherwise leave it out.`,
   ].join('\n');
   try {
     const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`, {
@@ -130,7 +147,9 @@ async function askModel(env: Env, text: string, today: string, ref: Awaited<Retu
     });
     if (!res.ok) throw new Error(`gemini ${res.status}`);
     const j = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-    return JSON.parse(j.candidates![0].content!.parts![0].text!) as Raw;
+    const parsed: unknown = JSON.parse(j.candidates![0].content!.parts![0].text!);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('not an object');
+    return parsed as Raw;
   } catch (err) {
     if (err instanceof InterpretError) throw err;
     throw new InterpretError('MODEL_UNAVAILABLE', 503, 'the model did not return a usable draft');
@@ -159,13 +178,13 @@ export async function interpret(
   const ref = await lists(env);
   const raw = await askModel(env, input.text, today, ref, deps.fetch);
   const { fields, unclear } = validate(raw, today, new Set(ref.categories.map((c) => c.category)), new Set(ref.claimIds));
-  const needs = (raw.needs ?? []).filter((n) => typeof n === 'string' && n);
+  const needs = (Array.isArray(raw.needs) ? raw.needs : []).filter((n) => typeof n === 'string' && n);
   const d: InterpretedDraft = { id: `d_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`, status: 'draft', text: input.text, ...fields, unclear: [], missing: [], needs };
   if (raw.category == null && needs.length === 0) {
     d.status = 'needs_input';
     d.missing = ['needs', ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy'])];
   } else {
-    const modelUnclear = (raw.unclear ?? []).filter((u) => !FIELDS.includes(u));
+    const modelUnclear = (Array.isArray(raw.unclear) ? raw.unclear : []).filter((u) => typeof u === 'string' && u);
     d.unclear = [...new Set([...modelUnclear, ...unclear, ...(fields.category ? [] : ['category']), ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy'])])];
   }
   await save(env, input.buyerId, d, helsinkiIso(at));
@@ -178,20 +197,23 @@ export async function interpret(
  * `unclear` entry (a field the model listed, such as `fatLevel`, included). Refuses with DRAFT_UNCLEAR while anything is
  * still unclear or the draft is `needs_input`; otherwise stores `status: 'confirmed'` and appends `draft.confirmed`.
  */
-export async function confirmDraft(env: Env, input: { draftId: string; fill: Record<string, unknown>; buyerId?: string }): Promise<InterpretedDraft> {
-  const row = await env.DB.prepare('SELECT buyer_id, body FROM drafts WHERE id = ?').bind(input.draftId).first<{ buyer_id: string; body: string }>();
-  if (!row || (input.buyerId && row.buyer_id !== input.buyerId)) throw new InterpretError('DRAFT_NOT_FOUND', 404, `no draft ${input.draftId}`);
+export async function confirmDraft(env: Env, input: { draftId: string; fill: Record<string, unknown>; buyerId: string }): Promise<InterpretedDraft> {
+  const row = await env.DB.prepare('SELECT buyer_id, body FROM drafts WHERE id = ? AND buyer_id = ?').bind(input.draftId, input.buyerId).first<{ buyer_id: string; body: string }>();
+  if (!row) throw new InterpretError('DRAFT_NOT_FOUND', 404, `no draft ${input.draftId}`);
   const d = JSON.parse(row.body) as InterpretedDraft;
+  if (d.status === 'confirmed') throw new InterpretError('DRAFT_ALREADY_CONFIRMED', 409, 'draft is already confirmed');
   if (d.status === 'needs_input') throw new InterpretError('DRAFT_UNCLEAR', 409, `draft needs: ${d.missing.join(', ')}`);
 
   const at = await now(env);
   const ref = await lists(env);
   const merged = { ...d, ...Object.fromEntries(Object.entries(input.fill).filter(([k]) => FIELDS.includes(k))) } as Raw;
   const { fields, unclear } = validate(merged, helsinkiIso(at).slice(0, 10), new Set(ref.categories.map((c) => c.category)), new Set(ref.claimIds));
-  const keep = d.unclear.filter((u) => !FIELDS.includes(u) && !(u in input.fill));
+  const keep = d.unclear.filter((u) => !Object.hasOwn(input.fill, u));
   const missing = [...(fields.category ? [] : ['category']), ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy'])];
   const next: InterpretedDraft = { ...d, category: undefined, subtype: undefined, quantity: undefined, deliverBy: undefined, brand: undefined, packLitres: undefined, ...fields, unclear: [...new Set([...keep, ...unclear, ...missing])] };
   if (next.unclear.length) throw new InterpretError('DRAFT_UNCLEAR', 409, `still unclear: ${next.unclear.join(', ')}`);
+  const typed = draftSchema.safeParse(next);
+  if (!typed.success) throw new InterpretError('DRAFT_UNCLEAR', 409, `draft is not a valid need: ${typed.error.issues[0]?.message}`);
   next.status = 'confirmed';
   await save(env, row.buyer_id, next, helsinkiIso(at));
   await logEvent(env, { type: 'draft.confirmed', buyerId: row.buyer_id, draftId: next.id, data: {} });
