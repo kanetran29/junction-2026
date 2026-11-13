@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "index:build": "tsx scripts/build-index.ts",
+    "index:load": "wrangler d1 execute DB --local --file .data/valio/build/products.sql",
+    "index:load:remote": "wrangler d1 execute DB --remote --file .data/valio/build/products.sql",
     "acceptance": "tsx test/acceptance/run.ts",
     "test": "vitest run"
   },
