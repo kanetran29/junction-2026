@@ -170,4 +170,4 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; box-shadow: non
 .skin { fill: none; }
 
 @media (prefers-reduced-motion: reduce) { .beacon[data-stamp="SCAN"] .beacon-lamp :is(.iso-fill, .iso-shade, .iso-top) { animation: none; } }
-@media (max-width: 640px) { .ticker { display: none; } .caption { font-size: 14px; bottom: 1cqw; } }
+@media (max-width: 640px) { .stage { aspect-ratio: 4 / 3.6; } .ticker { display: none; } .caption { font-size: 14px; bottom: 2cqw; } }

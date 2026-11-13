@@ -3,6 +3,7 @@
 export const SHELVES = 4;
 export const CUTOFF = "2026-11-15T17:00:00+02:00";
 const LOG_KEEP = 9;
+const OUTCOMES = new Set(["AUTO", "NEEDS_APPROVAL", "REJECT"]);
 const CROSSING = new Set(["NEW_ALLERGEN", "SUBTYPE_MISMATCH", "CLAIM_MISSING", "TEMP_CLASS_CHANGED", "UNIT_MISMATCH", "BRAND_EXCLUDED"]);
 
 /** Empty shelf slot; productId null means nothing is shown on its tag. */
@@ -120,7 +121,7 @@ export function reduce(state, ev, t) {
       break;
     }
     case "policy.decided":
-      if (!d.outcome) break;
+      if (!OUTCOMES.has(d.outcome)) break;
       s.door = { scan: false, stamp: d.outcome, reasons: codesOf(d.reasons), since: t };
       if (d.outcome === "REJECT") goAgent("chef", "rejected");
       break;

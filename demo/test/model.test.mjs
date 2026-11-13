@@ -136,3 +136,8 @@ test("reduce: story.say sets and clears a speech bubble", () => {
   s = run([{ type: "story.say", data: {} }], s);
   assert.equal(s.say, null);
 });
+
+test("reduce: an outcome outside the schema is ignored", () => {
+  const s = run([{ seq: 900, type: "policy.decided", data: { outcome: '"><img src=x onerror=alert(1)>', reasons: [] } }]);
+  assert.equal(s.door.stamp, null);
+});
