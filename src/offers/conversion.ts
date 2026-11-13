@@ -40,7 +40,7 @@ export function contentPerSalesUnit(product: ContentSource, price: PriceRow): { 
  */
 export function fillQuantity(
   qty: Quantity,
-  content: { value: number; unit: Unit },
+  content: { value: number; unit: Quantity['unit'] },
   lotStep: number | null,
 ): { salesUnits: number; filled: number; overage: number } | { code: 'NOT_CONVERTIBLE' } {
   if (qty.unit !== content.unit) return { code: 'NOT_CONVERTIBLE' };

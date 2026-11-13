@@ -89,9 +89,11 @@ describe('createQuote', () => {
 
   it('subtracts accepted lines for the same delivery date from limited stock, and ignores held, other dates', async () => {
     const limited: Record<string, Row> = { QA: { price: 1, stock: 600 } };
+    /** Inserts an order row for the lines below. */
     const order = async (id: string, state: string) => e.DB.prepare("INSERT INTO orders(id, buyer_id, state, body, created_at) VALUES (?, 'hotel-b', ?, '{}', 'x')").bind(id, state).run();
     await order('o1', 'ACCEPTED');
     await order('o2', 'HELD');
+    /** Inserts one order line of QA for hotel-b. */
     const line = (o: string, units: number, date: string, state: string) =>
       e.DB.prepare("INSERT INTO order_lines(order_id, buyer_id, product_id, delivery_date, sales_units, state) VALUES (?, 'hotel-b', 'QA', ?, ?, ?)").bind(o, date, units, state).run();
     await line('o1', 100, '2026-11-16', 'ACCEPTED');

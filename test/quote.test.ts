@@ -11,7 +11,9 @@ const meta = { id: 'q1', buyerId: 'hotel-a', draftId: 'd1', now: NOW };
 function quote(d: Draft, products: CatalogProduct[], rows: Record<string, Row>, extra: { acceptedUnits?: Map<string, number>; brandsNotCarried?: string[] } = {}): Quote {
   return buildQuote({ ...meta, draft: d, products, offers: offersFor(rows), ...extra });
 }
+/** The code of a product's rejection, or undefined. */
 const code = (q: Quote, id: string) => q.rejections.find((r) => r.productId === id)?.code;
+/** The product ids of the offers, in rank order. */
 const ids = (q: Quote) => q.offers.map((o) => o.productId);
 
 describe('buildQuote: the brief example', () => {
@@ -216,8 +218,10 @@ describe('buildQuote: product list and unknown ids', () => {
 });
 
 describe('buildQuote: reference product and substitutes', () => {
+  /** The reference product R with one allergen, overridable. */
   const ref = (o: Partial<CatalogProduct> = {}) =>
     product('R', { substitutes: ['S1', 'S2', 'S3', 'S4'], allergens: { contains: ['AM'], mayContain: [], freeFrom: ['AW'] }, ...o });
+  /** Four substitutes of R: equivalent, new allergen, lost claim, other temperature class. */
   const subs = () => [
     product('S1', { allergens: { contains: ['AM'], mayContain: [], freeFrom: [] } }),
     product('S2', { allergens: { contains: ['AM', 'AW'], mayContain: [], freeFrom: [] } }),
@@ -273,5 +277,32 @@ describe('buildQuote: reference product and substitutes', () => {
   it('pcs when the reference content is unknown: NOT_CONVERTIBLE', () => {
     const q = quote({ ...rd, quantity: { value: 100, unit: 'pcs' } }, [ref({ substitutes: ['S1'] }), subs()[0]], { R: { noStock: true, price: 2, unit: null }, S1: { price: 1 } });
     expect(code(q, 'S1')).toBe('NOT_CONVERTIBLE');
+  });
+  it('pcs on a reference with no litre or kilo content is its own sales units, rounded to whole lots', () => {
+    const r = ref({ substitutes: [] });
+    const q = quote({ ...rd, quantity: { value: 2, unit: 'pcs' } }, [r], { R: { price: 52.49, unit: null, tax: 25.5 } });
+    expect(q.offers[0]).toMatchObject({ productId: 'R', filled: 2, shortfall: 0, netCents: 10498, grossCents: 13175 });
+    expect(q.offers[0].lines[0]).toMatchObject({ salesUnits: 2, contentUnit: 'pcs' });
+    const lots = quote({ ...rd, quantity: { value: 5, unit: 'pcs' } }, [{ ...r, lotStep: 4 }], { R: { unit: null } });
+    expect(lots.offers[0].lines[0].salesUnits).toBe(8);
+  });
+  it('a split on a reference need takes the reference stock first, then cheaper substitutes', () => {
+    const q = quote(rd, [ref({ substitutes: ['S1'] }), subs()[0]], { R: { price: 2, stock: 10 }, S1: { price: 1, stock: 20 } });
+    expect(q.offers[0].lines.map((l) => [l.productId, l.salesUnits])).toEqual([['R', 10], ['S1', 20]]);
+    expect(q.offers[0]).toMatchObject({ filled: 30, shortfall: 20, changes: ['SUBSTITUTE', 'SHORTFALL'] });
+  });
+  it('a substitute list naming the reference itself, and repeated ids, never double-count a candidate', () => {
+    const q = quote(rd, [ref({ substitutes: ['R', 'S1', 'S1'] }), subs()[0]], { R: { noStock: true }, S1: { price: 1 } });
+    expect(q.summary).toEqual({ candidates: 2, offered: 1, rejected: 1, unaccounted: 0 });
+    const list = quote({ products: ['QA', 'QA'], quantity: { value: 10, unit: 'l' }, deliverBy: '2026-11-16' }, [product('QA')], { QA: {} });
+    expect(list.offers).toHaveLength(1);
+    expect(list.summary).toEqual({ candidates: 1, offered: 1, rejected: 0, unaccounted: 0 });
+  });
+});
+
+describe('buildQuote: gross is exact integer arithmetic', () => {
+  it('net 100 at 25.5 % is 126 (an exact half cent rounds up)', () => {
+    const q = quote({ ...draft, quantity: { value: 1, unit: 'l' } }, [product('T1')], { T1: { price: 1, tax: 25.5 } });
+    expect(q.offers[0]).toMatchObject({ netCents: 100, grossCents: 126 });
   });
 });

@@ -3,7 +3,7 @@ import { defaultSubtype } from '../catalog/subtypes';
 import { helsinkiIso } from '../clock';
 import { halfUp, lineNetCents } from '../domain/money';
 import type { ReasonCode } from '../domain/reasons';
-import { contentPerSalesUnit, fillQuantity, type Quantity, type Unit } from '../offers/conversion';
+import { contentPerSalesUnit, fillQuantity, type Quantity } from '../offers/conversion';
 import { orderable } from '../offers/orderable';
 import { checkSubstitute } from '../policy/substitute';
 import type { Offers } from '../valio/client';
@@ -30,7 +30,7 @@ export interface OfferLine {
   salesUnits: number;
   salesUnit: string | null;
   contentPerSalesUnit: number;
-  contentUnit: Unit;
+  contentUnit: Quantity['unit'];
   netCentsPerSalesUnit: number;
   taxRate: number;
   deliveryDate: string;
@@ -126,7 +126,7 @@ interface Feasible {
   validTo: string | undefined;
   priceEuros: number;
   taxRate: number;
-  content: { value: number; unit: Unit };
+  content: { value: number; unit: Quantity['unit'] };
   salesUnits: number;
   /** Sales units still free: Valio's limit less accepted lines, Infinity when unlimited. */
   available: number;
@@ -165,7 +165,9 @@ function evaluate(p: CatalogProduct, x: Ctx, substituteOf?: CatalogProduct): Eva
     else if (p.subtype !== x.wantedSubtype) return reject('SUBTYPE_MISMATCH', `${p.subtype ?? 'untyped'}, not ${x.wantedSubtype}`);
   }
   const priceRow = price!;
-  const content = contentPerSalesUnit(p, priceRow);
+  let content: { value: number; unit: Quantity['unit'] } | null = contentPerSalesUnit(p, priceRow);
+  // a pcs need on the reference itself is its own sales units, even when Valio gives no litre or kilo content
+  if (!content && x.qty.unit === 'pcs' && x.reference?.id === p.id) content = { value: 1, unit: 'pcs' };
   if (!content) return reject('NOT_CONVERTIBLE', 'no litre or kilo content known for this product');
   const fill = fillQuantity(x.qty, content, p.lotStep);
   if ('code' in fill) return reject('NOT_CONVERTIBLE', `${x.qty.unit} requested, this product is sold by ${content.unit}`);
@@ -190,11 +192,14 @@ function evaluate(p: CatalogProduct, x: Ctx, substituteOf?: CatalogProduct): Eva
 }
 
 /**
- * When no single product covers the quantity: takes the cheapest (per litre or kilo) limited products in turn, whole
- * lots only, until the quantity is covered or the stock runs out.
+ * When no single product covers the quantity: takes the reference product's own stock first (the buyer asked for it),
+ * then the cheapest (per litre or kilo) limited products in turn, whole lots only, until the quantity is covered or the stock runs out.
  */
-function splitLines(feasible: Feasible[], qty: Quantity): { f: Feasible; salesUnits: number }[] {
-  const order = feasible.filter((f) => f.available > 0).sort((a, b) => a.centsPerContentUnit - b.centsPerContentUnit || (a.product.id < b.product.id ? -1 : 1));
+function splitLines(feasible: Feasible[], qty: Quantity, referenceId?: string): { f: Feasible; salesUnits: number }[] {
+  const first = (f: Feasible) => (f.product.id === referenceId ? 0 : 1);
+  const order = feasible
+    .filter((f) => f.available > 0)
+    .sort((a, b) => first(a) - first(b) || a.centsPerContentUnit - b.centsPerContentUnit || (a.product.id < b.product.id ? -1 : 1));
   const lines: { f: Feasible; salesUnits: number }[] = [];
   let remaining = qty.value;
   for (const f of order) {
@@ -215,7 +220,7 @@ function makeOffer(lines: { f: Feasible; salesUnits: number }[], x: Ctx): Omit<O
   const netCents = lines.reduce((s, { f, salesUnits }) => s + lineNetCents(f.priceEuros, salesUnits), 0);
   const byRate = new Map<number, number>();
   for (const { f, salesUnits } of lines) byRate.set(f.taxRate, (byRate.get(f.taxRate) ?? 0) + lineNetCents(f.priceEuros, salesUnits));
-  const grossCents = [...byRate].reduce((s, [rate, net]) => s + halfUp(round(net * (1 + rate / 100), 6)), 0);
+  const grossCents = [...byRate].reduce((s, [rate, net]) => s + Math.floor((net * Math.round((100 + rate) * 100) + 5000) / 10000), 0);
   const filled = round(lines.reduce((s, { f, salesUnits }) => s + salesUnits * f.content.value, 0), 3);
   const shortfall = Math.max(0, round(x.qty.value - filled, 3));
   const flags = new Set<ReasonCode>(lines.flatMap(({ f }) => f.flags));
@@ -268,7 +273,7 @@ function assemble(candidates: CatalogProduct[], x: Ctx): { offers: Omit<Offer, '
     else feasible.push(e.feasible);
   }
   const singles = feasible.filter((f) => f.available >= f.salesUnits);
-  const lines = singles.length ? singles.map((f) => [{ f, salesUnits: f.salesUnits }]) : [splitLines(feasible, x.qty)].filter((l) => l.length);
+  const lines = singles.length ? singles.map((f) => [{ f, salesUnits: f.salesUnits }]) : [splitLines(feasible, x.qty, x.reference?.id)].filter((l) => l.length);
   const used = new Set(lines.flat().map(({ f }) => f.product.id));
   for (const f of feasible) {
     if (!used.has(f.product.id)) {
@@ -288,6 +293,7 @@ function assemble(candidates: CatalogProduct[], x: Ctx): { offers: Omit<Offer, '
 export function buildQuote(input: BuildInput): Quote {
   const { draft, offers, now } = input;
   const byId = new Map(input.products.map((p) => [p.id, p]));
+  const listed = draft.products ? [...new Set(draft.products)] : undefined;
   const brand = draft.brand;
   const reference = draft.referenceProduct ? byId.get(draft.referenceProduct) : undefined;
 
@@ -310,9 +316,9 @@ export function buildQuote(input: BuildInput): Quote {
 
   let candidates: CatalogProduct[];
   let unknown: string[] = [];
-  if (draft.products) {
-    candidates = draft.products.filter((id) => byId.has(id)).map((id) => byId.get(id)!);
-    unknown = draft.products.filter((id) => !byId.has(id));
+  if (listed) {
+    candidates = listed!.filter((id) => byId.has(id)).map((id) => byId.get(id)!);
+    unknown = listed!.filter((id) => !byId.has(id));
   } else if (draft.referenceProduct) {
     candidates = reference ? [reference] : [];
     unknown = reference ? [] : [draft.referenceProduct];
@@ -322,7 +328,7 @@ export function buildQuote(input: BuildInput): Quote {
 
   let result = assemble(candidates, x);
   if (reference && draft.allowSubstitutes && !result.offers.some((o) => o.shortfall === 0)) {
-    const subs = reference.substitutes.filter((id) => byId.has(id)).map((id) => byId.get(id)!);
+    const subs = [...new Set(reference.substitutes)].filter((id) => id !== reference.id && byId.has(id)).map((id) => byId.get(id)!);
     if (subs.length) {
       candidates = [reference, ...subs];
       result = assemble(candidates, x);
