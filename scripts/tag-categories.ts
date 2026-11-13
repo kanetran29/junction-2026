@@ -29,6 +29,17 @@ export function parseCategoryTags(json: unknown, knownCodes: Set<string>): Categ
   return out;
 }
 
+/** Codes in `known` that have no row in `tags`: what the second pass must ask for. */
+export function missingCodes(known: Iterable<string>, tags: CategoryTag[]): string[] {
+  const have = new Set(tags.map((t) => t.category));
+  return [...known].filter((c) => !have.has(c));
+}
+
+/** Reads back the `(category, name, tag_source)` tuples of a file written by `categoriesSql`. */
+export function parseCategoriesSql(sql: string): (CategoryTag & { tagSource: 'reviewed' | 'model' })[] {
+  return [...sql.matchAll(/\('(\d+)','((?:[^']|'')*)','(reviewed|model)'\)/g)].map((m) => ({ category: m[1], name: m[2].replaceAll("''", "'"), tagSource: m[3] as 'reviewed' | 'model' }));
+}
+
 const sqlStr = (s: string): string => `'${s.replaceAll("'", "''")}'`;
 
 /** Renders the rows as one DELETE plus one multi-row INSERT for `category_names`. */
@@ -97,20 +108,37 @@ async function main(): Promise<void> {
   const known = new Set(samples.keys());
   const items = [...samples].map(([category, s]) => ({ category, samples: s }));
 
+  const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7).split(',');
+  const outPath = `${dir}/build/categories.sql`;
   const t0 = Date.now();
   let tokens = 0;
   const named = new Map<string, { name: string; tagSource: 'reviewed' | 'model' }>();
-  for (let i = 0; i < items.length; i += BATCH) {
-    const r = await nameBatch(items.slice(i, i + BATCH), known, model, key);
-    tokens += r.tokens;
-    for (const t of r.tags) named.set(t.category, { name: t.name, tagSource: 'model' });
+  const ask = async (batchItems: typeof items): Promise<void> => {
+    for (let i = 0; i < batchItems.length; i += BATCH) {
+      const r = await nameBatch(batchItems.slice(i, i + BATCH), known, model, key);
+      tokens += r.tokens;
+      for (const t of r.tags) named.set(t.category, { name: t.name, tagSource: 'model' });
+    }
+  };
+  if (only) {
+    for (const r of parseCategoriesSql(readFileSync(outPath, 'utf8'))) named.set(r.category, r);
+    await ask(items.filter((i) => only.includes(i.category)));
+  } else {
+    await ask(items);
+    const retry = new Set(missingCodes(known, [...named].map(([category, v]) => ({ category, name: v.name }))));
+    await ask(items.filter((i) => retry.has(i.category)));
   }
   for (const [category, name] of Object.entries(FAMILY_NAMES)) if (known.has(category)) named.set(category, { name, tagSource: 'reviewed' });
+  const unnamed = missingCodes(known, [...named].map(([category, v]) => ({ category, name: v.name })));
 
   const rows = [...named].map(([category, v]) => ({ category, ...v }));
   mkdirSync(`${dir}/build`, { recursive: true });
-  writeFileSync(`${dir}/build/categories.sql`, categoriesSql(rows));
-  console.log(`${items.length} categories, ${rows.length} named, ${tokens} tokens, ${Date.now() - t0} ms, model ${model} -> ${dir}/build/categories.sql`);
+  writeFileSync(outPath, categoriesSql(rows));
+  console.log(`${items.length} categories, ${rows.length} named, ${tokens} tokens, ${Date.now() - t0} ms, model ${model} -> ${outPath}`);
+  if (unnamed.length) {
+    console.error(`unnamed after second pass: ${unnamed.join(',')}`);
+    process.exit(1);
+  }
 }
 
 const entry = (globalThis as { process?: { argv?: string[] } }).process?.argv?.[1];
