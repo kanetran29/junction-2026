@@ -82,6 +82,7 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; box-shadow: non
 /* Displays drawn in face planes. */
 .disp { font-family: var(--anatomy-mono); fill: var(--screen-ink); letter-spacing: .02em; }
 .disp.dim { fill: var(--screen-dim); }
+.disp.engraved { fill: var(--anatomy-mid); letter-spacing: .12em; }
 .disp.big { font-weight: 600; }
 .disp.red-text { fill: var(--stamp-reject); }
 .screen, .phone-screen, .tag-face, .window, .leaf-window { fill: var(--screen); }

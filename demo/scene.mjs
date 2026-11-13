@@ -169,6 +169,7 @@ function warehouse() {
   const seams = [];
   for (let x = wall.x + 44; x < wall.x + wall.w; x += 44) seams.push(seg([x, wall.y + wall.d, 0], [x, wall.y + wall.d, 132]));
   out.push(L(seams.join(""), { tone: "faint" }));
+  out.push(`<g transform="${face(-38, wall.y + wall.d + 0.1, 122)}">${text("", 0, 0, 6, "engraved", "start", "VALIO AIMO · WAREHOUSE")}</g>`);
   out.push(slab(CLOCK, CLOCK.z, CLOCK.h, { tone: "hi", crease: "lo" }, 3, 0.6));
   out.push(dots([[CLOCK.x + 4, CLOCK.y + CLOCK.d, CLOCK.z + CLOCK.h - 4], [CLOCK.x + CLOCK.w - 4, CLOCK.y + CLOCK.d, CLOCK.z + CLOCK.h - 4], [CLOCK.x + 4, CLOCK.y + CLOCK.d, CLOCK.z + 4], [CLOCK.x + CLOCK.w - 4, CLOCK.y + CLOCK.d, CLOCK.z + 4]], { size: 1, tone: "mid" }));
   out.push(`<g transform="${face(CLOCK.x, CLOCK.y + CLOCK.d + 0.1, CLOCK.z + CLOCK.h)}"><rect class="screen" x="7" y="3" width="${CLOCK.w - 14}" height="${CLOCK.h - 6}" rx="2"/>${text("", CLOCK.w / 2, 11, 5, "dim", "middle", "VALIO CUT-OFF · SUN 15 NOV 17:00")}${text("countdown", CLOCK.w / 2, 24.5, 12, "big", "middle")}${text("now", CLOCK.w / 2, 31.5, 4.6, "dim", "middle")}</g>`);
