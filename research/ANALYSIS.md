@@ -238,14 +238,34 @@ Record it on Saturday evening against the live mock, with the replay mode as the
 
 ### 4.4 Questions for the Valio booth
 
-1. Is the mock a frozen snapshot of Monday 16 Nov (the date sent is ignored)? Will it roll forward, and what should a demo show after Sunday 17:00?
-2. Terminal products still say "999999 on 16 Nov" after their closing time. Is "not orderable for that date" the right reading, what would
-   the next delivery date be, and what does a product without schedule lines mean?
-3. Ordering units: is 0.01 in `allowedLotSize` "whole sales units only"? May a buyer order pieces when the sales unit is a case? Which unit
-   does `availableAmount` use when the line's unit differs from the product's?
-4. What is the "fixed price": `catalogPrice` on the order day or the delivery day? What does `netPriceFound: false` mean? Budgets with or without VAT?
-5. Who is "the user" for the judges, and whose approval matters: the buyer's manager, a Valio sales person, or both? May Valio substitute
-   without the buyer's consent, given that some listed pairs change allergens?
+From REVIEW-2 section 13 (Fri 13 Nov), replacing the first list. Most important first; each is ready to ask as written.
+
+1. **"Many Terminal products still report 999999 available for Monday 16 Nov although their closing time passed on Thursday. Is
+   'no longer orderable for that date' the right reading? And is the mock a frozen snapshot of that Monday, or will it roll forward
+   before judging?"**
+   *Vì sao:* khoảnh khắc demo số 1 (cái bẫy 999999) và định nghĩa "đặt được" đều dựa trên cách đọc này; nếu sai, cả hai sụp.
+2. **"When two customers want the same limited stock for the same delivery day, who gets it: the first confirmed order, contract
+   customers first, or quotas? Does an order that is still waiting for the customer's own approval hold stock in the meantime?"**
+   *Vì sao:* quyết định D2 (đơn chờ duyệt có giữ kho không) và luật "đơn được uỷ quyền trước thắng"; 149/246 sản phẩm đặt được có tồn kho hữu hạn.
+3. **"Whose approval do you want to see in the flow: the buyer's manager, a Valio sales person, or both? And may Valio substitute a
+   product or ship short without the buyer confirming first, given that some listed substitution pairs add an allergen?"**
+   *Vì sao:* xác định ai là người duyệt trong hộp thư duyệt, và luật hàng thay thế/thiếu hàng phải qua người duyệt (20 điểm controls).
+4. **"How do your customers really start an order: 'I need product X', a reorder of their usual list, or 'what should I buy for this
+   event'? If the wholesaler's side suggests anything, what would you want it based on?"**
+   *Vì sao:* quyết định D3: dừng ở form + bản đồ danh mục, hay làm tìm kiếm theo dịp; dữ liệu không có lịch sử bán nên ta không tự gợi ý số lượng.
+5. **"How many lines does a typical order have, and when one line cannot be delivered do you ship the rest, hold the whole order, or
+   ask the customer? Is there a minimum order value or a delivery charge per order?"**
+   *Vì sao:* luật giỏ hàng: thiếu một dòng thì cần người duyệt (PARTIAL_BASKET) hay huỷ cả giỏ, và có nên gộp đơn theo ngày giao.
+6. **"What do customers' systems send you today: your product codes, GTINs, or free-text names? And when the sales unit is a case, may
+   a customer order single pieces, or does 0.01 in `allowedLotSize` simply mean whole sales units?"**
+   *Vì sao:* thứ tự phân giải tên (mã → GTIN đơn vị bán → loại → tên) và luật làm tròn lên đơn vị bán nguyên.
+7. **"Is the price fixed when the order is accepted or on the delivery day, and can `catalogPrice` change before the cut-off? What do
+   `netPriceFound: false` and a missing delivery-reliability value mean?"**
+   *Vì sao:* hạn của báo giá và luật PRICE_CHANGED khi duyệt; quyết định D4 (độ tin cậy không rõ: gắn cờ hay bắt duyệt, đang ảnh hưởng 14/37 sản phẩm).
+
+Settled by the review, so no longer asked: budgets with or without VAT (the mandate compares net, the receipt shows both); what a
+demo shows after Sunday 17:00 (recorded replies with a "replay" badge); which unit `availableAmount` uses when a line's unit differs
+and what a product without schedule lines means (both refused as not orderable, the conservative reading).
 
 ## 5. How to stand out in a crowded challenge
 

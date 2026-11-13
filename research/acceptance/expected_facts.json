@@ -4,9 +4,9 @@
   "candidates": 35,
   "orderable": 14,
   "codes": {
-   "CUTOFF_PASSED": 20,
    "NOT_ORDERABLE": 1,
-   "OK": 14
+   "OK": 14,
+   "CUTOFF_PASSED": 20
   },
   "rows": [
    {
@@ -978,5 +978,439 @@
    "OK",
    "OK"
   ]
- ]
+ ],
+ "R2": {
+  "contention_462775": {
+   "limit": 51,
+   "unitCents": 257,
+   "each30NetCents": 7710,
+   "leftAfter30": 21,
+   "requote30": {
+    "filled": 21,
+    "shortfall": 9,
+    "netCents": 5397
+   },
+   "each40NetCents": 10280,
+   "leftAfter40": 11
+  },
+  "hold_469363": {
+   "limit": 384,
+   "unitCents": 248,
+   "held250NetCents": 62000,
+   "freeWhileHeld": 134,
+   "b150WhileHeld": {
+    "filled": 134,
+    "shortfall": 16,
+    "netCents": 33232
+   },
+   "b150AfterRelease": {
+    "filled": 150,
+    "netCents": 37200
+   },
+   "leftForApproval": 234
+  },
+  "butter_orderable": [
+   [
+    6.6,
+    "464411",
+    "Valio voi 500 g suolaamaton"
+   ],
+   [
+    6.62,
+    "463437",
+    "Valio Eila® voi 500 g laktoositon"
+   ],
+   [
+    7.22,
+    "471792",
+    "Eleplant kasvivoimaa leivälle, ruoanlaittoon ja leivontaan 500 g"
+   ],
+   [
+    7.47,
+    "464076",
+    "Valio Eila® voi 4x5 kg laktoositon"
+   ],
+   [
+    7.64,
+    "475797",
+    "Valio voi 500 g normaalisuolainen"
+   ],
+   [
+    10.35,
+    "462421",
+    "Valio Eila® voi 200 g laktoositon"
+   ],
+   [
+    12.04,
+    "472127",
+    "Porlammin Kirkastettu voi 1,8kg"
+   ],
+   [
+    12.2,
+    "476740",
+    "Juustoportti Kirnuvoi 200 g"
+   ],
+   [
+    14.44,
+    "475594",
+    "PELTOLAN GOURMET KIRNUVOI N.700G"
+   ],
+   [
+    19.96,
+    "474681",
+    "Jokilaakson Juusto Ruskistettu Voi 1,2kg"
+   ]
+  ],
+  "basket_held": {
+   "lines": [
+    {
+     "productId": "464306",
+     "salesUnits": 300.0,
+     "filled": 300.0,
+     "netCents": 30300,
+     "taxRate": 13.5
+    },
+    {
+     "productId": "464411",
+     "salesUnits": 40.0,
+     "filled": 20.0,
+     "netCents": 13200,
+     "taxRate": 13.5
+    },
+    {
+     "productId": "472673",
+     "salesUnits": 30.0,
+     "filled": 30.0,
+     "netCents": 23100,
+     "taxRate": 13.5
+    }
+   ],
+   "netCents": 66600,
+   "grossCents": 75591
+  },
+  "basket_auto": {
+   "lines": [
+    {
+     "productId": "464306",
+     "salesUnits": 100.0,
+     "filled": 100.0,
+     "netCents": 10100,
+     "taxRate": 13.5
+    },
+    {
+     "productId": "464411",
+     "salesUnits": 20.0,
+     "filled": 10.0,
+     "netCents": 6600,
+     "taxRate": 13.5
+    },
+    {
+     "productId": "472673",
+     "salesUnits": 20.0,
+     "filled": 20.0,
+     "netCents": 15400,
+     "taxRate": 13.5
+    }
+   ],
+   "netCents": 32100,
+   "grossCents": 36434
+  },
+  "basket_auto_two_lines": {
+   "lines": [
+    {
+     "productId": "464306",
+     "salesUnits": 100.0,
+     "filled": 100.0,
+     "netCents": 10100,
+     "taxRate": 13.5
+    },
+    {
+     "productId": "464411",
+     "salesUnits": 20.0,
+     "filled": 10.0,
+     "netCents": 6600,
+     "taxRate": 13.5
+    }
+   ],
+   "netCents": 16700,
+   "grossCents": 18955
+  },
+  "basket_mixed_vat": {
+   "lines": [
+    {
+     "productId": "464306",
+     "salesUnits": 100.0,
+     "filled": 100.0,
+     "netCents": 10100,
+     "taxRate": 13.5
+    },
+    {
+     "productId": "472822",
+     "salesUnits": 2,
+     "filled": 2,
+     "netCents": 10498,
+     "taxRate": 25.5
+    }
+   ],
+   "netCents": 20598,
+   "grossCents": 24639
+  },
+  "split_brief_example": {
+   "litres": [
+    334,
+    333,
+    333
+   ],
+   "netCents": [
+    33734,
+    33633,
+    33633
+   ],
+   "sumNetCents": 101000,
+   "cumulative": [
+    33734,
+    67367,
+    101000
+   ]
+  },
+  "reliability": {
+   "464306": 1.0,
+   "464411": 1.0,
+   "472673": null,
+   "462281": 1.0,
+   "462775": null,
+   "469363": null,
+   "472822": 1.0
+  },
+  "reliability_known_in_three_families": {
+   "orderable": 37,
+   "known": 23
+  },
+  "limited_with_known_reliability": [
+   [
+    6.0,
+    4773,
+    "470746",
+    "Top Choice poultry Kanan rintafilee 130-150g nahaton luuton tuore 5kg",
+    "ST"
+   ],
+   [
+    13.0,
+    421,
+    "462946",
+    "Kariniemen Kananpojan koipireisi miedosti suolattu 4 kg",
+    "KG"
+   ],
+   [
+    192.0,
+    1509,
+    "463203",
+    "Arla Annosmaito 100x2 cl laktoositon 1,5% UHT",
+    "KI"
+   ],
+   [
+    198.0,
+    770,
+    "462281",
+    "Kariniemen Kananpojan rintafilee maustamaton 160-185g/n. 4,4 kg",
+    "KG"
+   ],
+   [
+    284.0,
+    2168,
+    "472127",
+    "Porlammin Kirkastettu voi 1,8kg",
+    "ST"
+   ],
+   [
+    387.0,
+    361,
+    "471792",
+    "Eleplant kasvivoimaa leivälle, ruoanlaittoon ja leivontaan 500 g",
+    "ST"
+   ]
+  ],
+  "approval_race_469363": {
+   "limit": 384,
+   "a250NetCents": 62000,
+   "b150NetCents": 37200,
+   "leftAfterB": 234
+  },
+  "race_470746": {
+   "limit": 6,
+   "contentKgRaw": 4.998,
+   "contentKg": 5.0,
+   "each20kg": {
+    "productId": "470746",
+    "salesUnits": 4.0,
+    "filled": 20.0,
+    "netCents": 19092,
+    "taxRate": 13.5
+   },
+   "leftUnits": 2,
+   "requote20kg": {
+    "filledKg": 10,
+    "shortfallKg": 10,
+    "netCents": 9546
+   },
+   "sameTypeAlternative": {
+    "productId": "472673",
+    "salesUnits": 20.0,
+    "filled": 20.0,
+    "netCents": 15400,
+    "taxRate": 13.5
+   }
+  },
+  "approval_race_462281": {
+   "limitKg": 198,
+   "a150kg": {
+    "productId": "462281",
+    "salesUnits": 154.0,
+    "filled": 154.0,
+    "netCents": 118580,
+    "taxRate": 13.5
+   },
+   "b60kg": {
+    "productId": "462281",
+    "salesUnits": 61.60000000000001,
+    "filled": 61.6,
+    "netCents": 47432,
+    "taxRate": 13.5
+   },
+   "leftKg": 136.4,
+   "aFits": false
+  },
+  "occasion_party": {
+   "terms": [
+    "juhla",
+    "party",
+    "cocktail",
+    "buffet"
+   ],
+   "products": 517,
+   "categories": 122,
+   "coffee22300": 6,
+   "top": [
+    {
+     "category": "63235",
+     "mentions": 28,
+     "of": 238,
+     "sample": [
+      "Duni 40cm 3-ply bordeaux napkin 125pcs",
+      "Duni 40cm 3-ply vanilla napkin 125pcs"
+     ]
+    },
+    {
+     "category": "63230",
+     "mentions": 20,
+     "of": 79,
+     "sample": [
+      "Softlin Basic 24cm 12x100pcs 2-ply 1/4 white napkin",
+      "Duni 24cm 2-ply yellow napkin 300pcs"
+     ]
+    },
+    {
+     "category": "22140",
+     "mentions": 19,
+     "of": 125,
+     "sample": [
+      "Nordic Sugar Talous Sugar Syrup 7kg",
+      "Nordic Sugar Talous Sugar Syrup 25kg"
+     ]
+    },
+    {
+     "category": "22700",
+     "mentions": 16,
+     "of": 157,
+     "sample": [
+      "Marli Traditional Mead 1,5 L",
+      "Mehukatti Mead 1,5 L"
+     ]
+    },
+    {
+     "category": "52201",
+     "mentions": 16,
+     "of": 58,
+     "sample": [
+      "Karl Fazer whole hazelnuts milk chocolate tablet 200g",
+      "Marabou Premium FIN 70% Mint tablet 100g"
+     ]
+    },
+    {
+     "category": "41701",
+     "mentions": 15,
+     "of": 56,
+     "sample": [
+      "Snellman sous vide Overcooked pork neck frozen n2,8kg",
+      "Snellman sous vide Overcooked Pork cheek frozen  n2kg"
+     ]
+    },
+    {
+     "category": "18720",
+     "mentions": 14,
+     "of": 149,
+     "sample": [
+      "WELL BEEF BONE-IN RIB FI",
+      "DRY AGED BONELESS BEEF ENTRECOTE STEA FI"
+     ]
+    },
+    {
+     "category": "10635",
+     "mentions": 13,
+     "of": 54,
+     "sample": [
+      "Valio Polar® spreadable 9 % e400 g natural processed cheese lactose free",
+      "Felix lactose free natural cream cheese 1,5kg"
+     ]
+    }
+   ]
+  },
+  "unmet_reference_463038": {
+   "ok": false,
+   "code": "CUTOFF_PASSED",
+   "closingTime": "2026-11-12T15:00:00+0200"
+  },
+  "gtin": {
+   "464306": "6408430000487",
+   "resolvesTo": [
+    "464306"
+   ],
+   "sharedSalesUnitGtins": 0
+  },
+  "identical_name": {
+   "name": "Kantolan Ballerina toffee täytekeksi 190g",
+   "products": [
+    "460320",
+    "475455"
+   ],
+   "salesUnits": {
+    "460320": "PAK",
+    "475455": "ST"
+   }
+  },
+  "brands": {
+   "pirkkaCarried": false,
+   "arlaCarried": true,
+   "distinctNormalised": 1399
+  },
+  "brand_neighbours": {
+   "pirkka": [],
+   "arrla": [
+    "arla"
+   ],
+   "oatley": [
+    "oatly"
+   ],
+   "valo": [
+    "jalo",
+    "valio"
+   ],
+   "danone": []
+  },
+  "name_lactose_free_milk": {
+   "products": 70,
+   "categories": 14,
+   "in10400": 34
+  }
+ }
 }
