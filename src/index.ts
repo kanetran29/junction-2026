@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { helsinkiIso, now, replayOn } from './clock';
 import type { Env } from './env';
+import { uiRoutes } from './ui/approve';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -14,5 +15,7 @@ app.get('/health', async (c) => {
     models: { gemini: Boolean(env.GEMINI_API_KEY) },
   });
 });
+
+app.route('/', uiRoutes());
 
 export default app;
