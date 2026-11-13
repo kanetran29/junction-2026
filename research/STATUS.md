@@ -80,3 +80,8 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 - Task 8 (`15dad49`, `7f1da7a`): biên nhận văn bản (đúng "1,010.00", "1,146.35", "Kitchen manager"), trang duyệt trên điện thoại, hộp thư
   người duyệt có QR. Review: quy tắc "còn bao nhiêu hàng" bị lặp ở trang → gộp về một helper.
 - Đang chạy: Task 10a (HTTP API, khoá API, route admin, OpenAPI) → sau đó chạy 49 case nghiệm thu thật lần đầu.
+
+### B6. HTTP API (Task 10a, `680d872`) — lần chạy nghiệm thu thật đầu tiên
+- Chạy 49 case với `wrangler dev` (replay bản ghi Thứ Sáu, Gemini thật): **43 PASS / 6 FAIL / 0 BLOCKED**. AC01, AC24, AC44 (cần model) đã
+  PASS với `gemini-3.8-flash`. 6 FAIL đều là route chưa làm: resolve (AC41–43), families (AC45), rules (AC47), MCP (AC26).
+- Đang chạy: review Opus cho 10a (bảo mật route), và Task 10b (resolve, families, rules, event stream cho trang demo).
