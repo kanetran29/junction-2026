@@ -16,6 +16,7 @@ export function initialState() {
     clockSet: false,
     replay: false,
     caption: "",
+    say: null,
     draft: null,
     quote: null,
     agent: { at: "home", carry: null, since: 0 },
@@ -152,6 +153,9 @@ export function reduce(state, ev, t) {
       break;
     case "story.caption":
       s.caption = d.text ?? "";
+      break;
+    case "story.say":
+      s.say = d.text ? { who: d.who ?? "chef", text: d.text, since: t } : null;
       break;
     case "story.naive":
       s.naive = { step: d.step ?? null, since: t };

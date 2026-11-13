@@ -129,3 +129,10 @@ test("euro and countdown", () => {
   assert.equal(countdown("2026-11-15T16:59:30+02:00", "2026-11-15T17:00:00+02:00"), "0 h 00 min");
   assert.equal(countdown("2026-11-15T17:05:00+02:00", "2026-11-15T17:00:00+02:00"), "closed");
 });
+
+test("reduce: story.say sets and clears a speech bubble", () => {
+  let s = run([{ type: "story.say", data: { who: "chef", text: "Milk!" } }]);
+  assert.deepEqual([s.say.who, s.say.text], ["chef", "Milk!"]);
+  s = run([{ type: "story.say", data: {} }], s);
+  assert.equal(s.say, null);
+});
