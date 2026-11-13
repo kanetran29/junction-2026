@@ -53,7 +53,7 @@ async function resolveName(env: Env, name: string): Promise<ResolveReply> {
   }
   const tokens = wanted.split(/\s+/).filter(Boolean);
   if (!tokens.length) return { status: 'NO_MATCH', valioCalls: 0 };
-  const where = tokens.map(() => "lower(names) LIKE ? ESCAPE '\\'").join(' AND ');
+  const where = tokens.map(() => "EXISTS (SELECT 1 FROM json_each(products.names) WHERE lower(json_extract(value, '$.value')) LIKE ? ESCAPE '\\')").join(' AND ');
   const args = tokens.map((t) => `%${t.replace(/[\\%_]/g, '\\$&')}%`);
   const { results } = await env.DB.prepare(`SELECT id, category, subtype FROM products WHERE ${where} ORDER BY id`).bind(...args).all<{ id: string; category: string; subtype: string | null }>();
   if (!results.length) return { status: 'NO_MATCH', valioCalls: 0 };
@@ -78,14 +78,15 @@ export async function resolve(env: Env, input: ResolveInput): Promise<ResolveRep
   }
   if ('gtin' in input) {
     const hits = await getByGtin(env, input.gtin);
-    if (hits.length === 1) return { status: 'RESOLVED', product: toProduct(hits[0]), valioCalls: 0 };
-    if (hits.length > 1) return { status: 'AMBIGUOUS', candidates: hits.map(toCandidate), valioCalls: 0 };
     const { results } = await env.DB.prepare('SELECT product_id, unit_id FROM product_gtins WHERE gtin = ? ORDER BY product_id').bind(input.gtin).all<{ product_id: string; unit_id: string }>();
-    if (!results.length) return { status: 'NO_MATCH', valioCalls: 0 };
-    const found = await getProducts(env, results.map((r) => r.product_id));
-    const candidates = results.map((r) => {
-      const p = found.find((f) => f.id === r.product_id);
-      return { id: r.product_id, unitId: r.unit_id, salesUnit: p?.salesUnit ?? null, name: p ? nameOf(p) : null };
+    const shared = results.some((r) => r.product_id !== hits[0]?.id) || results.filter((r) => r.product_id === hits[0]?.id).length > 1;
+    if (hits.length === 1 && !shared) return { status: 'RESOLVED', product: toProduct(hits[0]), valioCalls: 0 };
+    if (!hits.length && !results.length) return { status: 'NO_MATCH', valioCalls: 0 };
+    const rows = [...results.map((r) => ({ id: r.product_id, unitId: r.unit_id as string | undefined })), ...hits.filter((h) => !results.some((r) => r.product_id === h.id)).map((h) => ({ id: h.id, unitId: undefined }))];
+    const found = await getProducts(env, rows.map((r) => r.id));
+    const candidates = rows.map((r) => {
+      const p = found.find((f) => f.id === r.id);
+      return { id: r.id, unitId: r.unitId, salesUnit: p?.salesUnit ?? null, name: p ? nameOf(p) : null };
     });
     return { status: 'AMBIGUOUS', candidates, valioCalls: 0 };
   }

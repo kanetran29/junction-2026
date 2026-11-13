@@ -58,7 +58,7 @@ export async function streamEvents(c: Ctx): Promise<Response> {
         }
         ctl.close();
       } catch {
-        // the client went away; nothing left to send
+        // a D1 error or a departed client ends the stream; the client reconnects with Last-Event-ID
       }
     },
     cancel() {

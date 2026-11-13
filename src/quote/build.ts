@@ -1,6 +1,7 @@
 import { normBrand, type CatalogProduct } from '../catalog/search';
 import { defaultSubtype } from '../catalog/subtypes';
 import { helsinkiIso } from '../clock';
+import { defaultMandate } from '../domain/constants';
 import { grossCents, halfUp, lineNetCents } from '../domain/money';
 import type { ReasonCode } from '../domain/reasons';
 import { contentPerSalesUnit, fillQuantity, type Quantity } from '../offers/conversion';
@@ -100,7 +101,7 @@ export interface BuildInput {
 
 /** The order offer `changes` are listed in. */
 const CHANGE_ORDER: ReasonCode[] = ['SUBSTITUTE', 'ALLERGEN_UNKNOWN', 'SUBTYPE_UNVERIFIED', 'PACK_SIZE_CHANGED', 'BRAND_CHANGED', 'SHORTFALL'];
-const RELIABILITY_FLOOR = 0.9;
+const RELIABILITY_FLOOR = defaultMandate('').reliabilityFloor;
 export const QUOTE_TTL_MS = 30 * 60_000;
 
 /** Rounds to `dp` decimals (tames float noise such as 4.4 x 5). */

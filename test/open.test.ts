@@ -24,6 +24,8 @@ beforeAll(async () => {
       product('A3', { names: name('dupe item '), salesUnit: 'ST', category: '10500', subtype: 'butter' }),
       product('A4', { names: name('Juustomaito'), brand: 'ARLA', category: '10500', subtype: 'butter', salesUnitGtin: '222', units: [{ unitId: 'ST', gtin: '222', sizeInBaseUnits: 1 }] }),
       product('A5', { names: name('Tuote 5'), salesUnitGtin: '222', units: [{ unitId: 'ST', gtin: '222', sizeInBaseUnits: 1 }, { unitId: 'PAK', gtin: '333', sizeInBaseUnits: 6 }] }),
+      product('A6', { names: name('Gtin twin'), salesUnitGtin: '444', units: [{ unitId: 'ST', gtin: '444', sizeInBaseUnits: 1 }] }),
+      product('A7', { names: name('Gtin twin 2'), salesUnitGtin: '555', units: [{ unitId: 'ST', gtin: '555', sizeInBaseUnits: 1 }, { unitId: 'PAK', gtin: '444', sizeInBaseUnits: 6 }] }),
       ...['B1', 'B2', 'B3', 'B4'].map((id, i) => product(id, { category: '63235', subtype: null, tagSource: 'model', names: name(`Party ${id}`), brand: null, brandNorm: '', claims: [], searchText: i < 2 ? 'sopii juhla tarjoiluun' : 'ei mitään' })),
       ...['C1', 'C2'].map((id) => product(id, { category: '22300', names: name(`Few ${id}`), searchText: 'party' })),
     ].flatMap((p) => insertStatements([p]).map((s) => e.DB.prepare(s))),
@@ -49,6 +51,17 @@ describe('resolve', () => {
     const other = await json(await post('/v1/resolve', { gtin: '333' }));
     expect(other).toMatchObject({ status: 'AMBIGUOUS', candidates: [{ id: 'A5', unitId: 'PAK' }] });
     expect((await json(await post('/v1/resolve', { gtin: '999' }))).status).toBe('NO_MATCH');
+  });
+
+  it('is AMBIGUOUS when the sales-unit GTIN is also held by another product or level', async () => {
+    const r = await json(await post('/v1/resolve', { gtin: '444' }));
+    expect(r.status).toBe('AMBIGUOUS');
+    expect(r.candidates.map((c: { id: string }) => c.id)).toEqual(['A6', 'A7']);
+  });
+
+  it('matches name tokens against name values, not the JSON keys', async () => {
+    expect((await json(await post('/v1/resolve', { name: 'value' }))).status).toBe('NO_MATCH');
+    expect((await json(await post('/v1/resolve', { name: 'fi' }))).status).toBe('NO_MATCH');
   });
 
   it('never picks between two products sharing an exact name', async () => {
