@@ -29,3 +29,12 @@ Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 ### 5. Cách gắn vào Worker (việc của phiên build, khi merge)
 - `demo/` là file tĩnh thuần, không cần build. Phục vụ tại `/demo` bằng Workers static assets, ví dụ trong `wrangler.jsonc`: `"assets": { "directory": "./demo-public" }` với `demo-public/demo` trỏ (copy) tới `demo/`, hoặc route `/demo/*` đọc từ binding `ASSETS`. Khi cùng origin, ô "Gateway URL" để trống là dùng luôn gateway đó, không cần CORS.
 - Không đưa `demo/dev/` và `demo/test/` ra ngoài (chỉ dùng khi phát triển).
+
+### 6. Video mẫu (xong)
+- `demo/story.mp4`: 2:00, 1920×1080, 30 khung/giây, H.264 yuv420p, faststart, không tiếng. Quay từng khung (`?manual=1`) nên chuyển động mượt và lặp lại y hệt nếu quay lại.
+- Quay lại: chạy `node demo/dev/fake-gateway.mjs` (cổng 8790), rồi script quay trong phiên này (Playwright + ffmpeg, mỗi khung gọi `window.__step(1/30)` và chụp màn hình). Cách nhanh hơn để lấy cảnh cho video pitch: mở `http://localhost:8790/?kiosk=1&autoplay=1` toàn màn hình rồi quay màn hình.
+- 30 khung/giây thay vì 24 theo quy ước của skill quay video: đây là hoạt hình, 30 cho chuyển động mượt hơn.
+
+## Còn lại / cần làm sau
+- Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).
+- Gắn `demo/` vào Worker tại `/demo` (mục 5).
