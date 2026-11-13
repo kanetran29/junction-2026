@@ -44,6 +44,7 @@ function run(offers: Offer[], o: Partial<Parameters<typeof decide>[0]> = {}) {
     ...o,
   });
 }
+/** The reason codes of a decision, in order. */
 const codes = (d: ReturnType<typeof decide>) => d.reasons.map((r) => r.code);
 
 describe('decide', () => {
@@ -91,6 +92,11 @@ describe('decide', () => {
   it('reliability below the floor is RELIABILITY_LOW', () => {
     expect(codes(run([offer(1000, { reliability: { value: 0.5, tri: 'fail' } })]))).toEqual(['RELIABILITY_LOW']);
     expect(codes(run([offer(1000, { reliability: { value: 0.95, tri: 'pass' } })], { mandate: { ...mandate, reliabilityFloor: 0.99 } }))).toEqual(['RELIABILITY_LOW']);
+  });
+  it('RELIABILITY_LOW compares the value with the mandate floor, not the quote tri', () => {
+    const o = offer(1000, { reliability: { value: 0.8, tri: 'fail' } });
+    expect(run([o], { mandate: { ...mandate, reliabilityFloor: 0.5 } })).toEqual({ outcome: 'AUTO', reasons: [] });
+    expect(codes(run([o]))).toEqual(['RELIABILITY_LOW']);
   });
   it.each(['PACK_SIZE_CHANGED', 'SUBSTITUTE', 'SHORTFALL', 'SUBTYPE_UNVERIFIED', 'ALLERGEN_UNKNOWN'] as const)('change %s needs approval with that code', (c) => {
     const d = run([offer(1000, { changes: [c] })]);

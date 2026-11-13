@@ -1,7 +1,7 @@
 import { normBrand, type CatalogProduct } from '../catalog/search';
 import { defaultSubtype } from '../catalog/subtypes';
 import { helsinkiIso } from '../clock';
-import { halfUp, lineNetCents } from '../domain/money';
+import { grossCents, halfUp, lineNetCents } from '../domain/money';
 import type { ReasonCode } from '../domain/reasons';
 import { contentPerSalesUnit, fillQuantity, type Quantity } from '../offers/conversion';
 import { orderable } from '../offers/orderable';
@@ -220,7 +220,6 @@ function makeOffer(lines: { f: Feasible; salesUnits: number }[], x: Ctx): Omit<O
   const netCents = lines.reduce((s, { f, salesUnits }) => s + lineNetCents(f.priceEuros, salesUnits), 0);
   const byRate = new Map<number, number>();
   for (const { f, salesUnits } of lines) byRate.set(f.taxRate, (byRate.get(f.taxRate) ?? 0) + lineNetCents(f.priceEuros, salesUnits));
-  const grossCents = [...byRate].reduce((s, [rate, net]) => s + Math.floor((net * Math.round((100 + rate) * 100) + 5000) / 10000), 0);
   const filled = round(lines.reduce((s, { f, salesUnits }) => s + salesUnits * f.content.value, 0), 3);
   const shortfall = Math.max(0, round(x.qty.value - filled, 3));
   const flags = new Set<ReasonCode>(lines.flatMap(({ f }) => f.flags));
@@ -246,7 +245,7 @@ function makeOffer(lines: { f: Feasible; salesUnits: number }[], x: Ctx): Omit<O
     overage: Math.max(0, round(filled - x.qty.value, 3)),
     shortfall,
     netCents,
-    grossCents,
+    grossCents: grossCents(byRate),
     centsPerContentUnit: filled > 0 ? round(netCents / filled, 4) : 0,
     closingTime: lines.map(({ f }) => f.closingTime).sort((a, b) => Date.parse(a) - Date.parse(b))[0],
     deliveryDate: lines.map(({ f }) => f.deliveryDate).sort().at(-1)!,

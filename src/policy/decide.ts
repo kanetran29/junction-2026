@@ -73,8 +73,8 @@ export function decide(i: DecideInput): Decision {
       if (c === 'NEW_ALLERGEN') add(m.noNewAllergen ? reject : approve, { code: c });
       else if (APPROVAL_CHANGES.includes(c)) add(approve, { code: c });
     }
-    const { value, tri } = o.reliability;
-    if (tri === 'fail' || (value !== null && value < m.reliabilityFloor)) add(approve, { code: 'RELIABILITY_LOW' });
+    const { value } = o.reliability;
+    if (value !== null && value < m.reliabilityFloor) add(approve, { code: 'RELIABILITY_LOW' });
     else if (value === null && m.reliabilityUnknown === 'approve') add(approve, { code: 'RELIABILITY_UNKNOWN' });
   });
 

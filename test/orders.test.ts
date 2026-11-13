@@ -11,10 +11,12 @@ import { fakeValio, product, type Row } from './quote-helpers';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'test-key' };
 const day = '2026-11-16';
+/** A product-list need for `litres` of one product, delivered by the test day. */
 const need = (id: string, litres: number) => ({ products: [id], quantity: { value: litres, unit: 'l' as const }, deliverBy: day });
 const rows: Record<string, Row> = { QA: { price: 1.01 }, QB: { price: 1.2 }, QG: { price: 10, tax: 25.5 }, QL: { price: 1, stock: 6 }, QM: { price: 1, stock: 200 }, QX: { price: 1, closing: '2026-11-13T20:00:00+02:00' } };
 const valio = fakeValio(rows).fn;
 let n = 0;
+/** A fresh idempotency key. */
 const key = () => `k${++n}`;
 
 /** Quotes one need for a buyer against the synthetic Valio rows. */
@@ -24,7 +26,9 @@ const place = (buyer: string, quoteId: string, r: Record<string, Row> = rows, ex
   placeOrder(e, { buyerId: buyer, idempotencyKey: extra.idempotencyKey ?? key(), quoteId, offerId: extra.offerId ?? 'o1' }, fakeValio(r).fn);
 /** The approval token of a buyer's only HELD order, read from the approver inbox as the approver would. */
 const tokenOf = async (buyer = 'hotel-a') => (await approverInbox(e, buyer === 'hotel-a' ? 'ak-a' : 'ak-b')).pending[0].token;
+/** The error a promise rejects with, or null when it resolves. */
 const errOf = (p: Promise<unknown>) => p.then(() => null, (x: unknown) => x as OrderError);
+/** How many ledger lines exist (for one buyer, or all). */
 const lineCount = async (buyer?: string) =>
   (await e.DB.prepare(`SELECT COUNT(*) AS c FROM order_lines WHERE (?1 IS NULL OR buyer_id = ?1)`).bind(buyer ?? null).first<{ c: number }>())!.c;
 
@@ -179,6 +183,38 @@ describe('placeOrder: the state machine', () => {
   });
 });
 
+describe('stuck idempotency keys', () => {
+  it('a committed order whose reply was never written is rebuilt on retry, not 409 forever', async () => {
+    const q = await quote('hotel-a', 'QA', 20);
+    const first = await place('hotel-a', q.id, rows, { idempotencyKey: 'lost' });
+    await e.DB.prepare("UPDATE orders SET reply = NULL WHERE idempotency_key = 'lost'").run();
+    const again = await place('hotel-a', q.id, rows, { idempotencyKey: 'lost' });
+    expect(again).toEqual(first);
+    expect(await lineCount()).toBe(1);
+    expect((await e.DB.prepare("SELECT reply FROM orders WHERE idempotency_key = 'lost'").first<{ reply: string | null }>())!.reply).not.toBeNull();
+  });
+
+  it('a lost STOCK_TAKEN reply is rebuilt with available', async () => {
+    const [qa, qb] = [await quote('hotel-a', 'QL', 4), await quote('hotel-b', 'QL', 4)];
+    await place('hotel-b', qb.id);
+    const first = await place('hotel-a', qa.id, rows, { idempotencyKey: 'lost2' });
+    await e.DB.prepare("UPDATE orders SET reply = NULL WHERE idempotency_key = 'lost2'").run();
+    expect(await place('hotel-a', qa.id, rows, { idempotencyKey: 'lost2' })).toEqual(first);
+  });
+
+  it('a PLACING row is 409 while fresh and is swept after 60 s so the retry proceeds', async () => {
+    const q = await quote('hotel-a', 'QA', 20);
+    await e.DB.prepare("INSERT INTO orders(id, buyer_id, quote_id, idempotency_key, request_hash, state, body, created_at) VALUES ('dead','hotel-a',?, 'stale', ?, 'PLACING', '{}', '2026-11-13T21:10:00+02:00')")
+      .bind(q.id, await sha256Hex(JSON.stringify([q.id, 'o1', null, null, null])))
+      .run();
+    await setClock(e, '2026-11-13T19:10:30Z');
+    expect(await errOf(place('hotel-a', q.id, rows, { idempotencyKey: 'stale' }))).toMatchObject({ status: 409 });
+    await setClock(e, '2026-11-13T19:11:30Z');
+    expect((await place('hotel-a', q.id, rows, { idempotencyKey: 'stale' })).state).toBe('ACCEPTED');
+    expect(await e.DB.prepare("SELECT id FROM orders WHERE id = 'dead'").first()).toBeNull();
+  });
+});
+
 describe('the stock ledger (first authorised order wins)', () => {
   it('two concurrent 399.96 places for one buyer: one ACCEPTED, one HELD (day total re-checked in the batch)', async () => {
     const [q1, q2] = await Promise.all([quote('hotel-a', 'QA', 396), quote('hotel-a', 'QA', 396)]);
@@ -196,7 +232,6 @@ describe('the stock ledger (first authorised order wins)', () => {
     const quotes = await Promise.all(Array.from({ length: 20 }, () => quote('hotel-a', 'QL', 4)));
     const res = await Promise.all(quotes.map((q) => place('hotel-a', q.id)));
     const states = res.map((r) => r.state);
-    console.log('race 20x4 on 6 units:', states.filter((s) => s === 'ACCEPTED').length, 'ACCEPTED,', states.filter((s) => s === 'REJECTED').length, 'REJECTED');
     expect(states.filter((s) => s === 'ACCEPTED')).toHaveLength(1);
     const lost = res.filter((r) => r.state === 'REJECTED');
     expect(lost).toHaveLength(19);
@@ -274,17 +309,28 @@ describe('approval', () => {
     expect(await lineCount('hotel-a')).toBe(1);
     expect((await approverInbox(e, 'ak-a')).pending).toEqual([]);
     expect(await errOf(approve(e, token, { callerRole: 'approver' }, valio))).toMatchObject({ status: 409 });
-    expect(await errOf(approve(e, 'unknown-token', {}, valio))).toMatchObject({ status: 404 });
+    expect(await errOf(approve(e, 'unknown-token', { callerRole: 'approver' }, valio))).toMatchObject({ status: 404 });
     expect(await lineCount('hotel-a')).toBe(1);
   });
 
   it('two concurrent approvals of one token: one ACCEPTED, one 409, one set of lines', async () => {
     await held();
     const token = await tokenOf();
-    const res = await Promise.allSettled([approve(e, token, {}, valio), approve(e, token, {}, valio)]);
+    const res = await Promise.allSettled([approve(e, token, { callerRole: 'approver' }, valio), approve(e, token, { callerRole: 'approver' }, valio)]);
     expect(res.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
     expect(res.find((r) => r.status === 'rejected')).toMatchObject({ reason: { status: 409 } });
     expect(await lineCount('hotel-a')).toBe(1);
+  });
+
+  it('only the approver role may approve or reject: anything else is 403 and the order stays HELD', async () => {
+    const id = await held();
+    const token = await tokenOf();
+    for (const callerRole of ['agent', undefined, 'admin'] as never[]) {
+      expect(await errOf(approve(e, token, { callerRole }, valio))).toMatchObject({ status: 403 });
+      expect(await errOf(reject(e, token, { callerRole }))).toMatchObject({ status: 403 });
+    }
+    expect(await errOf(approve(e, token, undefined as never, valio))).toMatchObject({ status: 403 });
+    expect((await getOrder(e, 'hotel-a', id))?.state).toBe('HELD');
   });
 
   it('an agent key gets 403 and the order stays HELD', async () => {
@@ -299,7 +345,7 @@ describe('approval', () => {
     const id = await held();
     const token = await tokenOf();
     await setClock(e, '2026-11-15T15:05:00Z');
-    expect(await approve(e, token, {}, valio)).toEqual({ orderId: id, state: 'EXPIRED', reason: 'APPROVAL_EXPIRED' });
+    expect(await approve(e, token, { callerRole: 'approver' }, valio)).toEqual({ orderId: id, state: 'EXPIRED', reason: 'APPROVAL_EXPIRED' });
     expect(await getOrder(e, 'hotel-a', id)).toMatchObject({ state: 'EXPIRED', reason: 'APPROVAL_EXPIRED' });
     expect(await lineCount()).toBe(0);
     const ev = (await listEvents(e, { since: 0 })).map((x) => x.type);
@@ -310,7 +356,7 @@ describe('approval', () => {
     await held();
     const token = await tokenOf();
     const dearer = { ...rows, QA: { price: 1.111 } };
-    expect(await approve(e, token, {}, fakeValio(dearer).fn)).toMatchObject({ state: 'EXPIRED', reason: 'PRICE_CHANGED' });
+    expect(await approve(e, token, { callerRole: 'approver' }, fakeValio(dearer).fn)).toMatchObject({ state: 'EXPIRED', reason: 'PRICE_CHANGED' });
     expect(await lineCount()).toBe(0);
   });
 
@@ -318,7 +364,7 @@ describe('approval', () => {
     await held();
     const token = await tokenOf();
     const gone = { ...rows, QA: { price: 1.01, noStock: true } };
-    expect(await approve(e, token, {}, fakeValio(gone).fn)).toMatchObject({ state: 'EXPIRED', reason: 'APPROVAL_EXPIRED' });
+    expect(await approve(e, token, { callerRole: 'approver' }, fakeValio(gone).fn)).toMatchObject({ state: 'EXPIRED', reason: 'APPROVAL_EXPIRED' });
   });
 
   it('approval is not a reservation: stock taken meanwhile is EXPIRED STOCK_TAKEN with what is left', async () => {
@@ -328,7 +374,7 @@ describe('approval', () => {
     const tokenA = await tokenOf('hotel-a');
     const b = await place('hotel-b', (await quote('hotel-b', 'QM', 60, dear)).id, dear);
     expect(b.state).toBe('ACCEPTED');
-    expect(await approve(e, tokenA, {}, fakeValio(dear).fn)).toEqual({ orderId: heldA.orderId, state: 'EXPIRED', reason: 'STOCK_TAKEN', available: 140 });
+    expect(await approve(e, tokenA, { callerRole: 'approver' }, fakeValio(dear).fn)).toEqual({ orderId: heldA.orderId, state: 'EXPIRED', reason: 'STOCK_TAKEN', available: 140 });
     expect(await lineCount('hotel-a')).toBe(0);
     expect((await listEvents(e, { since: 0 })).filter((x) => x.type === 'stock.denied').at(-1)?.data).toEqual({ productId: 'QM', remaining: 140 });
   });
@@ -340,17 +386,17 @@ describe('approval', () => {
     const body = JSON.parse(row!.body);
     body.lines[0].salesUnits = 1;
     await e.DB.prepare('UPDATE orders SET body = ? WHERE id = ?').bind(JSON.stringify(body), id).run();
-    expect(await errOf(approve(e, token, {}, valio))).toMatchObject({ status: 409 });
+    expect(await errOf(approve(e, token, { callerRole: 'approver' }, valio))).toMatchObject({ status: 409 });
     expect((await getOrder(e, 'hotel-a', id))?.state).toBe('HELD');
   });
 
   it('reject ends the order REJECTED once', async () => {
     const id = await held();
     const token = await tokenOf();
-    expect(await reject(e, token)).toEqual({ orderId: id, state: 'REJECTED' });
-    expect(await errOf(reject(e, token))).toMatchObject({ status: 409 });
-    expect(await errOf(approve(e, token, {}, valio))).toMatchObject({ status: 409 });
-    expect(await errOf(reject(e, 'nope'))).toMatchObject({ status: 404 });
+    expect(await reject(e, token, { callerRole: 'approver' })).toEqual({ orderId: id, state: 'REJECTED' });
+    expect(await errOf(reject(e, token, { callerRole: 'approver' }))).toMatchObject({ status: 409 });
+    expect(await errOf(approve(e, token, { callerRole: 'approver' }, valio))).toMatchObject({ status: 409 });
+    expect(await errOf(reject(e, 'nope', { callerRole: 'approver' }))).toMatchObject({ status: 404 });
     expect((await listEvents(e, { since: 0 })).map((x) => x.type)).toContain('approval.rejected');
   });
 

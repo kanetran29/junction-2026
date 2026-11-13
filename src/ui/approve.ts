@@ -163,7 +163,7 @@ export function uiRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }>
     return c.html(r.html, r.status);
   });
 
-  for (const [verb, act] of [['approve', (e: Env, t: string) => approve(e, t, { callerRole: 'approver' }, fetchFn)], ['reject', reject]] as const) {
+  for (const [verb, act] of [['approve', (e: Env, t: string) => approve(e, t, { callerRole: 'approver' }, fetchFn)], ['reject', (e: Env, t: string) => reject(e, t, { callerRole: 'approver' })]] as const) {
     ui.post(`/${verb}/:token`, async (c) => {
       const r = await act(c.env, c.req.param('token'));
       return wantsJson(c.req.header('Accept')) || !c.req.header('Accept')?.includes('text/html') ? c.json(r) : c.html(resultPage(r));
