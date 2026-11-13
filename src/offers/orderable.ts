@@ -27,7 +27,7 @@ export function orderable(
   product: { salesUnit: string | null },
 ): Orderable {
   const cp = price?.catalogPrice;
-  if (!price || price.error || !cp || cp.value == null || (cp.validTo && Date.parse(cp.validTo) < now.getTime())) {
+  if (!price || price.error || !cp || !((cp.value ?? 0) > 0) || (cp.validTo && Date.parse(cp.validTo) < now.getTime())) {
     return no('PRICE_UNAVAILABLE', 'Valio returned no valid price');
   }
   const positive = (av.scheduleLines ?? []).filter((s) => s.availableAmount > 0);

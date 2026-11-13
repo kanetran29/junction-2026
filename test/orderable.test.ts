@@ -48,6 +48,17 @@ describe('orderable', () => {
     expect(r.ok === false && r.code).toBe('PRICE_UNAVAILABLE');
   });
 
+  it('a zero catalog price, a price error with a valid price, and a null price without an error are all PRICE_UNAVAILABLE', () => {
+    const base = pr('T0001');
+    const zero = { ...base, catalogPrice: { ...base.catalogPrice!, value: 0 } };
+    const errored = { ...base, error: true };
+    const none = { ...base, catalogPrice: null, error: false };
+    for (const bad of [zero, errored, none]) {
+      const r = orderable(av('T0001'), bad, NOW, '2026-11-16', { salesUnit: 'ST' });
+      expect(r.ok === false && r.code).toBe('PRICE_UNAVAILABLE');
+    }
+  });
+
   it('ignores a schedule line in another sales unit and names both units', () => {
     const r = run('T0001', NOW, '2026-11-16', 'KG');
     expect(r.ok).toBe(false);

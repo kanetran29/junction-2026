@@ -41,6 +41,9 @@ describe('fillQuantity', () => {
   it('150 kg with a lot step of 4.4 kg is 35 lots = 154 sales units, 154 kg', () => {
     expect(fillQuantity({ value: 150, unit: 'kg' }, { value: 1, unit: 'kg' }, 4.4)).toEqual({ salesUnits: 154, filled: 154, overage: 4 });
   });
+  it('a lot step counts sales units: lots of 2 units of 5 kg are 10 kg each', () => {
+    expect(fillQuantity({ value: 25, unit: 'kg' }, { value: 5, unit: 'kg' }, 2)).toEqual({ salesUnits: 6, filled: 30, overage: 5 });
+  });
   it('pcs for a kg product, or litres for a kg product, is NOT_CONVERTIBLE', () => {
     expect(fillQuantity({ value: 5, unit: 'pcs' }, { value: 1, unit: 'kg' }, null)).toEqual({ code: 'NOT_CONVERTIBLE' });
     expect(fillQuantity({ value: 5, unit: 'l' }, { value: 1, unit: 'kg' }, null)).toEqual({ code: 'NOT_CONVERTIBLE' });

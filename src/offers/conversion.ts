@@ -33,9 +33,10 @@ export function contentPerSalesUnit(product: ContentSource, price: PriceRow): { 
 }
 
 /**
- * Whole sales units covering `qty` of a product holding `content` per unit. A lot step (in content units; null when
- * the product has none) makes the order a whole number of lots. Only a quantity in the content's own unit converts:
- * `pcs` (or litres for a kilo product) is NOT_CONVERTIBLE.
+ * Whole sales units covering `qty` of a product holding `content` per sales unit. A lot step (in SALES units, as Valio's
+ * allowedLotSize; null when the product has none) makes the order a whole number of lots, each `lotStep` sales units
+ * (`lotStep * content` litres or kilos). Only a quantity in the content's own unit converts: `pcs` (or litres for a
+ * kilo product) is NOT_CONVERTIBLE.
  */
 export function fillQuantity(
   qty: Quantity,
@@ -43,7 +44,7 @@ export function fillQuantity(
   lotStep: number | null,
 ): { salesUnits: number; filled: number; overage: number } | { code: 'NOT_CONVERTIBLE' } {
   if (qty.unit !== content.unit) return { code: 'NOT_CONVERTIBLE' };
-  const step = lotStep ?? content.value;
+  const step = lotStep === null ? content.value : lotStep * content.value;
   const salesUnits = round(Math.ceil(round(qty.value / step, 6)) * (step / content.value), 6);
   const filled = round(salesUnits * content.value, 3);
   return { salesUnits, filled, overage: round(filled - qty.value, 3) };

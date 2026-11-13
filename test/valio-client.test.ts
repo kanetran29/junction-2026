@@ -57,4 +57,10 @@ describe('fetchOffers live', () => {
     }) as unknown as typeof fetch;
     await expect(fetchOffers(e, ['T0001'], '2026-11-16', down)).rejects.toBeInstanceOf(ValioError);
   });
+  it('a 200 with a non-JSON body or without a products array is a ValioError', async () => {
+    const html = vi.fn(async () => new Response('<html>oops</html>', { status: 200 })) as unknown as typeof fetch;
+    await expect(fetchOffers(e, ['T0001'], '2026-11-16', html)).rejects.toBeInstanceOf(ValioError);
+    const bare = vi.fn(async () => new Response(JSON.stringify({ timeNow: 'x' }), { status: 200 })) as unknown as typeof fetch;
+    await expect(fetchOffers(e, ['T0001'], '2026-11-16', bare)).rejects.toBeInstanceOf(ValioError);
+  });
 });

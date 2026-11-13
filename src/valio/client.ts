@@ -127,20 +127,24 @@ async function replayOffers(env: Env, ids: string[]): Promise<Pick<Offers, 'avai
   return { ...rows, timeNow: withIsoOffsets(timeNow) };
 }
 
-/** Posts one batch of up to 1,000 ids to a Valio endpoint and returns its reply; any failure becomes a ValioError. */
+/**
+ * Posts one batch of up to 1,000 ids to a Valio endpoint and returns its reply. Any failure becomes a ValioError:
+ * a network error, a non-200, a body that is not JSON, or a reply without a `products` array.
+ */
 async function post(env: Env, endpoint: 'availability' | 'price', ids: string[], date: string, fetchFn: typeof fetch): Promise<{ timeNow: string; products: unknown[] }> {
-  let res: Response;
   try {
-    res = await fetchFn(`${env.VALIO_API_BASE}/api/${endpoint}`, {
+    const res = await fetchFn(`${env.VALIO_API_BASE}/api/${endpoint}`, {
       method: 'POST',
       headers: { 'X-API-Key': env.VALIO_API_KEY, 'User-Agent': 'lazydoor/0.1', 'Content-Type': 'application/json' },
       body: JSON.stringify({ customer: 'lazydoor', requestedDate: date, products: ids }),
     });
+    if (!res.ok) throw new ValioError(`${endpoint} returned ${res.status}`);
+    const body = (await res.json()) as { timeNow: string; products: unknown[] } | null;
+    if (!body || !Array.isArray(body.products)) throw new ValioError(`${endpoint} reply has no products`);
+    return withIsoOffsets(body);
   } catch (err) {
-    throw new ValioError(`${endpoint} call failed: ${(err as Error).message}`);
+    throw err instanceof ValioError ? err : new ValioError(`${endpoint} call failed: ${(err as Error).message}`);
   }
-  if (!res.ok) throw new ValioError(`${endpoint} returned ${res.status}`);
-  return withIsoOffsets((await res.json()) as { timeNow: string; products: unknown[] });
 }
 
 /**

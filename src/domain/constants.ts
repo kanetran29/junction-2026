@@ -36,3 +36,22 @@ export function defaultMandate(buyerId: string): Mandate {
     aud: MANDATE_AUD,
   };
 }
+
+/**
+ * The published order in which a candidate's first failing check becomes its single rejection code (`/v1/rules`).
+ * The first five come from `orderable`; a new allergen outranks a lost claim because it is the safety finding.
+ */
+export const REJECTION_PRECEDENCE = [
+  'PRICE_UNAVAILABLE',
+  'NOT_ORDERABLE',
+  'SALES_BLOCKED',
+  'CUTOFF_PASSED',
+  'DATE_NOT_MET',
+  'NEW_ALLERGEN',
+  'CLAIM_MISSING',
+  'TEMP_CLASS_CHANGED',
+  'BRAND_EXCLUDED',
+  'SUBTYPE_MISMATCH',
+  'NOT_CONVERTIBLE',
+  'STOCK_LIMITED',
+] as const;

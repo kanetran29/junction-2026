@@ -116,13 +116,19 @@ export async function searchProducts(env: Env, f: SearchFilter): Promise<Catalog
   return results.map(toProduct);
 }
 
-/** Loads products by id (missing ids are simply absent from the result). */
+/** D1 allows at most 100 bound parameters per query, so ids are looked up in chunks well under that. */
+const ID_CHUNK = 90;
+
+/** Loads products by id, in id order (missing ids are simply absent from the result). */
 export async function getProducts(env: Env, ids: string[]): Promise<CatalogProduct[]> {
-  if (ids.length === 0) return [];
-  const { results } = await env.DB.prepare(`SELECT * FROM products WHERE id IN (${ids.map(() => '?').join(',')}) ORDER BY id`)
-    .bind(...ids)
-    .all<Row>();
-  return results.map(toProduct);
+  const unique = [...new Set(ids)];
+  const out: CatalogProduct[] = [];
+  for (let i = 0; i < unique.length; i += ID_CHUNK) {
+    const chunk = unique.slice(i, i + ID_CHUNK);
+    const { results } = await env.DB.prepare(`SELECT * FROM products WHERE id IN (${chunk.map(() => '?').join(',')})`).bind(...chunk).all<Row>();
+    out.push(...results.map(toProduct));
+  }
+  return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
 /** All products whose sales-unit GTIN equals `gtin` exactly (a few products share one). */

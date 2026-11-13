@@ -37,6 +37,8 @@ describe('lookups', () => {
     expect(p.claims).toContain('FREE_FROM_LACTOSE');
     expect(p.names[0].value).toContain('Arla');
     expect(await getProducts(e, [])).toEqual([]);
+    const many = [...Array.from({ length: 250 }, (_, i) => `X${i}`), 'T0003', 'T0001'];
+    expect((await getProducts(e, many)).map((p) => p.id)).toEqual(['T0001', 'T0003']);
   });
   it('getByGtin matches sales-unit GTINs only', async () => {
     expect(ids(await getByGtin(e, '6400000000011'))).toEqual(['T0001']);
