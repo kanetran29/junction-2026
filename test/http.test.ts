@@ -1,0 +1,164 @@
+import { env } from 'cloudflare:workers';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { insertStatements } from '../scripts/build-index';
+import type { Env } from '../src/env';
+import { createApp } from '../src/http/routes';
+import { fakeValio, product } from './quote-helpers';
+
+const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'vk', ADMIN_KEY: 'adm', GEMINI_API_KEY: 'gk', GEMINI_MODEL: 'gm' };
+const milk = { category: '10400', claims: ['FREE_FROM_LACTOSE'], quantity: { value: 200, unit: 'l' }, deliverBy: '2026-11-16', unclear: [], needs: ['milk'] };
+const valio = fakeValio({ P1: { price: 3, stock: 250 } }).fn;
+
+/** One injected fetch for both upstreams: Gemini answers with the milk draft, everything else goes to the fake Valio. */
+const upstream = (async (url: string | URL | Request, init?: RequestInit) =>
+  String(url).includes('generativelanguage')
+    ? new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(milk) }] } }] }))
+    : valio(url, init)) as typeof fetch;
+
+const app = createApp(upstream);
+const call = (path: string, o: { key?: string; body?: unknown; headers?: Record<string, string>; method?: string; env?: Env } = {}) =>
+  app.request(
+    path,
+    {
+      method: o.method ?? (o.body === undefined ? 'GET' : 'POST'),
+      headers: { ...(o.body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(o.key ? { Authorization: `Bearer ${o.key}` } : {}), ...o.headers },
+      body: o.body === undefined ? undefined : JSON.stringify(o.body),
+    },
+    o.env ?? e,
+  );
+const json = async (r: Response) => (await r.json()) as any;
+const reset = async (body: Record<string, unknown> = {}) =>
+  json(await call('/admin/reset', { key: 'adm', body: { clock: '2026-11-13T21:10:00+02:00', replay: null, replayVariant: {}, mandate: { perOrder: { auto: 500, hard: 5000 }, perDay: { auto: 500, hard: 10000 }, reliabilityFloor: 0.9, approver: 'Kitchen manager' }, ...body } }));
+
+beforeAll(async () => {
+  await e.DB.batch(insertStatements([product('P1', { names: [{ language: 'fi', value: 'Maito' }] })]).map((s) => e.DB.prepare(s)));
+  await e.DB.prepare("INSERT OR REPLACE INTO category_names(category, names, tag_source) VALUES ('10400','Milk','reviewed')").run();
+});
+
+describe('auth', () => {
+  it('answers 401 in the {error, detail} shape without a key or with an unknown one', async () => {
+    const r = await call('/v1/quotes/q1');
+    expect(r.status).toBe(401);
+    expect(await json(r)).toMatchObject({ error: 'UNAUTHORIZED', detail: expect.any(String) });
+    expect((await call('/v1/quotes/q1', { key: 'nope' })).status).toBe(401);
+  });
+
+  it('keeps the admin routes for the admin key and demo mode only', async () => {
+    const keys = await reset();
+    expect((await call('/admin/orders?idempotencyKey=x', { key: keys.agentKeys['hotel-a'] })).status).toBe(401);
+    expect((await call('/admin/orders?idempotencyKey=x')).status).toBe(401);
+    expect((await call('/admin/orders?idempotencyKey=x', { key: 'adm', env: { ...e, DEMO_MODE: '0' } })).status).toBe(404);
+    expect((await call('/admin/orders?idempotencyKey=x', { key: 'adm' })).status).toBe(200);
+  });
+
+  it('refuses the admin key on buyer routes (it has no buyer)', async () => {
+    expect((await call('/v1/quotes/q1', { key: 'adm' })).status).toBe(403);
+  });
+});
+
+describe('admin reset', () => {
+  it('can run twice (mandates are deleted before seeding), mints fresh keys and honours the case givens', async () => {
+    const a = await reset();
+    const b = await reset({ priorAccepted: [{ buyer: 'hotel-a', productId: 'P1', salesUnits: 4 }], priorAcceptedNetCents: 1000 });
+    expect(Object.keys(b.agentKeys)).toEqual(['hotel-a', 'hotel-b']);
+    expect(Object.keys(b.approverKeys)).toEqual(['hotel-a', 'hotel-b']);
+    expect(b.agentKeys['hotel-a']).not.toBe(a.agentKeys['hotel-a']);
+    expect((await call('/v1/quotes/q1', { key: a.agentKeys['hotel-a'] })).status).toBe(401);
+    expect(await json(await call('/admin/ledger?buyer=hotel-a', { key: 'adm' }))).toMatchObject({ count: 1, lines: [{ product_id: 'P1', sales_units: 4 }] });
+    expect((await json(await call('/admin/ledger?buyer=hotel-b', { key: 'adm' }))).count).toBe(0);
+  });
+
+  it('sets the clock and the replay variant', async () => {
+    await reset();
+    expect((await call('/admin/clock', { key: 'adm', body: { clock: '2026-11-15T17:05:00+02:00' } })).status).toBe(200);
+    expect((await json(await call('/health'))).now).toBe('2026-11-15T17:05:00+02:00');
+    expect((await call('/admin/replay', { key: 'adm', body: { variant: { P1: 'out_of_stock' } } })).status).toBe(200);
+    expect((await e.DB.prepare("SELECT value FROM settings WHERE key = 'variants'").first<{ value: string }>())!.value).toBe('{"P1":"out_of_stock"}');
+  });
+});
+
+describe('buyer routes', () => {
+  it('runs interpret, confirm, search, quote, order (HELD), inbox, approve, receipt over HTTP', async () => {
+    const keys = await reset();
+    const key = keys.agentKeys['hotel-a'];
+    const i = await json(await call('/v1/interpret', { key, body: { text: 'milk please' } }));
+    expect(i).toMatchObject({ draft: { status: 'draft' }, valioCalls: 0 });
+    const c = await json(await call(`/v1/drafts/${i.draft.id}/confirm`, { key, body: { fill: {} } }));
+    expect(c.draft.status).toBe('confirmed');
+    const s = await json(await call('/v1/search', { key, body: { category: '10400', claims: ['FREE_FROM_LACTOSE'] } }));
+    expect(s).toMatchObject({ valioCalls: 0, products: [{ id: 'P1', category: '10400' }] });
+    const q = await json(await call('/v1/quotes', { key, body: { draftId: i.draft.id } }));
+    expect(q.offers[0]).toMatchObject({ netCents: 60000 });
+    expect((await call(`/v1/quotes/${q.id}`, { key })).status).toBe(200);
+    expect((await call(`/v1/quotes/${q.id}`, { key: keys.agentKeys['hotel-b'] })).status).toBe(404);
+
+    const o = await json(await call('/v1/orders', { key, headers: { 'Idempotency-Key': 'k1' }, body: { quoteId: q.id, offerId: q.offers[0].offerId, agentReason: 'cheapest' } }));
+    expect(o).toMatchObject({ state: 'HELD', approval: { status: 'pending', approver: 'Kitchen manager' } });
+    expect(JSON.stringify(o)).not.toContain('approve/');
+    expect((await json(await call(`/v1/orders/${o.orderId}`, { key }))).state).toBe('HELD');
+    expect((await call(`/v1/orders/${o.orderId}`, { key: keys.agentKeys['hotel-b'] })).status).toBe(404);
+
+    const inbox = await json(await call(`/approver/${keys.approverKeys['hotel-a']}`, { headers: { Accept: 'application/json' } }));
+    const token = inbox.pending[0].token;
+    const asAgent = await call(`/approve/${token}`, { key, method: 'POST' });
+    expect(asAgent.status).toBe(403);
+    expect(await json(asAgent)).toMatchObject({ error: expect.any(String), detail: expect.any(String) });
+    const done = await json(await call(`/approve/${token}`, { method: 'POST' }));
+    expect(done).toMatchObject({ state: 'ACCEPTED' });
+    expect((await call(`/approve/${token}`, { method: 'POST' })).status).toBe(409);
+
+    const rec = await json(await call(`/v1/orders/${o.orderId}/receipt`, { key }));
+    expect(rec.text).toContain('600.00');
+    expect((await call(`/v1/orders/${o.orderId}/receipt`, { key: keys.agentKeys['hotel-b'] })).status).toBe(404);
+    expect(await json(await call(`/admin/orders?idempotencyKey=k1`, { key: 'adm' }))).toMatchObject({ count: 1 });
+  });
+
+  it('places a basket and answers 400 / 409-free idempotency: missing key 400, same key other body 422, same key same body replays', async () => {
+    const keys = await reset();
+    const key = keys.agentKeys['hotel-a'];
+    const need = { category: '10400', claims: ['FREE_FROM_LACTOSE'], quantity: { value: 20, unit: 'l' }, deliverBy: '2026-11-16' };
+    const b = await json(await call('/v1/baskets', { key, body: { needs: [need] } }));
+    expect(b.quotes).toHaveLength(1);
+    const sel = { basketId: b.basketId, selections: [{ quoteId: b.quotes[0].id, offerId: b.quotes[0].offers[0].offerId }] };
+    expect((await call('/v1/orders', { key, body: sel })).status).toBe(400);
+    const first = await json(await call('/v1/orders', { key, headers: { 'Idempotency-Key': 'kb' }, body: sel }));
+    expect(first.state).toBe('ACCEPTED');
+    const again = await json(await call('/v1/orders', { key, headers: { 'Idempotency-Key': 'kb' }, body: sel }));
+    expect(again.orderId).toBe(first.orderId);
+    expect((await call('/v1/orders', { key, headers: { 'Idempotency-Key': 'kb' }, body: { ...sel, agentReason: 'other' } })).status).toBe(422);
+  });
+
+  it('rejects malformed bodies with 400 and the {error, detail} shape', async () => {
+    const keys = await reset();
+    const r = await call('/v1/quotes', { key: keys.agentKeys['hotel-a'], body: { draft: { category: '10400' } } });
+    expect(r.status).toBe(400);
+    expect(await json(r)).toMatchObject({ error: 'INVALID_REQUEST', detail: expect.any(String) });
+  });
+
+  it('limits interpret to 20 a minute per key', async () => {
+    const keys = await reset();
+    const key = keys.agentKeys['hotel-a'];
+    for (let n = 0; n < 20; n++) expect((await call('/v1/interpret', { key, body: { text: 'milk' } })).status).toBe(200);
+    const r = await call('/v1/interpret', { key, body: { text: 'milk' } });
+    expect(r.status).toBe(429);
+    expect(await json(r)).toMatchObject({ error: 'RATE_LIMITED' });
+    expect((await call('/v1/interpret', { key: keys.agentKeys['hotel-b'], body: { text: 'milk' } })).status).toBe(200);
+  });
+
+  it('answers 503 MODEL_UNAVAILABLE without a Gemini key', async () => {
+    const keys = await reset();
+    const r = await call('/v1/interpret', { key: keys.agentKeys['hotel-a'], body: { text: 'milk' }, env: { ...e, GEMINI_API_KEY: undefined } });
+    expect(r.status).toBe(503);
+    expect(await json(r)).toMatchObject({ error: 'MODEL_UNAVAILABLE' });
+  });
+});
+
+describe('/openapi.json', () => {
+  it('lists the agent routes with schemas under the Lazydoor title', async () => {
+    const doc = await json(await call('/openapi.json'));
+    expect(doc.info).toMatchObject({ title: 'Lazydoor', version: '0.1.0' });
+    for (const p of ['/v1/interpret', '/v1/drafts/{id}/confirm', '/v1/search', '/v1/quotes', '/v1/quotes/{id}', '/v1/baskets', '/v1/orders', '/v1/orders/{id}', '/v1/orders/{id}/receipt', '/health']) expect(doc.paths).toHaveProperty([p]);
+    expect(doc.paths['/v1/orders'].post.parameters.some((x: { name: string }) => x.name === 'Idempotency-Key')).toBe(true);
+    expect(doc.paths['/v1/quotes'].post.requestBody.content['application/json'].schema).toBeDefined();
+  });
+});

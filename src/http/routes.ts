@@ -1,0 +1,155 @@
+import { OpenAPIHono, createRoute, type z } from '@hono/zod-openapi';
+import { ZodError } from 'zod';
+import { searchProducts } from '../catalog/search';
+import { helsinkiIso, now, replayOn } from '../clock';
+import type { Env } from '../env';
+import { logEvent } from '../events/log';
+import { InterpretError, confirmDraft, interpret } from '../interpret/gemini';
+import { OrderError, createBasket, getOrder, placeOrder } from '../orders/store';
+import { QuoteError, createQuote, getQuote, type QuoteInput } from '../quote/store';
+import { productName } from '../receipt/render';
+import { uiRoutes, receiptText } from '../ui/approve';
+import { adminRoutes } from './admin';
+import { HttpError, rateLimit, requireBuyer } from './auth';
+import * as S from './schemas';
+
+const INTERPRET_PER_MINUTE = 20;
+
+const json = <T extends z.ZodType>(schema: T, description: string) => ({ description, content: { 'application/json': { schema } } });
+
+const SECURITY = [{ bearerAuth: [] }];
+
+/** The documented replies of a buyer route: its 200 body plus the one shared `{ error, detail }` body for every failure status. */
+const ok = <T extends z.ZodType>(schema: T) => ({
+  200: json(schema, 'OK'),
+  400: json(S.ErrorBody, 'Invalid request'),
+  401: json(S.ErrorBody, 'Missing or unknown API key'),
+  404: json(S.ErrorBody, 'Not found'),
+  409: json(S.ErrorBody, 'Conflict'),
+  422: json(S.ErrorBody, 'Unprocessable'),
+  429: json(S.ErrorBody, 'Rate limited'),
+  502: json(S.ErrorBody, 'Upstream failure'),
+  503: json(S.ErrorBody, 'Model unavailable'),
+});
+
+const body = <T extends z.ZodType>(schema: T) => ({ body: { content: { 'application/json': { schema } }, required: true as const } });
+
+const interpretRoute = createRoute({ method: 'post', path: '/v1/interpret', summary: 'Turn one sentence into a typed draft need (Gemini translates, policy never reads it)', request: body(S.InterpretBody), security: SECURITY, responses: ok(S.InterpretReply) });
+const confirmRoute = createRoute({ method: 'post', path: '/v1/drafts/{id}/confirm', summary: 'Fill what is unclear and confirm a draft', request: { params: S.IdParam, ...body(S.ConfirmBody) }, security: SECURITY, responses: ok(S.ConfirmReply) });
+const searchRoute = createRoute({ method: 'post', path: '/v1/search', summary: 'Find products by category and claims, from the catalogue only (no Valio call)', request: body(S.SearchBody), security: SECURITY, responses: ok(S.SearchReply) });
+const quoteRoute = createRoute({ method: 'post', path: '/v1/quotes', summary: 'Quote a need: ranked offers, rejections with reason codes, one Valio call per endpoint', request: body(S.QuoteBody), security: SECURITY, responses: ok(S.Quote) });
+const getQuoteRoute = createRoute({ method: 'get', path: '/v1/quotes/{id}', summary: "Read the buyer's own quote", request: { params: S.IdParam }, security: SECURITY, responses: ok(S.Quote) });
+const basketRoute = createRoute({ method: 'post', path: '/v1/baskets', summary: 'Quote several needs as one basket', request: body(S.BasketBody), security: SECURITY, responses: ok(S.BasketReply) });
+const orderRoute = createRoute({
+  method: 'post',
+  path: '/v1/orders',
+  summary: 'Place one offer or one offer per basket need; needs an Idempotency-Key',
+  request: { headers: S.IdempotencyHeader, ...body(S.OrderBody) },
+  security: SECURITY,
+  responses: ok(S.Order),
+});
+const getOrderRoute = createRoute({ method: 'get', path: '/v1/orders/{id}', summary: "Read the buyer's own order", request: { params: S.IdParam }, security: SECURITY, responses: ok(S.Order) });
+const receiptRoute = createRoute({ method: 'get', path: '/v1/orders/{id}/receipt', summary: "The order's plain-text receipt", request: { params: S.IdParam }, security: SECURITY, responses: ok(S.Receipt) });
+const healthRoute = createRoute({ method: 'get', path: '/health', summary: 'Liveness, the gateway clock, replay mode and whether a Gemini key is configured', responses: { 200: json(S.Health, 'OK') } });
+
+/**
+ * The whole gateway app: `/health`, the buyer routes under `/v1` as zod-openapi routes (documented at `/openapi.json`), the
+ * demo-only admin routes and the approval pages. `fetchFn` reaches Valio and Gemini and is injected by tests.
+ * Every failure leaves as `{ error, detail }`.
+ */
+export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings: Env }> {
+  const app = new OpenAPIHono<{ Bindings: Env }>({
+    defaultHook: (result, c) => {
+      if (!result.success) return c.json({ error: 'INVALID_REQUEST', detail: result.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ') }, 400);
+    },
+  });
+
+  app.onError((err, c) => {
+    const known = errorBody(err);
+    if (known) return c.json({ error: known.code, detail: known.detail }, known.status);
+    console.error(err);
+    return c.json({ error: 'INTERNAL_ERROR', detail: 'unexpected failure' }, 500);
+  });
+
+  app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', { type: 'http', scheme: 'bearer', description: 'An API key from the gateway operator' });
+
+  app.openapi(healthRoute, async (c) =>
+    c.json({ ok: true, now: helsinkiIso(await now(c.env)), replay: await replayOn(c.env), models: { gemini: Boolean(c.env.GEMINI_API_KEY) } }, 200),
+  );
+
+  app.openapi(interpretRoute, async (c) => {
+    const { buyerId } = await requireBuyer(c);
+    await rateLimit(c.env, c.req.header('Authorization'), INTERPRET_PER_MINUTE);
+    const draft = await interpret(c.env, { buyerId, text: c.req.valid('json').text }, { fetch: fetchFn });
+    return c.json({ draft, valioCalls: 0 as const }, 200);
+  });
+
+  app.openapi(confirmRoute, async (c) => {
+    const { buyerId } = await requireBuyer(c);
+    const draft = await confirmDraft(c.env, { draftId: c.req.valid('param').id, fill: c.req.valid('json').fill, buyerId });
+    return c.json({ draft }, 200);
+  });
+
+  app.openapi(searchRoute, async (c) => {
+    const { buyerId } = await requireBuyer(c);
+    const q = c.req.valid('json');
+    const found = await searchProducts(c.env, { category: q.category, claims: q.claims, subtype: q.subtype });
+    await logEvent(c.env, { buyerId, type: 'search.done', data: { count: found.length, categories: [...new Set(found.map((p) => p.category))] } });
+    const products = found.map((p) => ({ id: p.id, category: p.category, subtype: p.subtype, name: productName([p], p.id), brand: p.brand, salesUnit: p.salesUnit, claims: p.claims }));
+    return c.json({ products, valioCalls: 0 as const }, 200);
+  });
+
+  app.openapi(quoteRoute, async (c) => {
+    const { buyerId } = await requireBuyer(c);
+    return c.json((await createQuote(c.env, buyerId, c.req.valid('json') as QuoteInput, fetchFn)) as never, 200);
+  });
+
+  app.openapi(getQuoteRoute, async (c) => {
+    const { buyerId } = await requireBuyer(c);
+    const q = await getQuote(c.env, buyerId, c.req.valid('param').id);
+    if (!q) throw new HttpError(404, 'QUOTE_NOT_FOUND', 'no such quote');
+    return c.json(q as never, 200);
+  });
+
+  app.openapi(basketRoute, async (c) => {
+    const { buyerId } = await requireBuyer(c);
+    return c.json((await createBasket(c.env, buyerId, c.req.valid('json').needs, fetchFn)) as never, 200);
+  });
+
+  app.openapi(orderRoute, async (c) => {
+    const { buyerId } = await requireBuyer(c);
+    const reply = await placeOrder(c.env, { buyerId, idempotencyKey: c.req.header('Idempotency-Key') || undefined, ...c.req.valid('json') }, fetchFn);
+    return c.json(reply as never, 200);
+  });
+
+  app.openapi(getOrderRoute, async (c) => {
+    const { buyerId } = await requireBuyer(c);
+    const o = await getOrder(c.env, buyerId, c.req.valid('param').id);
+    if (!o) throw new HttpError(404, 'ORDER_NOT_FOUND', 'no such order');
+    return c.json(o as never, 200);
+  });
+
+  app.openapi(receiptRoute, async (c) => {
+    const { buyerId } = await requireBuyer(c);
+    const text = await receiptText(c.env, c.req.valid('param').id, buyerId);
+    if (text === null) throw new HttpError(404, 'ORDER_NOT_FOUND', 'no such order');
+    return c.json({ text }, 200);
+  });
+
+  app.doc('/openapi.json', { openapi: '3.0.3', info: { title: 'Lazydoor', version: '0.1.0', description: 'Lazy at the order, strict at the border.' } });
+
+  app.route('/', adminRoutes());
+  app.route('/', uiRoutes(fetchFn));
+  return app;
+}
+
+/** Maps a thrown error from any module onto an HTTP status, machine-readable code and message; null for a bug. */
+function errorBody(err: unknown): { status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 502 | 503; code: string; detail: string } | null {
+  if (err instanceof HttpError || err instanceof OrderError || err instanceof InterpretError) return { status: err.status, code: err.code, detail: err.message };
+  if (err instanceof QuoteError) {
+    const status = err.code === 'DRAFT_NOT_FOUND' ? 404 : err.code === 'UPSTREAM_ERROR' ? 502 : 409;
+    return { status, code: err.code, detail: err.message };
+  }
+  if (err instanceof ZodError) return { status: 400, code: 'INVALID_REQUEST', detail: err.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ') };
+  return null;
+}

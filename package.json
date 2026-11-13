@@ -10,7 +10,11 @@
     "test": "vitest run",
     "pretest": "bash scripts/check-secrets.sh",
     "replies:build": "tsx scripts/load-replies.ts",
-    "replies:load": "wrangler d1 execute DB --local --file .data/valio/build/replies.sql"
+    "replies:load": "wrangler d1 execute DB --local --file .data/valio/build/replies.sql",
+    "mandate:sign": "tsx scripts/mandate-sign.ts",
+    "categories:build": "tsx scripts/tag-categories.ts",
+    "categories:load": "wrangler d1 execute DB --local --file .data/valio/build/categories.sql",
+    "dev:load": "wrangler d1 migrations apply DB --local && pnpm index:load && pnpm replies:load && pnpm categories:load"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.23.0",

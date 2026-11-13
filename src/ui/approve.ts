@@ -4,6 +4,7 @@ import { getProducts } from '../catalog/search';
 import { now } from '../clock';
 import { REASONS } from '../domain/reasons';
 import type { Env } from '../env';
+import { identify } from '../http/auth';
 import { OrderError, approve, approverInbox, freeStock, getOrder, limitKey, reject, type ApproveReply, type OrderView } from '../orders/store';
 import type { Draft, OfferLine } from '../quote/build';
 import { getQuote } from '../quote/store';
@@ -126,6 +127,18 @@ function resultPage(r: ApproveReply): string {
 }
 
 /**
+ * The plain-text receipt of a settled order, or null when it does not exist, is still being placed or (when `buyerId` is
+ * given) belongs to another buyer. Without `buyerId` the order id itself is the capability (the public receipt page).
+ */
+export async function receiptText(env: Env, orderId: string, buyerId?: string): Promise<string | null> {
+  const m = await env.DB.prepare("SELECT buyer_id, quote_id, basket_id, agent_reason, expires_at FROM orders WHERE id = ?1 AND state <> 'PLACING' AND (?2 IS NULL OR buyer_id = ?2)").bind(orderId, buyerId ?? null).first<Meta>();
+  const view: OrderView | null = m && (await getOrder(env, m.buyer_id, orderId));
+  if (!m || !view) return null;
+  const products = await getProducts(env, view.order.lines.map((l) => l.productId));
+  return renderReceipt(view.order, [], await draftsOf(env, m), view.decision, { products, approver: view.approval.approver, reason: view.reason });
+}
+
+/**
  * The approval, receipt and inbox routes. `fetchFn` reaches Valio for the live stock on the page and for the approve
  * re-check. The approval link and the inbox are the approver's; nothing here ever reaches the agent.
  */
@@ -136,7 +149,7 @@ export function uiRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }>
   ui.onError((err, c) => {
     if (!(err instanceof OrderError)) throw err;
     const status = err.status as 400 | 401 | 403 | 404 | 409 | 422 | 502;
-    if (wantsJson(c.req.header('Accept'))) return c.json({ error: err.code, message: err.message }, status);
+    if (!c.req.header('Accept')?.includes('text/html')) return c.json({ error: err.code, detail: err.message }, status);
     return c.html(page('Lazydoor – approval result', `<h1>${escapeHtml(err.code)}</h1><p>${escapeHtml(err.message)}</p>`), status);
   });
 
@@ -145,9 +158,10 @@ export function uiRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }>
     return c.html(r.html, r.status);
   });
 
-  for (const [verb, act] of [['approve', (e: Env, t: string) => approve(e, t, { callerRole: 'approver' }, fetchFn)], ['reject', (e: Env, t: string) => reject(e, t, { callerRole: 'approver' })]] as const) {
+  for (const [verb, act] of [['approve', (e: Env, t: string, role: 'approver' | 'agent') => approve(e, t, { callerRole: role }, fetchFn)], ['reject', (e: Env, t: string, role: 'approver' | 'agent') => reject(e, t, { callerRole: role })]] as const) {
     ui.post(`/${verb}/:token`, async (c) => {
-      const r = await act(c.env, c.req.param('token'));
+      const who = await identify(c.env, c.req.header('Authorization'));
+      const r = await act(c.env, c.req.param('token'), who?.role === 'agent' || who?.role === 'judge' ? 'agent' : 'approver');
       return wantsJson(c.req.header('Accept')) || !c.req.header('Accept')?.includes('text/html') ? c.json(r) : c.html(resultPage(r));
     });
   }
@@ -158,7 +172,7 @@ export function uiRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }>
       inbox = await approverInbox(c.env, c.req.param('key'));
     } catch (err) {
       if (err instanceof OrderError && err.status === 401) {
-        return wantsJson(c.req.header('Accept')) ? c.json({ error: 'APPROVER_KEY_UNKNOWN', message: 'unknown approver key' }, 404) : c.html(notFound('Unknown approver key.').html, 404);
+        return wantsJson(c.req.header('Accept')) ? c.json({ error: 'APPROVER_KEY_UNKNOWN', detail: 'unknown approver key' }, 404) : c.html(notFound('Unknown approver key.').html, 404);
       }
       throw err;
     }
@@ -168,12 +182,8 @@ export function uiRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }>
   });
 
   ui.get('/receipt/:orderId', async (c) => {
-    const m = await c.env.DB.prepare("SELECT buyer_id, quote_id, basket_id, agent_reason, expires_at FROM orders WHERE id = ? AND state <> 'PLACING'").bind(c.req.param('orderId')).first<Meta>();
-    const view: OrderView | null = m && (await getOrder(c.env, m.buyer_id, c.req.param('orderId')));
-    if (!m || !view) return c.json({ error: 'ORDER_NOT_FOUND', message: 'no such order' }, 404);
-    const products = await getProducts(c.env, view.order.lines.map((l) => l.productId));
-    const text = renderReceipt(view.order, [], await draftsOf(c.env, m), view.decision, { products, approver: view.approval.approver, reason: view.reason });
-    return c.text(text);
+    const text = await receiptText(c.env, c.req.param('orderId'));
+    return text === null ? c.json({ error: 'ORDER_NOT_FOUND', detail: 'no such order' }, 404) : c.text(text);
   });
 
   return ui;
