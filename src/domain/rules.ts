@@ -31,7 +31,7 @@ export function decisionRegister(): Decision[] {
     seller('quoteExpiry', 'A quote is binding until the earliest of its time limit, the Valio cut-off of its products and the end of their price validity.', { ttlMinutes: QUOTE_TTL_MS / 60_000 }),
     seller('allocation', 'Stock is allocated first come, first served at acceptance; a later order that finds it taken is refused with STOCK_TAKEN.'),
     seller('approvalRecheck', 'An approved held order is re-checked against live price and stock before it is accepted.'),
-    { id: 'interpretation', rule: 'A model turns free text into a typed draft; policy and money never read the model output directly.', owner: 'buyer', model: true, constants: {} },
+    { id: 'interpretation', rule: 'Gemini turns free text into a typed draft and Gemma reads the same text independently; when the two readings differ on any field the draft is needs_input and the buyer fills that field. Policy and money never read model output directly.', owner: 'buyer', model: true, constants: {} },
     {
       id: 'policy',
       rule: "The buyer's signed mandate decides AUTO, NEEDS_APPROVAL or REJECT; no model is involved.",

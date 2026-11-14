@@ -32,7 +32,7 @@ interface Event {
 
 | `type` | `data` |
 |---|---|
-| `draft.created` | `{ text, category, claims, quantity, unclear }` |
+| `draft.created` | `{ text, category, claims, quantity, unclear, crossCheck }`; `crossCheck` is `{ model, result, fields }`: the Gemma second reading, `result` `agreed`, `disagreed` (then `fields` lists where the readings differ) or `unavailable` |
 | `draft.confirmed` | `{}` |
 | `search.done` | `{ count, categories }` |
 | `valio.called` | `{ endpoint, ids, replay }` (`endpoint` is `availability` or `price`) |

@@ -7,18 +7,19 @@ import { clearListsCache, confirmDraft, InterpretError, interpret } from '../src
 import { draftSchema } from '../src/quote/store';
 import { db } from '../src/db';
 
-const e = { ...(env as unknown as Env), DEMO_MODE: '1', GEMINI_API_KEY: 'test-key', GEMINI_MODEL: 'gemini-test' };
+const e = { ...(env as unknown as Env), DEMO_MODE: '1', GEMINI_API_KEY: 'test-key', GEMINI_MODEL: 'gemini-test', GEMMA_MODEL: 'gemma-test' };
 const MILK = 'I need 1,000 litres of lactose-free milk by Monday.';
 
 /** A Gemini generateContent reply whose text part is the given draft JSON. */
 const reply = (obj: unknown) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(obj) }] } }] }), { status: 200 });
 
-/** An injected fetch that records its calls and answers with the given draft JSON. */
-function stub(obj: unknown) {
+/** An injected fetch that records its calls and answers with the given draft JSON; Gemma gets `gemma` when given (a Response is sent as is). */
+function stub(obj: unknown, gemma?: unknown) {
   const calls: { url: string; init: RequestInit }[] = [];
   const fetch = (async (url: string, init: RequestInit) => {
     calls.push({ url, init });
-    return reply(obj);
+    const answer = gemma !== undefined && url.includes('gemma-test') ? gemma : obj;
+    return answer instanceof Response ? answer : reply(answer);
   }) as unknown as typeof globalThis.fetch;
   return { calls, deps: { fetch } };
 }
@@ -45,9 +46,11 @@ describe('interpret', () => {
   it('asks Gemini for schema-constrained JSON and returns a typed, validated draft', async () => {
     const s = stub(milk);
     const d = await interpret(e, { buyerId: 'b1', text: MILK }, s.deps);
-    expect(d).toMatchObject({ status: 'draft', text: MILK, category: '10400', claims: ['FREE_FROM_LACTOSE'], quantity: { value: 1000, unit: 'l' }, deliverBy: '2026-11-16', unclear: [] });
-    expect(s.calls).toHaveLength(1);
+    expect(d).toMatchObject({ status: 'draft', text: MILK, category: '10400', claims: ['FREE_FROM_LACTOSE'], quantity: { value: 1000, unit: 'l' }, deliverBy: '2026-11-16', unclear: [], crossCheck: { model: 'gemma-test', result: 'agreed' } });
+    expect(s.calls).toHaveLength(2);
     expect(s.calls[0].url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent');
+    expect(s.calls[1].url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemma-test:generateContent');
+    expect(JSON.parse(s.calls[1].init.body as string)).toEqual(JSON.parse(s.calls[0].init.body as string));
     expect((s.calls[0].init.headers as Record<string, string>)['x-goog-api-key']).toBe('test-key');
     const body = JSON.parse(s.calls[0].init.body as string);
     expect(body.generationConfig.responseMimeType).toBe('application/json');
@@ -59,7 +62,7 @@ describe('interpret', () => {
     expect(JSON.stringify(body)).toContain('FREE_FROM_LACTOSE');
     const ev = await listEvents(e, { since: 0 });
     expect(ev.map((x) => x.type)).toEqual(['draft.created']);
-    expect(ev[0]).toMatchObject({ buyerId: 'b1', draftId: d.id, data: { text: MILK, category: '10400', unclear: [] } });
+    expect(ev[0]).toMatchObject({ buyerId: 'b1', draftId: d.id, data: { text: MILK, category: '10400', unclear: [], crossCheck: { model: 'gemma-test', result: 'agreed', fields: [] } } });
   });
 
   it('flags an unknown category, drops an unknown claim, rejects a bad unit and a past date', async () => {
@@ -125,11 +128,11 @@ describe('interpret', () => {
     expect(strip(b)).toEqual(strip(a));
     expect(b.text).toContain('auto-approve');
     const x = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, approved: true, outcome: 'AUTO', limit: 1e9 }).deps);
-    expect(Object.keys(x).filter((k) => !['id', 'status', 'text', 'category', 'claims', 'quantity', 'deliverBy', 'unclear', 'missing', 'needs'].includes(k))).toEqual([]);
+    expect(Object.keys(x).filter((k) => !['id', 'status', 'text', 'category', 'claims', 'quantity', 'deliverBy', 'unclear', 'missing', 'needs', 'crossCheck'].includes(k))).toEqual([]);
     const row = await db(e).prepare('SELECT body FROM drafts WHERE id = ?').bind(x.id).first<{ body: string }>();
     expect(row!.body).not.toMatch(/approved|outcome|limit/);
     expect(draftSchema.parse({ ...JSON.parse(row!.body), status: 'confirmed' })).not.toHaveProperty('text');
-    const allowed = ['id', 'status', 'text', 'category', 'subtype', 'claims', 'quantity', 'deliverBy', 'brand', 'packLitres', 'unclear', 'missing', 'needs'];
+    const allowed = ['id', 'status', 'text', 'category', 'subtype', 'claims', 'quantity', 'deliverBy', 'brand', 'packLitres', 'unclear', 'missing', 'needs', 'crossCheck'];
     expect(Object.keys(b).filter((k) => !allowed.includes(k))).toEqual([]);
   });
 });
@@ -197,3 +200,53 @@ describe('confirmDraft', () => {
     }
   });
 });
+
+describe('second reader (Gemma)', () => {
+  beforeEach(async () => {
+    clearListsCache();
+    for (const t of ['drafts', 'events']) await db(e).prepare(`DELETE FROM ${t}`).run();
+    for (const t of ['category_names', 'products']) await e.DB.prepare(`DELETE FROM ${t}`).run();
+    await e.DB.prepare("INSERT INTO category_names(category, names, tag_source) VALUES ('10400','Milk','reviewed')").run();
+    await e.DB.prepare("INSERT INTO products(id, category, names, claims) VALUES ('T0001','10400','[]','[\"FREE_FROM_LACTOSE\"]')").run();
+    await setClock(e, '2026-11-13T21:10:00+02:00');
+  });
+
+  it('a different reading of any field is needs_input: the field is left out and both readings are shown, never one picked', async () => {
+    const d = await interpret(e, { buyerId: 'b1', text: 'milk for Friday' }, stub({ ...milk, deliverBy: '2026-11-13' }, { ...milk, deliverBy: '2026-11-20' }).deps);
+    expect(d).toMatchObject({ status: 'needs_input', missing: ['deliverBy'], category: '10400', crossCheck: { model: 'gemma-test', result: 'disagreed' } });
+    expect(d.deliverBy).toBeUndefined();
+    expect(d.disagreement).toEqual([{ field: 'deliverBy', readings: [{ model: 'gemini-test', value: '2026-11-13' }, { model: 'gemma-test', value: '2026-11-20' }] }]);
+    const ev = await listEvents(e, { since: 0 });
+    expect(ev[0].data).toMatchObject({ crossCheck: { model: 'gemma-test', result: 'disagreed', fields: ['deliverBy'] } });
+  });
+
+  it('compares claims as sets and brand names without case, and flags each field that differs', async () => {
+    const same = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, claims: ['FREE_FROM_LACTOSE'], brand: { rule: 'only', names: ['Valio', 'Arla'] } }, { ...milk, brand: { rule: 'only', names: ['arla', 'VALIO'] } }).deps);
+    expect(same.crossCheck?.result).toBe('agreed');
+    const diff = await interpret(e, { buyerId: 'b1', text: MILK }, stub(milk, { ...milk, claims: [], quantity: { value: 1000, unit: 'kg' } }).deps);
+    expect(diff.status).toBe('needs_input');
+    expect(diff.missing).toEqual(['claims', 'quantity']);
+    expect(diff.claims).toEqual([]);
+    expect(diff.quantity).toBeUndefined();
+  });
+
+  it('reads a reply wrapped in a Markdown fence', async () => {
+    const fenced = new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: `\`\`\`json\n${JSON.stringify(milk)}\n\`\`\`` }] } }] }), { status: 200 });
+    expect((await interpret(e, { buyerId: 'b1', text: MILK }, stub(milk, fenced).deps)).crossCheck?.result).toBe('agreed');
+  });
+
+  it('when Gemma is down or answers nonsense the draft stands as Gemini read it and says the check was unavailable', async () => {
+    for (const bad of [new Response('quota', { status: 429 }), null]) {
+      const d = await interpret(e, { buyerId: 'b1', text: MILK }, stub(milk, bad).deps);
+      expect(d).toMatchObject({ status: 'draft', deliverBy: '2026-11-16', crossCheck: { model: 'gemma-test', result: 'unavailable' } });
+    }
+  });
+
+  it('confirms a disagreement once the buyer fills every field the readers differed on, and not before', async () => {
+    const d = await interpret(e, { buyerId: 'b1', text: MILK }, stub(milk, { ...milk, deliverBy: '2026-11-20' }).deps);
+    await expect(confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: {} })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR', status: 409 });
+    const ok = await confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: { deliverBy: '2026-11-20' } });
+    expect(ok).toMatchObject({ status: 'confirmed', deliverBy: '2026-11-20', missing: [] });
+  });
+});
+

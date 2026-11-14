@@ -7,6 +7,8 @@ export interface Bindings {
   VALIO_API_BASE: string;
   DEMO_MODE: string;
   GEMINI_MODEL: string;
+  /** The second, independent reader of a request (a Gemma model on the same Gemini API key). */
+  GEMMA_MODEL: string;
   VALIO_API_KEY: string;
   ADMIN_KEY: string;
   GEMINI_API_KEY?: string;

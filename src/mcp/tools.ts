@@ -27,7 +27,7 @@ const PlaceOrderInput = z.intersection(S.OrderBody, z.object({ idempotencyKey: S
 const tools: Tool[] = [
   {
     name: 'interpret_request',
-    description: 'Turn one sentence into a typed draft need (Gemini translates, policy never reads it).',
+    description: 'Turn one sentence into a typed draft need (Gemini translates, Gemma re-reads independently; if they differ the draft is needs_input with a disagreement list for the buyer; policy never reads it).',
     input: S.InterpretBody,
     output: S.InterpretReply,
     run: async (a, { env, buyerId, auth, fetchFn }) => {
@@ -37,7 +37,7 @@ const tools: Tool[] = [
   },
   {
     name: 'confirm_draft',
-    description: 'Fill what is unclear and confirm a draft.',
+    description: 'Fill what is unclear (and, for a disagreement, every field in missing) and confirm a draft.',
     input: S.IdParam.extend({ fill: S.ConfirmBody.shape.fill }),
     output: S.ConfirmReply,
     run: async (a, { env, buyerId }) => ({ draft: await confirmDraft(env, { draftId: a.id, fill: a.fill, buyerId }) }),

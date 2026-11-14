@@ -20,7 +20,7 @@ The door decides by published rules. Each rule has a named owner. Models transla
 - **Buyer rules:** the signed mandate. Default: auto-approve up to 500 EUR per order and per day. Hard stop at 5,000 EUR per order and 10,000 EUR per day. No new allergen. Delivery reliability at least 0.9. The limits and the approver are the customer's own rules, carried in the mandate they sign; Valio sets none of them and enforces no approval today, and "only the manager orders" stops working once an agent orders on anyone's behalf. The door applies each customer's rules to every agent, and a human approves agent orders over the customer's limit, which matches what Valio said is needed for now.
 - **Stock unknown:** Valio reports availability of 999999 or more for products it does not stock. It means the availability is unknown, and Valio's own logic allows any quantity. Lazydoor does the same and labels the quote line (`stockNote`) and the approval page "Stock unknown: Valio does not stock this product".
 - **Approver:** a held order is accepted only when the named human approves it through their own link.
-- **The only model step:** turning free text into a typed draft (Gemini, `interpret_request`). Policy and money never read that output directly.
+- **The only model step:** turning free text into a typed draft (`interpret_request`). Gemini drafts it and Gemma reads the same sentence a second time on its own (below). Policy and money never read model output directly.
 
 ## Aiven PostgreSQL holds every write
 
@@ -31,6 +31,16 @@ What Aiven does for Lazydoor:
 - **The stock ledger commits in one transaction.** Placing or approving an order runs one transaction under a transaction-scoped advisory lock (`pg_advisory_xact_lock`). It books the order, re-checks the buyer's day total and inserts the order's lines only if each one still fits Valio's limit less the lines already accepted. Either all of it happens or none of it does. A test races 20 orders of 4 units for a 6-unit product against Postgres: exactly one is accepted, the rest get `STOCK_TAKEN`.
 - **The audit log.** Every step appends an event with a strictly increasing sequence number. A second advisory lock orders the inserts, so a reader polling `seq > since` (the SSE stream, the demo page, a judge) never skips an event that commits late.
 - **No row-write quota.** D1's free tier stops at 100,000 row writes a day, and loading the catalog used that up. Aiven bills by plan, not per row, so the demo keeps writing.
+
+## Gemma reads every request a second time
+
+Gemini drafts the order from the buyer's sentence. **Gemma 4** (`gemma-4-31b-it`, on the same Gemini API) reads the same sentence on its own, in parallel, with the same prompt and output schema. Both readings pass the same rules (a known category and claims, a unit of l, kg or pcs, a real date that is not in the past). Lazydoor then compares them field by field, with claims compared as a set and brand names without case.
+
+- **Same reading:** the draft goes on, marked `crossCheck: { result: "agreed" }`.
+- **Different reading:** the draft comes back `needs_input`. The field is left out, `missing` names it, and `disagreement` shows what each model read. The buyer fills it in `confirm_draft`. The door never picks one reading. For example, "We need 40 kg of chicken breast fillet for Friday, Atria only", sent on Friday 13 Nov: Gemini read 13 Nov, Gemma read 20 Nov, so the buyer is asked which Friday.
+- **No answer from Gemma** within 20 s, or Gemma over its quota: the draft stands as Gemini read it, marked `unavailable`. A Gemma outage never stops ordering.
+
+The `draft.created` event carries the result (`crossCheck`), so the demo page shows when the two readers agree.
 
 ## Quick start
 

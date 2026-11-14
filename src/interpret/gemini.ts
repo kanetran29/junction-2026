@@ -37,6 +37,10 @@ export interface InterpretedDraft {
   unclear: string[];
   missing: string[];
   needs: string[];
+  /** The second, independent reading: whether Gemma read the text the same way (`unavailable` when it did not answer). */
+  crossCheck?: { model: string; result: 'agreed' | 'disagreed' | 'unavailable' };
+  /** Set when the readings differ: per field, what each model read. The field itself is left out for the buyer to fill. */
+  disagreement?: { field: string; readings: { model: string; value: unknown }[] }[];
 }
 
 /** The model's raw answer: every field optional and possibly null, nothing trusted until `validate` has run. */
@@ -157,8 +161,19 @@ function validate(raw: Raw, today: string, categories: Set<string>, claimIds: Se
   return { fields: out, unclear };
 }
 
-/** Calls Gemini once for structured JSON; any transport, status or parse failure is MODEL_UNAVAILABLE. */
-async function askModel(env: Env, text: string, today: string, ref: Awaited<ReturnType<typeof lists>>, fetchFn: typeof fetch): Promise<Raw> {
+/** How long the second reader may take before its check counts as unavailable. */
+const SECOND_READER_MS = 20_000;
+
+/** The JSON object in a model reply, ignoring a Markdown fence or text around it (Gemma sometimes adds one). */
+function jsonObject(text: string): unknown {
+  return JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+}
+
+/**
+ * Asks one model (Gemini, or Gemma as the second reader) for the structured draft with the same prompt and schema; any
+ * transport, status or parse failure is MODEL_UNAVAILABLE.
+ */
+async function askModel(env: Env, model: string, text: string, today: string, ref: Awaited<ReturnType<typeof lists>>, fetchFn: typeof fetch, signal?: AbortSignal): Promise<Raw> {
   if (!env.GEMINI_API_KEY) throw new InterpretError('MODEL_UNAVAILABLE', 503, 'no Gemini key');
   const system = [
     `You turn one buyer sentence into a typed draft for a food wholesaler. Today is ${today}. Resolve weekdays and relative dates to ISO dates on or after today.`,
@@ -170,8 +185,9 @@ async function askModel(env: Env, text: string, today: string, ref: Awaited<Retu
     `subtype is only set for these reviewed categories, and must be one of: ${Object.entries(REVIEWED_SUBTYPES).map(([c, l]) => `${c}: ${l.join(' | ')}`).join('; ')}. Otherwise use null.`,
   ].join('\n');
   try {
-    const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`, {
+    const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'POST',
+      signal,
       headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
@@ -179,16 +195,33 @@ async function askModel(env: Env, text: string, today: string, ref: Awaited<Retu
         generationConfig: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA, temperature: 0 },
       }),
     });
-    if (!res.ok) throw new Error(`gemini ${res.status}`);
-    const j = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-    const parsed: unknown = JSON.parse(j.candidates![0].content!.parts![0].text!);
+    if (!res.ok) throw new Error(`model ${res.status}`);
+    const j = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
+    const parsed = jsonObject(j.candidates![0].content!.parts!.filter((x) => !x.thought).map((x) => x.text ?? '').join(''));
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('not an object');
     return parsed as Raw;
   } catch (err) {
     if (err instanceof InterpretError) throw err;
-    console.error('gemini call failed:', err instanceof Error && err.message.startsWith('gemini ') ? err.message : String(err instanceof Error ? err.name : err));
+    console.error(`${model} call failed:`, err instanceof Error && err.message.startsWith('model ') ? err.message : String(err instanceof Error ? err.name : err));
     throw new InterpretError('MODEL_UNAVAILABLE', 503, 'the model did not return a usable draft');
   }
+}
+
+type Fields = ReturnType<typeof validate>['fields'];
+
+/** A field's value in comparable form: claims as a set, brand names without case or order, absent as null. */
+function comparable(field: string, v: unknown): string {
+  if (field === 'claims') return JSON.stringify([...((v as string[]) ?? [])].sort());
+  if (field === 'brand' && v) {
+    const b = v as NonNullable<InterpretedDraft['brand']>;
+    return JSON.stringify({ rule: b.rule, names: b.names.map((n) => n.toLowerCase()).sort() });
+  }
+  return JSON.stringify(v ?? null);
+}
+
+/** The draft fields the two validated readings set differently. */
+function differing(a: Fields, b: Fields): string[] {
+  return FIELDS.filter((f) => comparable(f, a[f as keyof Fields]) !== comparable(f, b[f as keyof Fields]));
 }
 
 /** Stores a draft as one `drafts` row whose body is the whole draft; the quote step reads `status` and the typed fields from it. */
@@ -201,7 +234,11 @@ async function save(env: Env, buyerId: string, d: InterpretedDraft, createdAt: s
 /**
  * Turns one buyer sentence into a validated draft. The model only translates; the rules in `validate` decide what stands.
  * No product type in the text gives `needs_input` listing every missing field; a missing quantity or date alongside a
- * category is `unclear` instead. The raw text is stored on the draft and never read by policy. Appends `draft.created`.
+ * category is `unclear` instead. Gemma reads the same text independently (same prompt and schema, in parallel): when the
+ * two validated readings differ on any field, the draft is `needs_input`, those fields are left out and listed in
+ * `missing` and `disagreement`, and the buyer decides; neither reading is picked. When Gemma does not answer, the draft
+ * stands as Gemini read it with `crossCheck.result = 'unavailable'`. The raw text is stored on the draft and never read
+ * by policy. Appends `draft.created`.
  */
 export async function interpret(
   env: Env,
@@ -211,8 +248,16 @@ export async function interpret(
   const at = await now(env);
   const today = helsinkiIso(at).slice(0, 10);
   const ref = await lists(env);
-  const raw = await askModel(env, input.text, today, ref, deps.fetch);
-  const { fields, unclear } = validate(raw, today, new Set(ref.categories.map((c) => c.category)), new Set(ref.claimIds));
+  const [raw, second] = await Promise.all([
+    askModel(env, env.GEMINI_MODEL, input.text, today, ref, deps.fetch),
+    // ponytail: a Gemma outage or quota (its tokens-per-minute cap is low) leaves the draft unchecked, not refused; fail closed here if that ever matters more than uptime
+    askModel(env, env.GEMMA_MODEL, input.text, today, ref, deps.fetch, AbortSignal.timeout(SECOND_READER_MS)).catch(() => null),
+  ]);
+  const categories = new Set(ref.categories.map((c) => c.category));
+  const claimIds = new Set(ref.claimIds);
+  const { fields, unclear } = validate(raw, today, categories, claimIds);
+  const other = second && validate(second, today, categories, claimIds).fields;
+  const differ = other ? differing(fields, other) : [];
   const needs = (Array.isArray(raw.needs) ? raw.needs : []).filter((n) => typeof n === 'string' && n);
   const d: InterpretedDraft = { id: newId('d'), status: 'draft', text: input.text, ...fields, unclear: [], missing: [], needs };
   if (!raw.category && needs.length === 0) {
@@ -220,24 +265,40 @@ export async function interpret(
     d.missing = ['needs', ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy'])];
   } else {
     const modelUnclear = (Array.isArray(raw.unclear) ? raw.unclear : []).filter((u) => typeof u === 'string' && u);
-    d.unclear = [...new Set([...modelUnclear, ...unclear, ...(fields.category ? [] : ['category']), ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy']), ...(claimWordsLost(input.text, fields.claims, new Set(ref.claimIds)) ? ['claims'] : [])])];
+    d.unclear = [...new Set([...modelUnclear, ...unclear, ...(fields.category ? [] : ['category']), ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy']), ...(claimWordsLost(input.text, fields.claims, claimIds) ? ['claims'] : [])])];
+  }
+  d.crossCheck = { model: env.GEMMA_MODEL, result: !other ? 'unavailable' : differ.length ? 'disagreed' : 'agreed' };
+  if (other && differ.length) {
+    d.status = 'needs_input';
+    d.missing = [...new Set([...d.missing, ...differ])];
+    d.disagreement = differ.map((field) => ({
+      field,
+      readings: [
+        { model: env.GEMINI_MODEL, value: fields[field as keyof Fields] ?? null },
+        { model: env.GEMMA_MODEL, value: other[field as keyof Fields] ?? null },
+      ],
+    }));
+    for (const f of differ) delete (d as unknown as Record<string, unknown>)[f];
+    d.claims ??= [];
   }
   await save(env, input.buyerId, d, helsinkiIso(at));
-  await logEvent(env, { type: 'draft.created', buyerId: input.buyerId, draftId: d.id, data: { text: d.text, category: d.category ?? null, claims: d.claims, quantity: d.quantity ?? null, unclear: d.unclear } });
+  await logEvent(env, { type: 'draft.created', buyerId: input.buyerId, draftId: d.id, data: { text: d.text, category: d.category ?? null, claims: d.claims, quantity: d.quantity ?? null, unclear: d.unclear, crossCheck: { ...d.crossCheck, fields: differ } } });
   return d;
 }
 
 /**
  * Applies the buyer's fill to a draft: known fields are set and re-validated, and every key in the fill clears its
  * `unclear` entry (a field the model listed, such as `fatLevel`, included). Refuses with DRAFT_UNCLEAR while anything is
- * still unclear or the draft is `needs_input`; otherwise stores `status: 'confirmed'` and appends `draft.confirmed`.
+ * still unclear, or while a `needs_input` draft has a missing field the fill does not give (`needs` can never be filled,
+ * so a request with no product type stays refused; fields the two readers disagreed on can); otherwise stores
+ * `status: 'confirmed'` and appends `draft.confirmed`.
  */
 export async function confirmDraft(env: Env, input: { draftId: string; fill: Record<string, unknown>; buyerId: string }): Promise<InterpretedDraft> {
   const row = await db(env).prepare('SELECT buyer_id, body FROM drafts WHERE id = ? AND buyer_id = ?').bind(input.draftId, input.buyerId).first<{ buyer_id: string; body: string }>();
   if (!row) throw new InterpretError('DRAFT_NOT_FOUND', 404, `no draft ${input.draftId}`);
   const d = JSON.parse(row.body) as InterpretedDraft;
   if (d.status === 'confirmed') throw new InterpretError('DRAFT_ALREADY_CONFIRMED', 409, 'draft is already confirmed');
-  if (d.status === 'needs_input') throw new InterpretError('DRAFT_UNCLEAR', 409, `draft needs: ${d.missing.join(', ')}`);
+  if (d.status === 'needs_input' && !d.missing.every((f) => FIELDS.includes(f) && Object.hasOwn(input.fill, f))) throw new InterpretError('DRAFT_UNCLEAR', 409, `draft needs: ${d.missing.join(', ')}`);
 
   const at = await now(env);
   const ref = await lists(env);
@@ -246,7 +307,7 @@ export async function confirmDraft(env: Env, input: { draftId: string; fill: Rec
   const lostClaim = claimWordsLost(d.text, fields.claims, new Set(ref.claimIds)) ? ['claims'] : [];
   const keep = d.unclear.filter((u) => !Object.hasOwn(input.fill, u));
   const missing = [...(fields.category ? [] : ['category']), ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy'])];
-  const next: InterpretedDraft = { ...d, category: undefined, subtype: undefined, quantity: undefined, deliverBy: undefined, brand: undefined, packLitres: undefined, ...fields, unclear: [...new Set([...keep, ...unclear, ...missing, ...lostClaim])] };
+  const next: InterpretedDraft = { ...d, category: undefined, subtype: undefined, quantity: undefined, deliverBy: undefined, brand: undefined, packLitres: undefined, ...fields, missing: [], unclear: [...new Set([...keep, ...unclear, ...missing, ...lostClaim])] };
   if (next.unclear.length) throw new InterpretError('DRAFT_UNCLEAR', 409, `still unclear: ${next.unclear.join(', ')}`);
   const typed = draftSchema.safeParse(next);
   if (!typed.success) throw new InterpretError('DRAFT_UNCLEAR', 409, `draft is not a valid need: ${typed.error.issues[0]?.message}`);
