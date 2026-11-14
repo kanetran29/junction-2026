@@ -103,3 +103,11 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
   và ngày rơi vào `unclear` (an toàn), nhưng mất "lactose-free" thì KHÔNG bị báo → agent có thể đặt sữa thường. Đang sửa: bắt buộc mọi
   trường trong schema (nullable), và một luật cố định: câu có "lactose-free/laktoositon" mà draft thiếu claim → đưa `claims` vào `unclear`.
 - Đang chạy: sửa MCP (lỗi trả về không khớp outputSchema làm SDK client ném lỗi; lỗi lạ lộ message).
+
+### B9. Sửa xong lỗi `interpret` + mọi task đã qua review
+- Nguyên nhân: schema trả về của Gemini để các trường là tuỳ chọn → model đôi khi bỏ trống. Sửa: mọi trường bắt buộc (nullable),
+  luật cố định cho từ claim (EN + FI, kể cả "laktoosittoman"): câu nói "lactose-free" mà draft thiếu claim → `claims` vào `unclear`, kể cả
+  lúc confirm (agent không xoá được yêu cầu). Mẫu 20 lần: trước 17/20 đầy đủ, sau 20/20 (2 lần).
+- Kiểm tra cuối: **nghiệm thu 8 lần liên tiếp 49/49** (Gemini thật), **vitest 291/291**. Đã push `62463f4`.
+- MCP: lỗi trả về không còn làm SDK client ném lỗi; lỗi lạ bị che. Agent mua hàng vẫn đọc được lỗi.
+- Đang chạy: review toàn nhánh (Opus, cổng cuối). Sau đó: một đợt sửa (nếu có) → deploy lên account Cloudflare hackathon.
