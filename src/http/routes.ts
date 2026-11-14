@@ -6,7 +6,7 @@ import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
 import { listFamilies, resolve } from '../catalog/open';
 import { searchProducts } from '../catalog/search';
-import { getSetting, helsinkiIso, now, replayOn } from '../clock';
+import { featureOn, getSetting, helsinkiIso, now, replayOn } from '../clock';
 import type { Env } from '../env';
 import { decisionRegister, reasonCodes } from '../domain/rules';
 import { logEvent, verifyChain } from '../events/log';
@@ -24,14 +24,15 @@ import * as S from './schemas';
 import { storeKind } from '../db';
 import { AUD, jwks, signJws } from '../sign/door';
 import { tryDecision, tryIt } from '../try/sandbox';
+import { VOICE_MAX_BYTES, VOICE_TYPES, audioType, transcribe } from '../try/voice';
 import { VERSION, discovery } from './discovery';
 
 export const INTERPRET_PER_MINUTE = 20;
 /** `/v1/audit/verify` recomputes the whole chain, so anonymous callers get at most this many a minute per client address. */
 export const AUDIT_PER_MINUTE = 30;
 
-/** The only `/v1` routes that need no key: the published rules and reason codes, the audit check (it shows only hashes) and Try it (demo door only). */
-const PUBLIC_PATHS = ['/v1/rules', '/v1/reason-codes', '/v1/audit/verify', '/v1/try', '/v1/try/decision'];
+/** The only `/v1` routes that need no key: the published rules and reason codes, the audit check (it shows only hashes) and Try it, voice included (demo door only). */
+const PUBLIC_PATHS = ['/v1/rules', '/v1/reason-codes', '/v1/audit/verify', '/v1/try', '/v1/try/decision', '/v1/try/voice'];
 
 /** One documented JSON reply: its description and the zod schema of the body. */
 const json = <T extends z.ZodType>(schema: T, description: string) => ({ description, content: { 'application/json': { schema } } });
@@ -100,6 +101,14 @@ const tryDecisionRoute = createRoute({
   request: body(S.TryDecisionBody),
   responses: { 200: json(S.TryDecisionReply, 'OK'), 400: json(S.ErrorBody, 'Invalid request'), 403: json(S.ErrorBody, 'An agent or judge key'), 404: json(S.ErrorBody, 'Not a demo door, or an unknown visitor or token'), 409: json(S.ErrorBody, 'Already decided'), 429: json(S.ErrorBody, 'TRY_RATE_LIMITED') },
 });
+const voiceAudio = { schema: S.AudioClip };
+const tryVoiceRoute = createRoute({
+  method: 'post',
+  path: '/v1/try/voice',
+  summary: 'Demo door only, no key, feature flag `voice`: turn a spoken request into text (Gemini transcribes, nothing else; the route never interprets, quotes, orders or approves, so the page sends the transcript to /v1/try as a normal request). Body: the raw audio clip as a browser MediaRecorder sends it, at most 1 MB; the 30 s limit is enforced by the page recorder, the door enforces size only. Optional X-Visitor-Token counts against that visitor (3 a minute); always counts against the address (60) and the shared free-text model bucket (6 a minute for everyone)',
+  request: { body: { content: Object.fromEntries(VOICE_TYPES.map((t) => [t, voiceAudio])), required: true as const } },
+  responses: { 200: json(S.VoiceReply, 'The transcript, trimmed, at most 200 characters'), 400: json(S.ErrorBody, 'TRANSCRIPT_EMPTY: no clear speech'), 404: json(S.ErrorBody, 'Not a demo door, Try it or voice switched off, or an unknown X-Visitor-Token (VISITOR_UNKNOWN)'), 413: json(S.ErrorBody, 'Clip over 1 MB'), 415: json(S.ErrorBody, 'UNSUPPORTED_MEDIA_TYPE: not audio/webm, audio/ogg, audio/mp4 or audio/wav'), 429: json(S.ErrorBody, 'TRY_RATE_LIMITED, with retryAfter'), 503: json(S.ErrorBody, 'MODELS_BUSY (with retryAfter and a Retry-After header) or MODEL_UNAVAILABLE') },
+});
 const healthRoute = createRoute({ method: 'get', path: '/health', summary: 'Liveness, the gateway clock, replay mode, whether a Gemini key is configured and the write store', responses: { 200: json(S.Health, 'OK') } });
 
 /**
@@ -147,6 +156,15 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   // a keyless route reads no body over 4 KB, so oversized bodies cost nothing before the rate limits apply
   const tryBodyLimit = bodyLimit({ maxSize: 4096, onError: (c) => c.json({ error: 'PAYLOAD_TOO_LARGE', detail: 'at most 4 KB' }, 413) });
   for (const path of ['/v1/try', '/v1/try/decision']) app.use(path, demoOnly, tryCors, tryBodyLimit);
+  /** The voice route exists only while the `voice` feature is on: else 404 like any unknown route. */
+  const voiceOn: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+    if (!(await featureOn(c.env, 'voice'))) throw new HttpError(404, 'NOT_FOUND', 'no such route');
+    await next();
+  };
+  const voiceCors = cors({ origin: '*', allowMethods: ['POST', 'OPTIONS'], allowHeaders: ['Content-Type', 'X-Visitor-Token'] });
+  // the clip route has its own 1 MB limit; the 4 KB one above is not applied to it
+  const voiceBodyLimit = bodyLimit({ maxSize: VOICE_MAX_BYTES, onError: (c) => c.json({ error: 'PAYLOAD_TOO_LARGE', detail: 'at most 1 MB' }, 413) });
+  app.use('/v1/try/voice', demoOnly, voiceOn, voiceCors, voiceBodyLimit);
   app.use('/v1/*', authenticate(PUBLIC_PATHS, ['/v1/events', '/v1/events/stream']));
 
   app.notFound((c) => c.json({ error: 'NOT_FOUND', detail: 'no such route' }, 404));
@@ -279,6 +297,13 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   app.openapi(streamRoute, (c) => streamEvents(c) as never);
   /** One Try it step for a visitor (demo door only, no key); the client address comes from Cloudflare. */
   app.openapi(tryRoute, async (c) => c.json((await tryIt(c.env, c.req.valid('json'), c.req.header('CF-Connecting-IP') ?? 'unknown', fetchFn)) as never, 200));
+  /** Transcribes one spoken clip to text (demo door, flag `voice`, no key); the client address comes from Cloudflare. */
+  app.openapi(tryVoiceRoute, async (c) => {
+    const mimeType = audioType(c.req.header('Content-Type'));
+    if (!mimeType) return c.json({ error: 'UNSUPPORTED_MEDIA_TYPE', detail: `send the clip as ${VOICE_TYPES.join(', ')}` }, 415) as never;
+    const clip = new Uint8Array(await c.req.arrayBuffer());
+    return c.json(await transcribe(c.env, clip, mimeType, c.req.header('CF-Connecting-IP') ?? 'unknown', c.req.header('X-Visitor-Token'), fetchFn), 200);
+  });
   /** The visitor approves or rejects their own sandbox's held order. */
   app.openapi(tryDecisionRoute, async (c) =>
     c.json(await tryDecision(c.env, c.req.valid('json'), { address: c.req.header('CF-Connecting-IP') ?? 'unknown', authorization: c.req.header('Authorization') }, fetchFn), 200),
@@ -293,7 +318,7 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   app.get('/.well-known/jwks.json', async (c) => c.json(await jwks(c.env), 200, { 'Cache-Control': 'public, max-age=300' }));
 
   /** What any agent fetches first: where the API, MCP, rules, events, audit, keys and demo are. */
-  app.get('/.well-known/agent-gateway.json', (c) => c.json(discovery(new URL(c.req.url).origin, c.env.DEMO_MODE === '1')));
+  app.get('/.well-known/agent-gateway.json', async (c) => c.json(discovery(new URL(c.req.url).origin, c.env.DEMO_MODE === '1', await featureOn(c.env, 'voice'))));
 
   app.doc('/openapi.json', (c) => {
     const discoveryUrl = `${new URL(c.req.url).origin}/.well-known/agent-gateway.json`;

@@ -9,9 +9,9 @@ export const REPOSITORY = 'https://github.com/kanetran29/junction-2026';
 /**
  * The discovery document served at `/.well-known/agent-gateway.json`: everything an agent or a judge needs to find and check
  * the door (API, MCP, rules, reason codes, events, audit, signing keys, approval model, demo page, code, and Try it on a demo
- * door: `demo`), as absolute URLs on the origin it was requested from.
+ * door: `demo`; its `voice` route only while that feature is on: `voice`), as absolute URLs on the origin it was requested from.
  */
-export function discovery(origin: string, demo: boolean) {
+export function discovery(origin: string, demo: boolean, voice = false) {
   return {
     name: 'Lazydoor',
     punchline: 'Lazy at the order, strict at the border.',
@@ -37,6 +37,7 @@ export function discovery(origin: string, demo: boolean) {
           tryIt: {
             url: `${origin}/v1/try`,
             decision: `${origin}/v1/try/decision`,
+            ...(voice ? { voice: `${origin}/v1/try/voice` } : {}),
             demoOnly: true,
             auth: 'none',
             note: "POST; a visitor orders as the chef of a sandbox kitchen (its own stock world) and approves its held orders as that kitchen's manager; example sentences use recorded readings; 3 calls a minute per visitor, 60 per address, 6 free-text tries a minute for everyone",

@@ -91,14 +91,14 @@ export function addressBucket(ip: string): string {
 }
 
 /** Counts one call in a rate bucket and refuses it with 429 TRY_RATE_LIMITED (and the seconds to the next minute) past `max`. */
-async function limit(env: Env, bucket: string, max: number, detail: string): Promise<void> {
+export async function limit(env: Env, bucket: string, max: number, detail: string): Promise<void> {
   if ((await countUse(env, bucket)) > max) throw new HttpError(429, 'TRY_RATE_LIMITED', detail, untilNextMinute());
 }
 
 /** The flood guard for a client address: 60 calls a minute. */
-const limitAddress = (env: Env, address: string) => limit(env, `try-address:${addressBucket(address)}`, TRY_PER_ADDRESS_PER_MINUTE, `at most ${TRY_PER_ADDRESS_PER_MINUTE} Try it calls a minute from one address`);
+export const limitAddress = (env: Env, address: string) => limit(env, `try-address:${addressBucket(address)}`, TRY_PER_ADDRESS_PER_MINUTE, `at most ${TRY_PER_ADDRESS_PER_MINUTE} Try it calls a minute from one address`);
 /** The per-person limit, keyed on the visitor token: 3 calls a minute. */
-const limitVisitor = (env: Env, visitor: string) => limit(env, `try-visitor:${visitor}`, TRY_PER_VISITOR_PER_MINUTE, `at most ${TRY_PER_VISITOR_PER_MINUTE} Try it calls a minute for this visitor`);
+export const limitVisitor = (env: Env, visitor: string) => limit(env, `try-visitor:${visitor}`, TRY_PER_VISITOR_PER_MINUTE, `at most ${TRY_PER_VISITOR_PER_MINUTE} Try it calls a minute for this visitor`);
 
 /** The tables a sandbox's buyer id appears in, children first (events stay: removing them would break the hash chain). */
 const SANDBOX_TABLES = ['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'mandates', 'buyer_keys', 'try_visitors'];
@@ -132,7 +132,7 @@ async function openSandbox(env: Env, address: string): Promise<{ visitor: string
 }
 
 /** The sandbox buyer of a visitor token (and marks it used now); an unknown one (a reset, 20 idle minutes, or recycled) is 404 VISITOR_UNKNOWN. */
-async function sandboxOf(env: Env, visitor: string): Promise<string> {
+export async function sandboxOf(env: Env, visitor: string): Promise<string> {
   const row = await db(env).prepare('UPDATE try_visitors SET last_used = ?2::bigint WHERE token_hash = ?1 RETURNING buyer_id').bind(await sha256Hex(visitor), Date.now()).first<{ buyer_id: string }>();
   if (!row) throw new HttpError(404, 'VISITOR_UNKNOWN', 'no such visitor: sandboxes end at a demo reset, after 20 idle minutes or when recycled, so start again without one');
   return row.buyer_id;
