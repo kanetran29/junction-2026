@@ -12,7 +12,7 @@ Cần xem:
 3. 1:00 đến 1:13, đơn được chấp nhận: thùng lên xe, cổng bến nâng, xe chạy tới bếp, dỡ thùng lên quầy, chef giơ ngón cái, thẻ hoá đơn 1,010.00 €, lịch lật sang MON 16, xe quay về.
 4. Xe tải cận cảnh 1080p: [shots/after-truck.png](shots/after-truck.png) (một khung xe, cabin và thùng cùng trục, bánh chạm đường dưới vòm).
 5. Chữ ở 50%: [shots/after-scene-50pct.png](shots/after-scene-50pct.png).
-6. 1:23 chờ duyệt ("Waiting for approval" ở cổng bến) và 1:46 phê duyệt hết hạn: cổng bến đóng, "Approval expired".
+6. 0:53 và 1:27 chờ duyệt ("Waiting for approval" ở cổng bến), 1:46 phê duyệt hết hạn: cổng bến đóng, "Approval expired".
 
 
 ## Nhật ký
