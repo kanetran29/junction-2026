@@ -93,3 +93,13 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 - **Nghiệm thu với `wrangler dev`: 49/49 PASS, 0 BLOCKED** (3 lần chạy; một lần trước đó 48/49 chưa rõ case nào → mình sẽ chạy lặp để bắt).
 - Đang chạy: sửa review Task 10a (JSON hỏng trả 500 thay vì 400; chuyển xác thực thành middleware), review Task 11.
 - Còn lại: Task 13 (agent mua hàng Gemini + kịch bản demo), README (Task 14a), review toàn nhánh (Opus), deploy (Task 14b).
+
+### B8. Agent mua hàng, kịch bản demo, README
+- Task 13 (`67a576b`): agent Gemini (`pnpm agent`) gọi 9 tool MCP; chạy thật ví dụ của đề bài: chọn 464306, 1.010,00 € → HELD chờ "Kitchen
+  manager" → duyệt qua hộp thư → ACCEPTED. Agent không bao giờ thấy link/khoá duyệt. `pnpm scenarios`: 11/11 PASS (không cần model).
+- README (`bafc7cf`, `bdf5421`) + `docs/reason-codes.md` (sinh từ code). Review: không có câu sai.
+- Task 10a xong sau 2 vòng sửa (JSON hỏng → 400; xác thực thành middleware; reset kiểm đồng hồ trước khi xoá).
+- **Lỗi thật tìm được khi chạy nghiệm thu lặp lại**: `interpret` (gemini-3.8-flash) ~2/15 lần trả về thiếu `claims`/số lượng/ngày. Số lượng
+  và ngày rơi vào `unclear` (an toàn), nhưng mất "lactose-free" thì KHÔNG bị báo → agent có thể đặt sữa thường. Đang sửa: bắt buộc mọi
+  trường trong schema (nullable), và một luật cố định: câu có "lactose-free/laktoositon" mà draft thiếu claim → đưa `claims` vào `unclear`.
+- Đang chạy: sửa MCP (lỗi trả về không khớp outputSchema làm SDK client ném lỗi; lỗi lạ lộ message).
