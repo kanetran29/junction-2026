@@ -41,7 +41,7 @@ const LAYOUTS = {
   hook: () => `
     <div class="split hook">
       <div><p class="wordmark">${esc(pitch.title)}</p>${h1("hook")}${points(slide.hook.bullets)}</div>
-      ${shot("shots/story-4.webp", "Story: Friday 16:30, the chef types the order at the kitchen terminal and the agent sets off for Valio.")}
+      ${shot("shots/story-4.webp", "Story: Friday 16:30, the chef types the order at the kitchen terminal and the agent sets off for Valio.", "bleed")}
     </div>`,
   problem: () => `
     ${h1("problem")}
@@ -88,8 +88,9 @@ const LAYOUTS = {
   next: () => {
     const bullets = slide.next.bullets;
     const url = bullets.find((b) => b.startsWith("Demo:"));
-    return `<div class="split next">${shot(`${STILL}/delivery.webp`, "Monday: the truck unloads the milk and chicken beside the chef, with the signed receipt.")}
-      <div>${h1("next")}${points(bullets.filter((b) => b !== url))}<p class="url">${esc(url)}</p></div></div>`;
+    const [label, link] = [url.slice(0, url.indexOf(": ") + 1), url.slice(url.indexOf(": ") + 2)];
+    return `<div class="closing"><div class="split next">${shot(`${STILL}/delivery.webp`, "Monday: the truck unloads the milk and chicken beside the chef, with the signed receipt.")}
+      <div>${h1("next")}${points(bullets.filter((b) => b !== url))}</div></div><p class="url"><span>${esc(label)}</span> ${esc(link)}</p></div>`;
   },
 };
 
@@ -133,7 +134,7 @@ try {
   if (bad.length) throw new Error(`missing files: ${bad.join(", ")}`);
   const report = await page.evaluate(() => [...document.querySelectorAll(".slide")].map((s) => {
     const r = s.getBoundingClientRect();
-    const over = [...s.querySelectorAll("h1, li, p, figure, dl, .arch, .track")].filter((e) => { const b = e.getBoundingClientRect(); return b.bottom > r.bottom - 64 || b.right > r.right - 60 || b.left < r.left + 60; }).map((e) => e.tagName + "." + e.className);
+    const over = [...s.querySelectorAll("h1, li, p, figure, dl, .arch, .track")].filter((e) => { const b = e.getBoundingClientRect(); return b.bottom > r.bottom - 64 || (b.right > r.right - 60 && !e.classList.contains("bleed")) || b.left < r.left + 60; }).map((e) => e.tagName + "." + e.className);
     const small = [...s.querySelectorAll("h1, li, p, dt, dd, b, span")].filter((e) => e.closest("footer") === null && e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 28).map((e) => `${e.tagName}:${e.textContent.trim().slice(0, 24)}`);
     return { id: s.dataset.id, over, small };
   }));

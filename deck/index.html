@@ -5,7 +5,7 @@
 <section class="slide s-hook" data-id="hook">
     <div class="split hook">
       <div><p class="wordmark">Lazydoor</p><h1>Agents will order for kitchens. Who checks the agent?</h1><ul class="points"><li>Buying is moving from people in a webshop to agents</li><li>Valio's API answers availability and price</li><li>It cannot tell whether an order makes sense</li></ul></div>
-      <figure class="shot "><img src="shots/story-4.webp" alt="Story: Friday 16:30, the chef types the order at the kitchen terminal and the agent sets off for Valio."></figure>
+      <figure class="shot bleed"><img src="shots/story-4.webp" alt="Story: Friday 16:30, the chef types the order at the kitchen terminal and the agent sets off for Valio."></figure>
     </div><footer><span>Valio Aimo, Trusted Trade Agents, Junction 2026</span><span>01</span></footer></section>
 <section class="slide s-problem" data-id="problem">
     <h1>Friday 16:30: an agent orders milk for Monday</h1>
@@ -45,6 +45,6 @@
 <section class="slide s-proof" data-id="proof"><h1>It works, and you can check it</h1><dl class="numerals"><div><dt>60/60</dt><dd>acceptance cases</dd></div><div><dt>11/11</dt><dd>scenarios</dd></div><div><dt>390</dt><dd>tests</dd></div></dl>
       <figure class="shot wide"><img src="shots/inside-checks.webp" alt="Inside, Check it yourself: the audit chain is valid and the door's EdDSA Ed25519 signing key is published, read live from the deployed door."></figure>
       <ul class="row3"><li><b>Real agent run:</b> held, approved, accepted 1,010.00 €</li><li><b><code>/v1/audit/verify</code>:</b> the chain, signed by the door</li><li><b>A tampered quote is refused:</b> <code>QUOTE_SIGNATURE_INVALID</code></li></ul><footer><span></span><span>08</span></footer></section>
-<section class="slide s-next" data-id="next"><div class="split next"><figure class="shot "><img src="../demo/assets/stills/delivery.webp" alt="Monday: the truck unloads the milk and chicken beside the chef, with the signed receipt."></figure>
-      <div><h1>Path to production</h1><ul class="points"><li>Valio adds an order endpoint and its allocation rule</li><li>Kitchens sign their own limits once</li><li><b>Any agent plugs in:</b> <code>/.well-known/agent-gateway.json</code></li></ul><p class="url">Demo: lazydoor.lazydoor.workers.dev/demo</p></div></div><footer><span></span><span>09</span></footer></section>
+<section class="slide s-next" data-id="next"><div class="closing"><div class="split next"><figure class="shot "><img src="../demo/assets/stills/delivery.webp" alt="Monday: the truck unloads the milk and chicken beside the chef, with the signed receipt."></figure>
+      <div><h1>Path to production</h1><ul class="points"><li>Valio adds an order endpoint and its allocation rule</li><li>Kitchens sign their own limits once</li><li><b>Any agent plugs in:</b> <code>/.well-known/agent-gateway.json</code></li></ul></div></div><p class="url"><span>Demo:</span> lazydoor.lazydoor.workers.dev/demo</p></div><footer><span></span><span>09</span></footer></section>
 </body></html>

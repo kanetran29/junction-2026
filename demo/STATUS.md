@@ -265,6 +265,7 @@ Vấn đề tìm thấy:
 - `deck/` ở gốc repo (không nằm trong demo/, nên không được phục vụ): `build.mjs` đọc `pitch/pitch.json` (giữ 9 id, tiêu đề, bullet, notes), viết `deck/index.html` + `deck.css`, rồi một trình duyệt in `deck.pdf` (9 trang 1920×1080), `slides/NN.png` và `notes.md` vào `~/junction-2026/pitch/out/`.
 - Cùng hệ hình với trang demo: petrol tối, chỉ một màu nhấn hồng #d65c84, Geist và Geist Mono, bo góc 10 px; không eyebrow, không chuỗi dấu chấm giữa, 0 gạch ngang dài; chữ thân ≥ 28 px (build kiểm và báo).
 - Hình thật ở mọi slide: khung Story lúc 16:30 (hook), ảnh NO MILK (problem), ảnh HELD với điện thoại (solution), đường ray 7 bước + ảnh từ chối (flow), 4 dòng Compare chụp từ door (guardrails), Live + thẻ điện thoại của Try it (demo), sơ đồ kiến trúc với logo Simple Icons (built), số 60/60, 11/11, 390 + ô "Chain valid" và khoá ký chụp trực tiếp (proof), ảnh giao hàng thứ Hai + URL (next). Ảnh chụp ở 2x từ https://lazydoor.lazydoor.workers.dev/demo/ bằng `deck/capture.mjs`, mỗi lần một context mới.
+- Kane duyệt deck; chỉnh slide 1 (khung Story thành ảnh chính, 57% bề ngang, sát mép phải, tiêu đề 3 dòng, cả khối căn giữa theo chiều dọc) và slide 9 (ảnh giao hàng lớn hơn, chữ căn giữa bên cạnh, URL demo thành dòng kết lớn màu hồng).
 
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
