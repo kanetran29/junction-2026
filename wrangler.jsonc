@@ -7,7 +7,7 @@
     {
       "binding": "DB",
       "database_name": "lazydoor",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "4ff32275-5661-41e2-9e74-f36b175237bc",
       "migrations_dir": "migrations"
     }
   ],
