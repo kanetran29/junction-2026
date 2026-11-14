@@ -285,3 +285,24 @@ Hiện không có gì. (Quyền Hyperdrive đã được thêm; Aiven + Gemma đ
   agent, reset lại theo quy ước trên.
 - Sửa lỗi nhỏ của agent: dòng HELD in `PACK_SIZE_CHANGED: undefined` vì lý do loại thay đổi offer không có `detail` (trường này
   vốn là tuỳ chọn, `src/policy/decide.ts`). Giờ agent chỉ in mã khi không có detail. Không cần deploy (agent chạy ở máy).
+
+### C6. Merge nhánh demo và phục vụ trang demo ở /demo (xong, **chưa push**)
+- Kane duyệt "Merge và phục vụ /demo". Đã merge `origin/demo-animation` (`a475c58`) vào main bằng merge commit `266b073`; không
+  đụng worktree demo.
+- **Kane dặn: không push gì lên GitHub cho tới khi Kane cho phép** (giấu bản mới với các đội khác tới sát giờ pitch). Merge và
+  commit này chỉ nằm ở máy. `origin/main` vẫn ở `827cac8`. Nhánh `origin/demo-animation` (`a475c58`) do session demo push từ trước.
+- Phục vụ bằng Workers static assets: `scripts/build-demo.mjs` chép đúng các file trang demo cần (index.html, css, các .mjs,
+  `kit/`, `fixtures/`, `assets/`) vào `dist/assets/demo/` (đã gitignore). Wrangler chạy script đó trước mỗi lần deploy,
+  `pnpm test` cũng vậy. Không publish `demo/dev/`, `demo/test/`, `demo/shots/`, SCRIPT.md, STATUS.md, `story.mp4`.
+- Worker chạy trước mọi asset (`run_worker_first`), nên không asset nào che được route API. `/demo` trả 301 về `/demo/`, còn
+  `/demo/*` lấy file từ binding `ASSETS`. Lớp assets trả 200 cho request có Range (đã kiểm trong miniflare), nên Worker tự cắt
+  đoạn và trả 206 để audio player tua được.
+- Test: 334/334 (thêm `test/demo.test.ts`, viết trước cho đỏ). Lúc chạy test, Docker đã tắt (máy từng crash vì RAM). Mình bật
+  Docker chỉ để chạy test rồi tắt lại ngay.
+- Deploy phiên bản **`bf69c1ea-eaba-4a85-8bb9-6303d2238156`**. Kiểm live bằng curl:
+  - `/demo` → 301 về `/demo/`; `/demo/` → 200 `text/html`; `/demo/main.mjs` → 200 `text/javascript`;
+  - `assets/voice/01.mp3` với `Range: bytes=0-99` → 206, `bytes 0-99/117548`;
+  - `dev/`, `SCRIPT.md`, `story.mp4`, `shots/` → 404;
+  - `/v1/events` không key → 200; `/health` → `aiven-postgres`.
+- Nghiệm thu trên door: **49/49**. Sau đó reset demo chuẩn (Thứ Sáu 21:10, replay, mandate bếp 500/1.500).
+- Trang demo công khai: https://lazydoor.lazydoor.workers.dev/demo/

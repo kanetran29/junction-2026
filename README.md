@@ -105,6 +105,8 @@ The scenarios use the demo-only admin routes (reset, clock, replay), so they wor
 
 The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/search`, `/v1/quotes`, `/v1/baskets`, `/v1/orders`, `/v1/resolve`, and `GET /v1/families`, `/v1/quotes/{id}` and `/v1/orders/{id}`. Every `/v1` route except `/v1/rules` and `/v1/reason-codes` needs `Authorization: Bearer <key>`, and so does `/mcp`. The one exception is the event log on a demo door: with `DEMO_MODE=1`, `GET /v1/events` and `/v1/events/stream` also answer a request with no key at all, read-only and for every buyer, so the public demo page can watch the door (a wrong key is still 401). `/health` and `/openapi.json` are open. HTTP and MCP share one schema.
 
+**Demo page.** The animated demo (story and Live mode) is served by the same Worker at [`/demo/`](https://lazydoor.lazydoor.workers.dev/demo/), as Workers static assets. `scripts/build-demo.mjs` copies only the files the page loads into `dist/assets/demo/` (wrangler runs it before every deploy, `pnpm test` before every run); `demo/dev/`, `demo/test/`, `demo/shots/`, the notes and `story.mp4` stay unpublished. Live mode reads `/v1/events` from the page's own origin.
+
 `POST /v1/orders` follows the ACP idempotency rules: a missing `Idempotency-Key` is 400, the same key in flight is 409, the same key with another body is 422. A retry with the same key and body returns the same order.
 
 **Judge key.** The operator mints a read-everything key with `POST /admin/judge-key` (admin key, `DEMO_MODE=1`); it returns `{ key }` once. The key acts as buyer `hotel-b` (it can place orders as `hotel-b`) and reads every buyer's events. It survives `/admin/reset`; agent and approver keys do not.

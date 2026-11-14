@@ -14,7 +14,7 @@
     "agent": "tsx --env-file-if-exists=.dev.vars agent/buyer.ts",
     "scenarios": "tsx agent/scenarios.ts",
     "test": "vitest run",
-    "pretest": "bash scripts/check-secrets.sh",
+    "pretest": "bash scripts/check-secrets.sh && node scripts/build-demo.mjs",
     "replies:build": "tsx scripts/load-replies.ts",
     "replies:load": "wrangler d1 execute DB --local --file .data/valio/build/replies.sql",
     "mandate:sign": "tsx scripts/mandate-sign.ts",

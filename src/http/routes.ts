@@ -80,9 +80,30 @@ const streamRoute = createRoute({
 const healthRoute = createRoute({ method: 'get', path: '/health', summary: 'Liveness, the gateway clock, replay mode, whether a Gemini key is configured and the write store', responses: { 200: json(S.Health, 'OK') } });
 
 /**
+ * One demo page file from the static assets. A single `Range: bytes=a-b` (or `a-`, `-n`) on a whole-file reply is answered
+ * with 206 and that slice, because the page's audio player seeks with it and the assets layer answers ranges with 200.
+ */
+async function demoFile(req: Request, assets: Fetcher): Promise<Response> {
+  const res = await assets.fetch(req);
+  const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get('Range') ?? '');
+  if (res.status !== 200 || !m || (!m[1] && !m[2])) return res;
+  const body = new Uint8Array(await res.arrayBuffer());
+  const size = body.byteLength;
+  const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+  const end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+  if (start > end) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+  const headers = new Headers(res.headers);
+  headers.delete('Content-Encoding');
+  headers.set('Accept-Ranges', 'bytes');
+  headers.set('Content-Range', `bytes ${start}-${end}/${size}`);
+  headers.set('Content-Length', String(end - start + 1));
+  return new Response(body.slice(start, end + 1), { status: 206, headers });
+}
+
+/**
  * The whole gateway app: `/health`, the buyer routes under `/v1` as zod-openapi routes (documented at `/openapi.json`), the
- * demo-only admin routes and the approval pages. `fetchFn` reaches Valio and Gemini and is injected by tests.
- * Every failure leaves as `{ error, detail }`.
+ * demo-only admin routes, the approval pages and the demo page at `/demo/` (static assets). `fetchFn` reaches Valio and
+ * Gemini and is injected by tests. Every failure leaves as `{ error, detail }`.
  */
 export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings: Env }> {
   const app = new OpenAPIHono<{ Bindings: Env }>({
@@ -97,6 +118,9 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   app.use('/v1/*', authenticate(PUBLIC_PATHS, ['/v1/events', '/v1/events/stream']));
 
   app.notFound((c) => c.json({ error: 'NOT_FOUND', detail: 'no such route' }, 404));
+
+  app.get('/demo', (c) => c.redirect('/demo/', 301));
+  app.get('/demo/*', (c) => demoFile(c.req.raw, c.env.ASSETS));
 
   app.onError((err, c) => {
     const known = errorBody(err);

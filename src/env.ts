@@ -4,6 +4,8 @@ export interface Bindings {
   DB: D1Database;
   /** Hyperdrive in front of Aiven PostgreSQL: every table the door writes (see `src/db.ts`). */
   HYPERDRIVE: Hyperdrive;
+  /** The demo page's static files (`dist/assets/demo/`, built by `scripts/build-demo.mjs`), served under `/demo/`. */
+  ASSETS: Fetcher;
   VALIO_API_BASE: string;
   DEMO_MODE: string;
   GEMINI_MODEL: string;
