@@ -366,3 +366,19 @@ Kane duyệt cả 3 phần ("làm cả 3, k cần lo thời gian, làm cho tốt
   - JWS của offer kiểm đúng với JWKS. JWS đã đổi giá bị 422. JWS thật cho ra ACCEPTED, có biên nhận ký.
   - Tamper thì verify chỉ ra seq 1625, và `verify-audit.mjs` cũng báo cùng seq (exit 1).
 - Đã reset demo chuẩn (Thứ Sáu 21:10, replay, mandate 500/1.500).
+
+### C8. Merge tab "Inside" của demo và phục vụ ở /demo/ (xong, **chưa push**)
+- Đã merge commit demo `fd4408a` vào main (merge `8f4857a`). Commit này thêm tab Inside, hai dòng Compare, chip audit ở Live và `demo/assets/proof/agent-run.mp4`.
+- `scripts/build-demo.mjs` publish thêm `inside.mjs`, `inside-view.mjs` và `proof.json`. Video nằm sẵn trong `assets/`, nên đã được publish cùng thư mục.
+- `demo/proof.json` đã điền số đo thật, bỏ dấu "pending":
+  - Nghiệm thu 55/55 và scenarios 11/11, đo trên `5a8bf688` ngày 14/11.
+  - 369 unit test.
+  - Thêm trường `measuredOn`; tab Inside hiện chưa hiển thị trường này.
+- Commit `1bb6f65`. Deploy phiên bản **`31a7294d-77cb-4c02-ac24-49c3b3bb23a3`**; code của door không đổi so với `5a8bf688`.
+- Kiểm live:
+  - `/demo/?mode=inside` 200; `inside*.mjs` 200; `proof.json` 200 JSON.
+  - `agent-run.mp4` với Range trả 206, `bytes 0-1023/2740023`.
+  - Các API mà tab Inside gọi đều 200.
+  - `demo/test/` vẫn 404.
+- Đã reset demo chuẩn. Đã tắt lại Docker (chỉ bật để chạy test).
+- **Quy ước reset chuẩn hiện tại:** Thứ Sáu 21:10, replay `replies_2026-11-16`, mandate 500 € một đơn và 1.500 € một ngày.
