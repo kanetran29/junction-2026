@@ -8,7 +8,7 @@ A buyer's purchasing agent can order from Valio in plain words. The gateway chec
 It has two parts.
 
 - **The door.** A Cloudflare Worker with a typed HTTP API (OpenAPI) and an MCP server. An agent finds products, gets a quote, places an order and reads the receipt. Every refusal has a reason code.
-- **The reference agent.** A small purchasing agent in `agent/`. It is a client of the door and uses the same API as any other agent.
+- **The reference agent.** A small purchasing agent, `agent/buyer.ts`. It uses Gemini function calling over the door's MCP tools, holds only an agent key and never sees an approval link. See [agent/README.md](agent/README.md).
 
 ## Who decides what
 
@@ -37,7 +37,7 @@ ADMIN_KEY=
 GEMINI_API_KEY=
 ```
 
-`GEMINI_API_KEY` is optional. Without it, free-text interpretation is unavailable and the cases that need a real model report `BLOCKED_ON_GEMINI`. Everything else works.
+`GEMINI_API_KEY` is optional, but `pnpm categories:build` calls Gemini and needs it. Without it, free-text interpretation is unavailable and the cases that need a real model report `BLOCKED_ON_GEMINI`. Everything else works.
 
 Get the challenge data (never committed, see the data notice below), then build and load the local database.
 
@@ -57,7 +57,16 @@ pnpm test                     # unit tests (vitest in workerd, real D1)
 pnpm acceptance               # 49 acceptance cases against the running Worker
 ```
 
-`pnpm acceptance` resets the gateway through the demo-only admin routes and mints its own agent and approver keys, so it needs only `ADMIN_KEY` to match. Set `GATEWAY_URL` to run it against another deployment.
+`pnpm acceptance` resets the gateway through the demo-only admin routes and mints its own agent and approver keys. It reads `ADMIN_KEY` from the shell, default `dev-admin-key`, and that must match `ADMIN_KEY` in `.dev.vars`. Set `GATEWAY_URL` to run it against another deployment.
+
+The reference agent and the model-free scenarios:
+
+```bash
+pnpm scenarios                # 11 PASS/FAIL scenarios that drive the demo flows below, no model
+pnpm agent                    # the buyer agent on the brief's example (needs GEMINI_API_KEY)
+```
+
+The scenarios use the demo-only admin routes (reset, clock, replay), so they work only where `DEMO_MODE=1`. Details in [agent/README.md](agent/README.md).
 
 ## Interfaces
 
@@ -72,7 +81,7 @@ pnpm acceptance               # 49 acceptance cases against the running Worker
 | Receipt | `GET /v1/orders/{id}/receipt` (plain text) |
 | Health | `GET /health` |
 
-The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/search`, `/v1/quotes`, `/v1/baskets`, `/v1/orders`, `/v1/resolve` and `GET /v1/families`. Every `/v1` route except `/v1/rules` and `/v1/reason-codes` needs `Authorization: Bearer <key>`, and so does `/mcp`. `/health` and `/openapi.json` are open. HTTP and MCP share one schema.
+The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/search`, `/v1/quotes`, `/v1/baskets`, `/v1/orders`, `/v1/resolve`, and `GET /v1/families`, `/v1/quotes/{id}` and `/v1/orders/{id}`. Every `/v1` route except `/v1/rules` and `/v1/reason-codes` needs `Authorization: Bearer <key>`, and so does `/mcp`. `/health` and `/openapi.json` are open. HTTP and MCP share one schema.
 
 `POST /v1/orders` follows the ACP idempotency rules: a missing `Idempotency-Key` is 400, the same key in flight is 409, the same key with another body is 422. A retry with the same key and body returns the same order.
 
@@ -93,7 +102,7 @@ Be clear about what this prototype does not do.
 
 - **Order acceptance is simulated.** Valio has no order endpoint in the challenge. The receipt says "Accepted = binding order, invoiced on delivery (simulated)". The ledger is a **mock ledger adapter** in the Worker's D1 database. Valio's order API and allocation rule would replace it at the same call.
 - **Allocation is a stand-in.** Stock is allocated first come, first served against the Valio availability amount less accepted ledger lines. One SQL statement inserts all lines of an order or none. A quote and a held order reserve nothing.
-- **Replay.** After Sunday 15 Nov 17:00 (Helsinki) the gateway serves the recording made on Friday 13 Nov at 21:08 instead of calling Valio. Before that it calls Valio live. The demo clock can be set with the demo-only admin routes (`DEMO_MODE=1` and the admin key; otherwise 404).
+- **Replay.** After Sunday 15 Nov 17:00 (Helsinki) the gateway serves the recording made on Friday 13 Nov at 21:08 instead of calling Valio. Before that it calls Valio live. The demo clock can be set with the demo-only admin routes (`DEMO_MODE=1` and the admin key; otherwise 404). The deployed instance keeps `DEMO_MODE=1` so the demo can set the clock and replay. Its admin routes are protected by a long random `ADMIN_KEY` Worker secret.
 - **Payments, invoices and delivery** are not implemented.
 - **Mandate.** A mandate is a bearer JWS (Ed25519, signed per buyer, checked on every order). It has no key binding to the agent, so anyone holding it could present it. AP2-style key binding is out of scope.
 
