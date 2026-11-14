@@ -306,3 +306,63 @@ Hiện không có gì. (Quyền Hyperdrive đã được thêm; Aiven + Gemma đ
   - `/v1/events` không key → 200; `/health` → `aiven-postgres`.
 - Nghiệm thu trên door: **49/49**. Sau đó reset demo chuẩn (Thứ Sáu 21:10, replay, mandate bếp 500/1.500).
 - Trang demo công khai: https://lazydoor.lazydoor.workers.dev/demo/
+
+### C7. Audit log băm nối chuỗi, quote và biên nhận có chữ ký, tài liệu discovery (xong, **chưa push**)
+Kane duyệt cả 3 phần ("làm cả 3, k cần lo thời gian, làm cho tốt là đc"). Làm theo TDD; chỉ commit ở máy.
+
+**Phần 1. Event log băm nối chuỗi trên Aiven**
+- Mỗi event có thêm `prevHash` và `hash`:
+  - `hash` = sha256 của (`prevHash` + JSON chuẩn RFC 8785 của event, bỏ hai trường hash).
+  - Event đầu tiên nối vào 64 số 0. `/admin/reset` bắt đầu chuỗi mới; seq vẫn tăng tiếp qua các lần reset.
+- Chuỗi được tính trong cùng transaction và cùng advisory lock 2 với lúc ghi event:
+  - Câu lệnh lấy lock tách riêng, nên câu lệnh đọc hash trước đó thấy mọi event đã commit.
+  - Vì vậy chuỗi luôn thẳng, và người đọc không bao giờ thấy một hash đổi về sau.
+  - Có test 25 event ghi song song.
+- `GET /v1/audit/verify` (công khai, tối đa 30 lần/phút cho mỗi địa chỉ):
+  - Tính lại toàn chuỗi trong một snapshot REPEATABLE READ.
+  - Trả `{count, firstSeq, headSeq, headHash, valid, firstBadSeq?, checkedAt}` cùng một JWS ký bằng khoá của door.
+- `POST /admin/tamper` (chỉ demo, cần admin key) sửa data của một event mà không đổi hash, để verify chỉ ra đúng seq đó.
+- `scripts/verify-audit.mjs` kiểm từ bên ngoài, chỉ cần Node:
+  - Tính lại chuỗi và kiểm head đã ký với JWKS.
+  - `--head seq:hash` phát hiện event bị cắt ở cuối.
+
+**Phần 2. Quote và biên nhận có chữ ký**
+- Door có khoá Ed25519 riêng:
+  - Khoá được tạo ở máy, lưu ở `~/.config/junction2026/door-signing.jwk` (quyền 600, chưa từng in ra) và trong Worker secret `DOOR_SIGNING_JWK`.
+  - Khoá công khai ở `/.well-known/jwks.json`, kid `6W6BP7gnqzLnA09LygvL0SPEyt_BZcdh_msRvMUL9HU` (thumbprint RFC 7638).
+- Mỗi offer mang `jws` ký các trường ràng buộc: quote, offer, buyer, ngày giao, từng dòng, tổng, tiền tệ, `validUntil`, `iat`, `aud`.
+- Đơn hàng có thể gửi kèm `quoteJws` (cả từng selection của giỏ). Door đặt đơn chỉ khi chữ ký đúng và mọi trường khớp offer đã lưu; nếu không thì trả 422 `QUOTE_SIGNATURE_INVALID` và không tạo đơn nào.
+- Đơn cuối (ACCEPTED/REJECTED/EXPIRED) mang `jws` biên nhận, có `approvedBy` và `decidedAt`. Đơn HELD chỉ có biên nhận sau khi người duyệt quyết.
+- Agent tham chiếu kiểm JWS với JWKS trước khi đặt, in "quote signature verified". Không có chữ ký khớp thì không đặt.
+
+**Phần 3. Discovery**
+- `GET /.well-known/agent-gateway.json` liệt kê: API, MCP, rules, reason codes, events, audit, JWKS, mô hình duyệt (agent nhận 403), `/demo/`, repo.
+- `/openapi.json` có link tới tài liệu này.
+
+**Review độc lập (Opus, chỉ đọc diff)**
+- Không có lỗi critical.
+- Đã sửa 8 điểm:
+  1. Migration: áp `SCHEMA` lên Aiven trước khi deploy, có ghi trong README.
+  2. Thiếu khoá ký: door từ chối quote và đơn trước khi ghi hay đặt bất cứ gì.
+  3. verify: thêm rate limit.
+  4. Agent: không đặt nếu thiếu chữ ký khớp, và so mọi trường ràng buộc.
+  5. Secret hỏng: thông báo lỗi không lộ phần nào của khoá.
+  6. verify đọc toàn bộ trong một snapshot.
+  7. Script kiểm ngoài: sửa dòng hướng dẫn và thêm `--head`.
+  8. `approvedBy` lấy theo approval token.
+- Giữ lại làm giới hạn đã biết:
+  - Hash của event buyer khác (`prevHash`) cho phép đoán dữ liệu entropy thấp của buyer đó.
+  - Lock event giữ lâu hơn (3 lượt round trip).
+  - Chưa có đường xoay khoá (nhưng đã có kid).
+  - `/admin/tamper` trả 401 khi thiếu admin key, giống các route admin khác.
+  - Đơn HELD hết hạn mà không ai bấm thì vẫn HELD, chưa có biên nhận.
+
+**Kết quả**
+- Test 368/368, tsc sạch, check-secrets OK.
+- Commit `f968b38`. Deploy phiên bản **`5a8bf688-7202-4695-8d85-13be93e2e8ab`**.
+- Trên door thật:
+  - Nghiệm thu **55/55** (thêm AC50–AC55), scenarios **11/11**.
+  - JWKS, discovery, verify `valid:true` đều đúng.
+  - JWS của offer kiểm đúng với JWKS. JWS đã đổi giá bị 422. JWS thật cho ra ACCEPTED, có biên nhận ký.
+  - Tamper thì verify chỉ ra seq 1625, và `verify-audit.mjs` cũng báo cùng seq (exit 1).
+- Đã reset demo chuẩn (Thứ Sáu 21:10, replay, mandate 500/1.500).
