@@ -241,4 +241,8 @@ Hiện không có gì. (Quyền Hyperdrive đã được thêm; Aiven + Gemma đ
 - Judge key đã mint (vai judge, buyer hotel-b, đọc được mọi event: thử `/v1/events` → 200). Key nằm ở
   `.data/valio/keys/judge-key.json` (gitignore, quyền 600), không in ra.
 - D1 giờ chỉ còn danh mục, chỉ đọc; hạn mức ghi D1 không còn ảnh hưởng demo.
+- Giới hạn đã biết (chưa sửa, theo quyết định): agent tham chiếu `agent/plan.ts` `fillUnclear` chỉ tự điền khi `unclear` chứa đúng chữ
+  `packLitres`; Gemini ghi unclear bằng chữ tự do (vd. "bulk boxes"), nên agent không tự confirm được câu kiểu "Bulk boxes if you can."
+  Door để vế đó ở `unclear` là đúng ("asks, never guesses"). Câu chef của video đổi thành "…, in 10-litre boxes if you can." (ra
+  `packLitres 10`, Gemma agreed; xem `demo/SCRIPT.md` mục 12b ở nhánh demo).
 
