@@ -523,3 +523,15 @@ Tắt Try it ngay lập tức: `node scripts/demo-admin.mjs try-off`. Bật lạ
 **Sơ suất của mình**
 - Trong lúc chẩn đoán 503, mình đã lỡ in ra một lần phản hồi reset, gồm các agent key và approver key demo vừa tạo.
 - Mình đã reset ngay để thu hồi chúng. Đó chỉ là key demo tạm, không phải secret của Worker.
+
+### C12. Merge tab Deck, mục Acceptance cases và logo Junction (xong, **chưa push**)
+- Merge demo `360c527` thành `4676e67`. Gồm: các bước tiến trình của Try it, tab Deck (`demo/assets/deck/*`, PDF 9,0 MB),
+  chip AC dẫn tới mục "Acceptance cases" trong Inside (`demo/acceptance.json`, 63/63 đo trên `e48a8c55`), logo Junction.
+- `build-demo.mjs` giờ publish mọi file trang ở cấp đầu (`.html`, `.css`, `.mjs`, `.json`) cùng `kit/`, `fixtures/`,
+  `assets/`. File trang mới tự được publish; ghi chú `.md`, `dev/`, `test/`, `shots/`, `story.mp4` vẫn không.
+- Deploy **`c903edf7-99e0-494f-9a22-cec749529c5f`**. Kiểm live:
+  - `?mode=deck` 200; PDF 200, `application/pdf`, 9.025.238 byte; slide WebP 200; logo Junction 200;
+  - `acceptance.json` 200, 63 ca, 63/63;
+  - `dev/`, `test/` vẫn 404;
+  - `/v1/try` với chip ví dụ cho ra `decided`, `cached`, ACCEPTED.
+- Test demo 65 pass, 0 fail; tsc sạch; check-secrets OK. Đã reset chuẩn.

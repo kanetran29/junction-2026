@@ -24,7 +24,7 @@ describe('/demo (the animated demo page, Workers static assets)', () => {
     const js = await get('/demo/main.mjs');
     expect(js.status).toBe(200);
     expect(js.headers.get('Content-Type')).toContain('javascript');
-    for (const path of ['/demo/scene.mjs', '/demo/kit/iso-kit.mjs', '/demo/compare.mjs', '/demo/fixtures/story-v2.json', '/demo/assets/fonts/Geist-Variable.woff2', '/demo/assets/sfx/rewind.mp3', '/demo/inside.mjs', '/demo/inside-view.mjs', '/demo/try.mjs', '/demo/try-view.mjs', '/demo/assets/stills/held.webp', '/demo/assets/proof/agent-run-poster.webp', '/demo/assets/logos/cloudflare.svg'])
+    for (const path of ['/demo/scene.mjs', '/demo/kit/iso-kit.mjs', '/demo/compare.mjs', '/demo/fixtures/story-v2.json', '/demo/assets/fonts/Geist-Variable.woff2', '/demo/assets/sfx/rewind.mp3', '/demo/inside.mjs', '/demo/inside-view.mjs', '/demo/try.mjs', '/demo/try-view.mjs', '/demo/deck-view.mjs', '/demo/acceptance-view.mjs', '/demo/deck.json', '/demo/acceptance.json', '/demo/assets/deck/01.webp', '/demo/assets/stills/held.webp', '/demo/assets/proof/agent-run-poster.webp', '/demo/assets/logos/cloudflare.svg'])
       expect((await get(path)).status, path).toBe(200);
   });
 
