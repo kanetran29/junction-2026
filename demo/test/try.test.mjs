@@ -14,6 +14,7 @@ test("try: each step of the door's reply renders as the panel shows it", () => {
   assert.equal(q.lines[0], "Gemini read Fri 13 Nov, Gemma read Fri 20 Nov. The door asks, never guesses.");
   const when = viewOf(ok({ step: "needs_input", draft: { id: "d-beans" }, question: { field: "deliverBy", readings: [] } }));
   assert.deepEqual([when.kind, when.title, when.choices, when.draftId], ["question", "When should it arrive?", [], "d-beans"]);
+  assert.equal(viewOf(ok({ step: "needs_input", draft: { id: "d1" }, question: { field: "deliverBy", text: "Which day should it arrive?", readings: [] } })).title, "Which day should it arrive?", "the door's own words win");
   assert.deepEqual(["quantity", "category", "needs", "brand", "somethingNew"].map(questionFor), ["How much?", "Which product?", "Which product?", "Which brand?", "One more detail: somethingNew?"]);
   assert.deepEqual(q.choices.map((c) => [c.label, c.value]), [["Fri 13 Nov", "2026-11-13"], ["Fri 20 Nov", "2026-11-20"]]);
 
