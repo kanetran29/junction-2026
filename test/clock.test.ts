@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { helsinkiIso, now, replayOn, setClock } from '../src/clock';
 import type { Env } from '../src/env';
 import app from '../src/index';
+import { db } from '../src/db';
 
 const e = env as unknown as Env;
 const demo = { ...e, DEMO_MODE: '1' };
@@ -11,7 +12,7 @@ const live = { ...e, DEMO_MODE: '0' };
 describe('clock', () => {
   afterEach(async () => {
     await setClock(demo, null);
-    await e.DB.prepare("DELETE FROM settings WHERE key = 'replay'").run();
+    await db(e).prepare("DELETE FROM settings WHERE key = 'replay'").run();
   });
 
   it('now returns the override in demo mode', async () => {
@@ -41,7 +42,7 @@ describe('clock', () => {
     expect(await replayOn(demo)).toBe(true);
     await setClock(demo, '2026-11-13T19:10:00Z');
     expect(await replayOn(demo)).toBe(false);
-    await e.DB.prepare("INSERT INTO settings(key,value) VALUES('replay','1')").run();
+    await db(e).prepare("INSERT INTO settings(key,value) VALUES('replay','1')").run();
     expect(await replayOn(demo)).toBe(true);
   });
 
@@ -58,6 +59,7 @@ describe('clock', () => {
       now: '2026-11-13T21:10:00+02:00',
       replay: false,
       models: { gemini: false },
+      store: 'postgres',
     });
   });
 

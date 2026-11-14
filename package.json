@@ -20,6 +20,7 @@
     "mandate:sign": "tsx scripts/mandate-sign.ts",
     "categories:build": "tsx scripts/tag-categories.ts",
     "categories:load": "wrangler d1 execute DB --local --file .data/valio/build/categories.sql",
+    "pg:local": "docker run -d --name lazydoor-pg -p 54329:5432 -e POSTGRES_PASSWORD=lazydoor -e POSTGRES_DB=lazydoor postgres:18",
     "dev:load": "wrangler d1 migrations apply DB --local && pnpm index:load && pnpm replies:load && pnpm categories:load"
   },
   "devDependencies": {
@@ -35,6 +36,7 @@
     "@hono/zod-openapi": "^1.6.3",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "hono": "^4.13.18",
+    "postgres": "3.4.9",
     "qrcode-generator": "^2.0.4",
     "zod": "^4.6.7"
   },

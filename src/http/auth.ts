@@ -1,6 +1,7 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Env } from '../env';
 import { sha256Hex } from '../util';
+import { db } from '../db';
 
 export type Role = 'agent' | 'judge' | 'admin';
 
@@ -43,7 +44,7 @@ export async function identify(env: Env, header: string | undefined): Promise<Ca
   const token = bearerOf(header);
   if (!token) return null;
   if (env.ADMIN_KEY && (await sameSecret(token, env.ADMIN_KEY))) return { role: 'admin', buyerId: null };
-  const row = await env.DB.prepare('SELECT buyer_id, role FROM api_keys WHERE key_hash = ?').bind(await sha256Hex(token)).first<{ buyer_id: string; role: Role }>();
+  const row = await db(env).prepare('SELECT buyer_id, role FROM api_keys WHERE key_hash = ?').bind(await sha256Hex(token)).first<{ buyer_id: string; role: Role }>();
   return row ? { role: row.role, buyerId: row.buyer_id } : null;
 }
 
@@ -74,15 +75,16 @@ export async function requireBuyer(c: Context<{ Bindings: Env }>): Promise<{ buy
 }
 
 /**
- * Counts one use of a key in the current minute (D1 counter keyed by key hash and wall-clock minute) and answers 429
+ * Counts one use of a key in the current minute (Postgres counter keyed by key hash and wall-clock minute) and answers 429
  * once it exceeds `limit`; older minutes are swept in the same call so the table stays tiny.
  */
 export async function rateLimit(env: Env, header: string | undefined, limit: number): Promise<void> {
   const keyHash = await sha256Hex(bearerOf(header) ?? '');
   const minute = Math.floor(Date.now() / 60_000);
-  const [, bump] = await env.DB.batch([
-    env.DB.prepare('DELETE FROM rate_limits WHERE minute < ?').bind(minute),
-    env.DB.prepare('INSERT INTO rate_limits(key_hash, minute, n) VALUES (?, ?, 1) ON CONFLICT(key_hash, minute) DO UPDATE SET n = n + 1 RETURNING n').bind(keyHash, minute),
+  const s = db(env);
+  const [, bump] = await s.batch([
+    s.prepare('DELETE FROM rate_limits WHERE minute < ?').bind(minute),
+    s.prepare('INSERT INTO rate_limits(key_hash, minute, n) VALUES (?, ?, 1) ON CONFLICT(key_hash, minute) DO UPDATE SET n = rate_limits.n + 1 RETURNING n').bind(keyHash, minute),
   ]);
   if ((bump.results[0] as { n: number }).n > limit) throw new HttpError(429, 'RATE_LIMITED', `at most ${limit} requests a minute for this key`);
 }

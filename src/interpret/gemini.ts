@@ -5,6 +5,7 @@ import { logEvent } from '../events/log';
 import type { Quantity } from '../offers/conversion';
 import { draftSchema } from '../quote/store';
 import { newId } from '../util';
+import { db } from '../db';
 
 /** A buyer-facing failure: MODEL_UNAVAILABLE (503), DRAFT_NOT_FOUND (404), DRAFT_UNCLEAR or DRAFT_ALREADY_CONFIRMED (409). */
 export class InterpretError extends Error {
@@ -192,7 +193,7 @@ async function askModel(env: Env, text: string, today: string, ref: Awaited<Retu
 
 /** Stores a draft as one `drafts` row whose body is the whole draft; the quote step reads `status` and the typed fields from it. */
 async function save(env: Env, buyerId: string, d: InterpretedDraft, createdAt: string): Promise<void> {
-  await env.DB.prepare('INSERT INTO drafts(id, buyer_id, body, created_at) VALUES (?1,?2,?3,?4) ON CONFLICT(id) DO UPDATE SET body = excluded.body')
+  await db(env).prepare('INSERT INTO drafts(id, buyer_id, body, created_at) VALUES (?1,?2,?3,?4) ON CONFLICT(id) DO UPDATE SET body = excluded.body')
     .bind(d.id, buyerId, JSON.stringify(d), createdAt)
     .run();
 }
@@ -232,7 +233,7 @@ export async function interpret(
  * still unclear or the draft is `needs_input`; otherwise stores `status: 'confirmed'` and appends `draft.confirmed`.
  */
 export async function confirmDraft(env: Env, input: { draftId: string; fill: Record<string, unknown>; buyerId: string }): Promise<InterpretedDraft> {
-  const row = await env.DB.prepare('SELECT buyer_id, body FROM drafts WHERE id = ? AND buyer_id = ?').bind(input.draftId, input.buyerId).first<{ buyer_id: string; body: string }>();
+  const row = await db(env).prepare('SELECT buyer_id, body FROM drafts WHERE id = ? AND buyer_id = ?').bind(input.draftId, input.buyerId).first<{ buyer_id: string; body: string }>();
   if (!row) throw new InterpretError('DRAFT_NOT_FOUND', 404, `no draft ${input.draftId}`);
   const d = JSON.parse(row.body) as InterpretedDraft;
   if (d.status === 'confirmed') throw new InterpretError('DRAFT_ALREADY_CONFIRMED', 409, 'draft is already confirmed');

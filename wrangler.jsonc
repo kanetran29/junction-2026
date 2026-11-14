@@ -3,12 +3,20 @@
   "name": "lazydoor",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "lazydoor",
       "database_id": "4ff32275-5661-41e2-9e74-f36b175237bc",
       "migrations_dir": "migrations"
+    }
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "00000000000000000000000000000000",
+      "localConnectionString": "postgres://postgres:lazydoor@localhost:54329/lazydoor"
     }
   ],
   "vars": {

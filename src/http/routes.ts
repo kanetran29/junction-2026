@@ -18,6 +18,7 @@ import { adminRoutes } from './admin';
 import { HttpError, authenticate, rateLimit, requireBuyer } from './auth';
 import { readEvents, streamEvents } from './events';
 import * as S from './schemas';
+import { storeKind } from '../db';
 
 export const INTERPRET_PER_MINUTE = 20;
 
@@ -76,7 +77,7 @@ const streamRoute = createRoute({
   security: SECURITY,
   responses: { 200: { description: 'text/event-stream', content: { 'text/event-stream': { schema: S.EventStream } } }, 401: json(S.ErrorBody, 'Missing or unknown API key'), 403: json(S.ErrorBody, "Another buyer's events") },
 });
-const healthRoute = createRoute({ method: 'get', path: '/health', summary: 'Liveness, the gateway clock, replay mode and whether a Gemini key is configured', responses: { 200: json(S.Health, 'OK') } });
+const healthRoute = createRoute({ method: 'get', path: '/health', summary: 'Liveness, the gateway clock, replay mode, whether a Gemini key is configured and the write store', responses: { 200: json(S.Health, 'OK') } });
 
 /**
  * The whole gateway app: `/health`, the buyer routes under `/v1` as zod-openapi routes (documented at `/openapi.json`), the
@@ -107,9 +108,9 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
 
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', { type: 'http', scheme: 'bearer', description: 'An API key from the gateway operator' });
 
-  /** Liveness, the gateway clock, replay mode and whether a Gemini key is configured. */
+  /** Liveness, the gateway clock, replay mode, whether a Gemini key is configured and which Postgres holds the writes. */
   app.openapi(healthRoute, async (c) =>
-    c.json({ ok: true, now: helsinkiIso(await now(c.env)), replay: await replayOn(c.env), models: { gemini: Boolean(c.env.GEMINI_API_KEY) } }, 200),
+    c.json({ ok: true, now: helsinkiIso(await now(c.env)), replay: await replayOn(c.env), models: { gemini: Boolean(c.env.GEMINI_API_KEY) }, store: await storeKind(c.env) }, 200),
   );
 
   /** Interprets one sentence into a draft; rate limited per key, never touches Valio. */

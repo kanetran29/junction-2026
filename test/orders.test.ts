@@ -9,6 +9,7 @@ import { approve, approverInbox, createBasket, getOrder, OrderError, placeOrder,
 import { sha256Hex } from '../src/util';
 import { createQuote } from '../src/quote/store';
 import { fakeValio, product, type Row } from './quote-helpers';
+import { db } from '../src/db';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'test-key' };
 const day = '2026-11-16';
@@ -31,20 +32,20 @@ const tokenOf = async (buyer = 'hotel-a') => (await approverInbox(e, buyer === '
 const errOf = (p: Promise<unknown>) => p.then(() => null, (x: unknown) => x as OrderError);
 /** How many ledger lines exist (for one buyer, or all). */
 const lineCount = async (buyer?: string) =>
-  (await e.DB.prepare(`SELECT COUNT(*) AS c FROM order_lines WHERE (?1 IS NULL OR buyer_id = ?1)`).bind(buyer ?? null).first<{ c: number }>())!.c;
+  (await db(e).prepare(`SELECT COUNT(*) AS c FROM order_lines WHERE (?1::text IS NULL OR buyer_id = ?1)`).bind(buyer ?? null).first<{ c: number }>())!.c;
 
 beforeAll(async () => {
   await e.DB.batch(insertStatements(['QA', 'QB', 'QG', 'QL', 'QM', 'QX'].map((id) => product(id, id === 'QG' ? { claims: [] } : {}))).map((s) => e.DB.prepare(s)));
   for (const b of ['hotel-a', 'hotel-b']) await seedMandate(e, b);
-  await e.DB.prepare("DELETE FROM approver_keys").run();
+  await db(e).prepare("DELETE FROM approver_keys").run();
   for (const [k, b] of [['ak-a', 'hotel-a'], ['ak-b', 'hotel-b']]) {
-    await e.DB.prepare('INSERT INTO approver_keys(key_hash, buyer_id, approver) VALUES (?,?,?)').bind(await sha256Hex(k), b, 'Kitchen manager').run();
+    await db(e).prepare('INSERT INTO approver_keys(key_hash, buyer_id, approver) VALUES (?,?,?)').bind(await sha256Hex(k), b, 'Kitchen manager').run();
   }
 });
 
 beforeEach(async () => {
-  for (const t of ['events', 'quotes', 'drafts', 'baskets', 'order_lines', 'orders']) await e.DB.prepare(`DELETE FROM ${t}`).run();
-  await e.DB.prepare("DELETE FROM settings WHERE key = 'replay'").run();
+  for (const t of ['events', 'quotes', 'drafts', 'baskets', 'order_lines', 'orders']) await db(e).prepare(`DELETE FROM ${t}`).run();
+  await db(e).prepare("DELETE FROM settings WHERE key = 'replay'").run();
   await setClock(e, '2026-11-13T19:10:00Z');
 });
 
@@ -55,7 +56,7 @@ describe('placeOrder: input and idempotency', () => {
     expect(await errOf(place('hotel-b', q.id))).toMatchObject({ status: 404 });
     expect(await errOf(place('hotel-a', 'nope'))).toMatchObject({ status: 404 });
     expect(await errOf(place('hotel-a', q.id, rows, { offerId: 'o9' }))).toMatchObject({ status: 400, code: 'OFFER_NOT_IN_QUOTE' });
-    expect((await e.DB.prepare('SELECT COUNT(*) AS c FROM orders').first<{ c: number }>())!.c).toBe(0);
+    expect((await db(e).prepare('SELECT COUNT(*) AS c FROM orders').first<{ c: number }>())!.c).toBe(0);
   });
 
   it('the same key twice is the same order and the stored reply; the same key with another body is 422', async () => {
@@ -63,7 +64,7 @@ describe('placeOrder: input and idempotency', () => {
     const first = await place('hotel-a', q.id, rows, { idempotencyKey: 'dup' });
     const again = await place('hotel-a', q.id, rows, { idempotencyKey: 'dup' });
     expect(again).toEqual(first);
-    expect((await e.DB.prepare("SELECT COUNT(*) AS c FROM orders WHERE idempotency_key = 'dup'").first<{ c: number }>())!.c).toBe(1);
+    expect((await db(e).prepare("SELECT COUNT(*) AS c FROM orders WHERE idempotency_key = 'dup'").first<{ c: number }>())!.c).toBe(1);
     const other = await quote('hotel-a', 'QB', 20);
     expect(await errOf(place('hotel-a', other.id, rows, { idempotencyKey: 'dup' }))).toMatchObject({ status: 422 });
     expect(await lineCount()).toBe(1);
@@ -72,7 +73,7 @@ describe('placeOrder: input and idempotency', () => {
   it('two concurrent places with one key make one order; the loser is 409 or the same reply', async () => {
     const q = await quote('hotel-a', 'QA', 20);
     const res = await Promise.allSettled([place('hotel-a', q.id, rows, { idempotencyKey: 'race' }), place('hotel-a', q.id, rows, { idempotencyKey: 'race' })]);
-    expect((await e.DB.prepare("SELECT COUNT(*) AS c FROM orders WHERE idempotency_key = 'race'").first<{ c: number }>())!.c).toBe(1);
+    expect((await db(e).prepare("SELECT COUNT(*) AS c FROM orders WHERE idempotency_key = 'race'").first<{ c: number }>())!.c).toBe(1);
     const ok = res.filter((r) => r.status === 'fulfilled');
     expect(ok.length).toBeGreaterThanOrEqual(1);
     for (const r of res) if (r.status === 'rejected') expect(r.reason).toMatchObject({ status: 409 });
@@ -124,7 +125,7 @@ describe('placeOrder: the state machine', () => {
       buyerId: 'hotel-a',
       mandateVersion: 1,
     });
-    const row = await e.DB.prepare('SELECT lines_hash FROM orders WHERE id = ?').bind(r.orderId).first<{ lines_hash: string }>();
+    const row = await db(e).prepare('SELECT lines_hash FROM orders WHERE id = ?').bind(r.orderId).first<{ lines_hash: string }>();
     expect(row!.lines_hash).toBe(await sha256Hex(canon));
   });
 
@@ -140,12 +141,12 @@ describe('placeOrder: the state machine', () => {
     const q = await quote('hotel-b', 'QA', 20);
     await seedMandate(e, 'hotel-b', {}, { tamper: true });
     expect((await place('hotel-b', q.id)).decision.reasons.map((x) => x.code)).toContain('MANDATE_INVALID');
-    await e.DB.prepare("DELETE FROM mandates WHERE buyer_id = 'hotel-b'").run();
+    await db(e).prepare("DELETE FROM mandates WHERE buyer_id = 'hotel-b'").run();
     await seedMandate(e, 'hotel-b', { exp: '2026-11-13T21:00:00+02:00' });
     const r = await place('hotel-b', q.id);
     expect(r).toMatchObject({ state: 'REJECTED' });
     expect(r.decision.reasons.map((x) => x.code)).toContain('MANDATE_EXPIRED');
-    await e.DB.prepare("DELETE FROM mandates WHERE buyer_id = 'hotel-b'").run();
+    await db(e).prepare("DELETE FROM mandates WHERE buyer_id = 'hotel-b'").run();
     await seedMandate(e, 'hotel-b');
   });
 
@@ -188,31 +189,31 @@ describe('stuck idempotency keys', () => {
   it('a committed order whose reply was never written is rebuilt on retry, not 409 forever', async () => {
     const q = await quote('hotel-a', 'QA', 20);
     const first = await place('hotel-a', q.id, rows, { idempotencyKey: 'lost' });
-    await e.DB.prepare("UPDATE orders SET reply = NULL WHERE idempotency_key = 'lost'").run();
+    await db(e).prepare("UPDATE orders SET reply = NULL WHERE idempotency_key = 'lost'").run();
     const again = await place('hotel-a', q.id, rows, { idempotencyKey: 'lost' });
     expect(again).toEqual(first);
     expect(await lineCount()).toBe(1);
-    expect((await e.DB.prepare("SELECT reply FROM orders WHERE idempotency_key = 'lost'").first<{ reply: string | null }>())!.reply).not.toBeNull();
+    expect((await db(e).prepare("SELECT reply FROM orders WHERE idempotency_key = 'lost'").first<{ reply: string | null }>())!.reply).not.toBeNull();
   });
 
   it('a lost STOCK_TAKEN reply is rebuilt with available', async () => {
     const [qa, qb] = [await quote('hotel-a', 'QL', 4), await quote('hotel-b', 'QL', 4)];
     await place('hotel-b', qb.id);
     const first = await place('hotel-a', qa.id, rows, { idempotencyKey: 'lost2' });
-    await e.DB.prepare("UPDATE orders SET reply = NULL WHERE idempotency_key = 'lost2'").run();
+    await db(e).prepare("UPDATE orders SET reply = NULL WHERE idempotency_key = 'lost2'").run();
     expect(await place('hotel-a', qa.id, rows, { idempotencyKey: 'lost2' })).toEqual(first);
   });
 
   it('a PLACING row is 409 while fresh and is swept after 60 s so the retry proceeds', async () => {
     const q = await quote('hotel-a', 'QA', 20);
-    await e.DB.prepare("INSERT INTO orders(id, buyer_id, quote_id, idempotency_key, request_hash, state, body, created_at) VALUES ('dead','hotel-a',?, 'stale', ?, 'PLACING', '{}', '2026-11-13T21:10:00+02:00')")
+    await db(e).prepare("INSERT INTO orders(id, buyer_id, quote_id, idempotency_key, request_hash, state, body, created_at) VALUES ('dead','hotel-a',?, 'stale', ?, 'PLACING', '{}', '2026-11-13T21:10:00+02:00')")
       .bind(q.id, await sha256Hex(JSON.stringify([q.id, 'o1', null, null, null])))
       .run();
     await setClock(e, '2026-11-13T19:10:30Z');
     expect(await errOf(place('hotel-a', q.id, rows, { idempotencyKey: 'stale' }))).toMatchObject({ status: 409 });
     await setClock(e, '2026-11-13T19:11:30Z');
     expect((await place('hotel-a', q.id, rows, { idempotencyKey: 'stale' })).state).toBe('ACCEPTED');
-    expect(await e.DB.prepare("SELECT id FROM orders WHERE id = 'dead'").first()).toBeNull();
+    expect(await db(e).prepare("SELECT id FROM orders WHERE id = 'dead'").first()).toBeNull();
   });
 });
 
@@ -393,10 +394,10 @@ describe('approval', () => {
   it('a held order whose lines no longer match the token binding is 409 and stays HELD', async () => {
     const id = await held();
     const token = await tokenOf();
-    const row = await e.DB.prepare('SELECT body FROM orders WHERE id = ?').bind(id).first<{ body: string }>();
+    const row = await db(e).prepare('SELECT body FROM orders WHERE id = ?').bind(id).first<{ body: string }>();
     const body = JSON.parse(row!.body);
     body.lines[0].salesUnits = 1;
-    await e.DB.prepare('UPDATE orders SET body = ? WHERE id = ?').bind(JSON.stringify(body), id).run();
+    await db(e).prepare('UPDATE orders SET body = ? WHERE id = ?').bind(JSON.stringify(body), id).run();
     expect(await errOf(approve(e, token, { callerRole: 'approver' }, valio))).toMatchObject({ status: 409 });
     expect((await getOrder(e, 'hotel-a', id))?.state).toBe('HELD');
   });

@@ -4,6 +4,7 @@ import type { Env } from '../src/env';
 import { fetchOffers, ValioError, ValioRateLimited, clearValioBlock } from '../src/valio/client';
 import { setClock } from '../src/clock';
 import fixture from './fixtures/valio-replies.json';
+import { db } from '../src/db';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'test-key-123' };
 const reply = (kind: 'availability' | 'price', ids: string[]) => ({
@@ -24,7 +25,7 @@ function fakeValio() {
 
 describe('fetchOffers live', () => {
   beforeEach(async () => {
-    await e.DB.prepare("DELETE FROM settings WHERE key IN ('replay', 'clock')").run();
+    await db(e).prepare("DELETE FROM settings WHERE key IN ('replay', 'clock')").run();
     await setClock(e, '2026-11-13T19:10:00Z');
   });
 
@@ -67,7 +68,7 @@ describe('fetchOffers live', () => {
 describe('fetchOffers honours Valio 429', () => {
   const limited = (retryAfter?: string) => vi.fn(async () => new Response('slow down', { status: 429, headers: retryAfter ? { 'Retry-After': retryAfter } : {} })) as unknown as typeof fetch;
   beforeEach(async () => {
-    await e.DB.prepare("DELETE FROM settings WHERE key IN ('replay', 'clock')").run();
+    await db(e).prepare("DELETE FROM settings WHERE key IN ('replay', 'clock')").run();
     clearValioBlock();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-14T10:00:00Z'));
@@ -136,9 +137,9 @@ describe('fetchOffers honours Valio 429', () => {
 
   it('replay mode ignores an active block', async () => {
     await fetchOffers(e, ['T0001'], '2026-11-16', limited()).catch(() => undefined);
-    await e.DB.prepare("INSERT OR REPLACE INTO settings(key, value) VALUES ('replay', '1')").run();
+    await db(e).prepare("INSERT INTO settings(key, value) VALUES ('replay', '1') ON CONFLICT (key) DO UPDATE SET value = excluded.value").run();
     const r = await fetchOffers(e, ['T0001'], '2026-11-16', fakeValio().fn);
-    await e.DB.prepare("DELETE FROM settings WHERE key = 'replay'").run();
+    await db(e).prepare("DELETE FROM settings WHERE key = 'replay'").run();
     expect(r.replay).toBe(true);
   });
 

@@ -6,6 +6,7 @@ import { createApp } from '../src/http/routes';
 import { clearValioBlock } from '../src/valio/client';
 import { sha256Hex } from '../src/util';
 import { fakeValio, product } from './quote-helpers';
+import { db } from '../src/db';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'vk', ADMIN_KEY: 'adm', GEMINI_API_KEY: 'gk', GEMINI_MODEL: 'gm' };
 const milk = { category: '10400', claims: ['FREE_FROM_LACTOSE'], quantity: { value: 200, unit: 'l' }, deliverBy: '2026-11-16', unclear: [], needs: ['milk'] };
@@ -145,7 +146,7 @@ describe('structural auth and error shapes', () => {
   it('answers 409 while the same Idempotency-Key is still being processed', async () => {
     const keys = await reset();
     const hash = await sha256Hex(JSON.stringify(['qx', 'ox', null, null, null]));
-    await e.DB.prepare("INSERT INTO orders(id, buyer_id, quote_id, idempotency_key, request_hash, state, body, created_at) VALUES ('ord_busy','hotel-a','qx','busy',?,'PLACING','{}','2026-11-13T21:10:00+02:00')").bind(hash).run();
+    await db(e).prepare("INSERT INTO orders(id, buyer_id, quote_id, idempotency_key, request_hash, state, body, created_at) VALUES ('ord_busy','hotel-a','qx','busy',?,'PLACING','{}','2026-11-13T21:10:00+02:00')").bind(hash).run();
     const r = await call('/v1/orders', { key: keys.agentKeys['hotel-a'], headers: { 'Idempotency-Key': 'busy' }, body: { quoteId: 'qx', offerId: 'ox' } });
     expect(r.status).toBe(409);
     expect(await json(r)).toMatchObject({ error: 'IDEMPOTENCY_IN_PROGRESS' });
@@ -205,7 +206,7 @@ describe('admin reset', () => {
     expect((await call('/admin/clock', { key: 'adm', body: { clock: '2026-11-15T17:05:00+02:00' } })).status).toBe(200);
     expect((await json(await call('/health'))).now).toBe('2026-11-15T17:05:00+02:00');
     expect((await call('/admin/replay', { key: 'adm', body: { variant: { P1: 'out_of_stock' } } })).status).toBe(200);
-    expect((await e.DB.prepare("SELECT value FROM settings WHERE key = 'variants'").first<{ value: string }>())!.value).toBe('{"P1":"out_of_stock"}');
+    expect((await db(e).prepare("SELECT value FROM settings WHERE key = 'variants'").first<{ value: string }>())!.value).toBe('{"P1":"out_of_stock"}');
   });
 });
 

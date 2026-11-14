@@ -46,7 +46,9 @@ export const Order = z.looseObject({
 }).openapi('Order');
 
 export const Receipt = z.object({ text: z.string() }).openapi('Receipt');
-export const Health = z.object({ ok: z.boolean(), now: z.string(), replay: z.boolean(), models: z.object({ gemini: z.boolean() }) }).openapi('Health');
+export const Health = z
+  .object({ ok: z.boolean(), now: z.string(), replay: z.boolean(), models: z.object({ gemini: z.boolean() }), store: z.enum(['aiven-postgres', 'postgres']).openapi({ description: 'Where orders, the ledger, approvals and events live' }) })
+  .openapi('Health');
 
 export const IdParam = z.object({ id: z.string().min(1) });
 

@@ -5,6 +5,7 @@ import type { Env } from '../src/env';
 import { listEvents } from '../src/events/log';
 import { clearListsCache, confirmDraft, InterpretError, interpret } from '../src/interpret/gemini';
 import { draftSchema } from '../src/quote/store';
+import { db } from '../src/db';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', GEMINI_API_KEY: 'test-key', GEMINI_MODEL: 'gemini-test' };
 const MILK = 'I need 1,000 litres of lactose-free milk by Monday.';
@@ -34,7 +35,8 @@ const milk = {
 describe('interpret', () => {
   beforeEach(async () => {
     clearListsCache();
-    for (const t of ['drafts', 'events', 'category_names', 'products']) await e.DB.prepare(`DELETE FROM ${t}`).run();
+    for (const t of ['drafts', 'events']) await db(e).prepare(`DELETE FROM ${t}`).run();
+    for (const t of ['category_names', 'products']) await e.DB.prepare(`DELETE FROM ${t}`).run();
     await e.DB.prepare("INSERT INTO category_names(category, names, tag_source) VALUES ('10400','Milk','reviewed')").run();
     await e.DB.prepare("INSERT INTO products(id, category, names, claims) VALUES ('T0001','10400','[]','[\"FREE_FROM_LACTOSE\",\"FREE_FROM_GLUTEN\",\"VEGAN\"]')").run();
     await setClock(e, '2026-11-13T21:10:00+02:00');
@@ -124,7 +126,7 @@ describe('interpret', () => {
     expect(b.text).toContain('auto-approve');
     const x = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, approved: true, outcome: 'AUTO', limit: 1e9 }).deps);
     expect(Object.keys(x).filter((k) => !['id', 'status', 'text', 'category', 'claims', 'quantity', 'deliverBy', 'unclear', 'missing', 'needs'].includes(k))).toEqual([]);
-    const row = await e.DB.prepare('SELECT body FROM drafts WHERE id = ?').bind(x.id).first<{ body: string }>();
+    const row = await db(e).prepare('SELECT body FROM drafts WHERE id = ?').bind(x.id).first<{ body: string }>();
     expect(row!.body).not.toMatch(/approved|outcome|limit/);
     expect(draftSchema.parse({ ...JSON.parse(row!.body), status: 'confirmed' })).not.toHaveProperty('text');
     const allowed = ['id', 'status', 'text', 'category', 'subtype', 'claims', 'quantity', 'deliverBy', 'brand', 'packLitres', 'unclear', 'missing', 'needs'];
@@ -135,7 +137,8 @@ describe('interpret', () => {
 describe('confirmDraft', () => {
   beforeEach(async () => {
     clearListsCache();
-    for (const t of ['drafts', 'events', 'category_names', 'products']) await e.DB.prepare(`DELETE FROM ${t}`).run();
+    for (const t of ['drafts', 'events']) await db(e).prepare(`DELETE FROM ${t}`).run();
+    for (const t of ['category_names', 'products']) await e.DB.prepare(`DELETE FROM ${t}`).run();
     await e.DB.prepare("INSERT INTO category_names(category, names, tag_source) VALUES ('10400','Milk','reviewed')").run();
     await e.DB.prepare("INSERT INTO products(id, category, names, claims) VALUES ('T0001','10400','[]','[\"FREE_FROM_LACTOSE\"]')").run();
     await setClock(e, '2026-11-13T21:10:00+02:00');
@@ -146,7 +149,7 @@ describe('confirmDraft', () => {
     await expect(confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: { fatLevel: 'any' } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR', status: 409 });
     const ok = await confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: { fatLevel: 'any', quantity: { value: 1000, unit: 'l' } } });
     expect(ok).toMatchObject({ status: 'confirmed', unclear: [], quantity: { value: 1000, unit: 'l' } });
-    const row = await e.DB.prepare('SELECT body FROM drafts WHERE id = ?').bind(d.id).first<{ body: string }>();
+    const row = await db(e).prepare('SELECT body FROM drafts WHERE id = ?').bind(d.id).first<{ body: string }>();
     const stored = JSON.parse(row!.body);
     expect(stored.status).toBe('confirmed');
     expect(draftSchema.parse(stored)).toMatchObject({ category: '10400', deliverBy: '2026-11-16' });

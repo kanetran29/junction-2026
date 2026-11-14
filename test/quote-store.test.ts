@@ -6,6 +6,7 @@ import type { Env } from '../src/env';
 import { listEvents } from '../src/events/log';
 import { createQuote, getQuote, QuoteError } from '../src/quote/store';
 import { fakeValio, product, type Row } from './quote-helpers';
+import { db } from '../src/db';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'test-key' };
 const draft = { category: '10400', claims: ['FREE_FROM_LACTOSE'], quantity: { value: 1000, unit: 'l' }, deliverBy: '2026-11-16' };
@@ -25,8 +26,8 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  for (const t of ['events', 'quotes', 'drafts', 'order_lines', 'orders']) await e.DB.prepare(`DELETE FROM ${t}`).run();
-  await e.DB.prepare("DELETE FROM settings WHERE key = 'replay'").run();
+  for (const t of ['events', 'quotes', 'drafts', 'order_lines', 'orders']) await db(e).prepare(`DELETE FROM ${t}`).run();
+  await db(e).prepare("DELETE FROM settings WHERE key = 'replay'").run();
   await setClock(e, '2026-11-13T19:10:00Z');
 });
 
@@ -45,7 +46,7 @@ describe('createQuote', () => {
 
   it('stores a posted draft as confirmed and quotes it again by draftId', async () => {
     const first = await createQuote(e, 'hotel-a', { draft }, fakeValio(rows).fn);
-    const row = await e.DB.prepare('SELECT body FROM drafts WHERE id = ?').bind(first.draftId).first<{ body: string }>();
+    const row = await db(e).prepare('SELECT body FROM drafts WHERE id = ?').bind(first.draftId).first<{ body: string }>();
     expect(JSON.parse(row!.body)).toMatchObject({ ...draft, status: 'confirmed' });
     const again = await createQuote(e, 'hotel-a', { draftId: first.draftId }, fakeValio(rows).fn);
     expect(again.draftId).toBe(first.draftId);
@@ -55,7 +56,7 @@ describe('createQuote', () => {
   it('refuses an unknown, foreign or unconfirmed draft', async () => {
     const own = await createQuote(e, 'hotel-a', { draft }, fakeValio(rows).fn);
     await expect(createQuote(e, 'hotel-b', { draftId: own.draftId }, fakeValio(rows).fn)).rejects.toMatchObject({ code: 'DRAFT_NOT_FOUND' });
-    await e.DB.prepare("INSERT INTO drafts(id, buyer_id, body, created_at) VALUES ('d-open','hotel-a',?, 'x')").bind(JSON.stringify({ ...draft, status: 'needs_input' })).run();
+    await db(e).prepare("INSERT INTO drafts(id, buyer_id, body, created_at) VALUES ('d-open','hotel-a',?, 'x')").bind(JSON.stringify({ ...draft, status: 'needs_input' })).run();
     await expect(createQuote(e, 'hotel-a', { draftId: 'd-open' }, fakeValio(rows).fn)).rejects.toMatchObject({ code: 'DRAFT_NOT_CONFIRMED' });
   });
 
@@ -90,12 +91,12 @@ describe('createQuote', () => {
   it('subtracts accepted lines for the same delivery date from limited stock, and ignores held, other dates', async () => {
     const limited: Record<string, Row> = { QA: { price: 1, stock: 600 } };
     /** Inserts an order row for the lines below. */
-    const order = async (id: string, state: string) => e.DB.prepare("INSERT INTO orders(id, buyer_id, state, body, created_at) VALUES (?, 'hotel-b', ?, '{}', 'x')").bind(id, state).run();
+    const order = async (id: string, state: string) => db(e).prepare("INSERT INTO orders(id, buyer_id, state, body, created_at) VALUES (?, 'hotel-b', ?, '{}', 'x')").bind(id, state).run();
     await order('o1', 'ACCEPTED');
     await order('o2', 'HELD');
     /** Inserts one order line of QA for hotel-b. */
     const line = (o: string, units: number, date: string, state: string) =>
-      e.DB.prepare("INSERT INTO order_lines(order_id, buyer_id, product_id, delivery_date, sales_units, state) VALUES (?, 'hotel-b', 'QA', ?, ?, ?)").bind(o, date, units, state).run();
+      db(e).prepare("INSERT INTO order_lines(order_id, buyer_id, product_id, delivery_date, sales_units, state) VALUES (?, 'hotel-b', 'QA', ?, ?, ?)").bind(o, date, units, state).run();
     await line('o1', 100, '2026-11-16', 'ACCEPTED');
     await line('o1', 50, '2026-11-17', 'ACCEPTED');
     await line('o2', 70, '2026-11-16', 'HELD');

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Env } from '../env';
 import { MANDATE_AUD, defaultMandate, type Mandate } from '../domain/constants';
+import { db } from '../db';
 
 /** Typed failure of mandate verification: MANDATE_INVALID (bad token, signature, aud, buyer, version) or MANDATE_EXPIRED. */
 export class MandateError extends Error {
@@ -124,7 +125,7 @@ export async function verifyMandate(
 
 /** Reads the stored mandate row and its public key; null when the buyer has none, errors propagate. */
 async function readRow(env: Env, buyerId: string): Promise<{ jws: string; publicKey: string } | null> {
-  const row = await env.DB.prepare(
+  const row = await db(env).prepare(
     'SELECT m.payload, m.signature, k.public_key FROM mandates m JOIN buyer_keys k ON k.buyer_id = m.buyer_id WHERE m.buyer_id = ?',
   )
     .bind(buyerId)
@@ -144,11 +145,12 @@ function parseKey(json: string): JsonWebKey {
 /** Upserts a buyer's public key and mandate (`payload` = header.payload, `signature` = the last part) in one batch. */
 async function writeRow(env: Env, buyerId: string, publicJwk: JsonWebKey, jws: string): Promise<void> {
   const [h, p, s] = jws.split('.');
-  await env.DB.batch([
-    env.DB.prepare(
+  const store = db(env);
+  await store.batch([
+    store.prepare(
       'INSERT INTO buyer_keys(buyer_id, public_key) VALUES(?, ?) ON CONFLICT(buyer_id) DO UPDATE SET public_key = excluded.public_key',
     ).bind(buyerId, JSON.stringify(publicJwk)),
-    env.DB.prepare(
+    store.prepare(
       'INSERT INTO mandates(buyer_id, payload, signature) VALUES(?, ?, ?) ON CONFLICT(buyer_id) DO UPDATE SET payload = excluded.payload, signature = excluded.signature',
     ).bind(buyerId, `${h}.${p}`, s),
   ]);

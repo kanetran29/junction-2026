@@ -8,6 +8,7 @@ import type { ReasonCode } from '../domain/reasons';
 import { ValioError, fetchOffers, type Offers } from '../valio/client';
 import { newId } from '../util';
 import { buildQuote, type Draft, type Quote } from './build';
+import { db } from '../db';
 
 /** A quote request that cannot be answered: Valio failed (UPSTREAM_ERROR) or the named draft is missing or not confirmed. */
 export class QuoteError extends Error {
@@ -45,20 +46,20 @@ export type QuoteInput = { draftId: string } | { draft: unknown } | { products: 
 
 /** Stores a quote (one row per quote, body is the JSON). */
 export async function saveQuote(env: Env, q: Quote): Promise<void> {
-  await env.DB.prepare('INSERT INTO quotes(id, buyer_id, body, created_at, expires_at) VALUES (?,?,?,?,?)')
+  await db(env).prepare('INSERT INTO quotes(id, buyer_id, body, created_at, expires_at) VALUES (?,?,?,?,?)')
     .bind(q.id, q.buyerId, JSON.stringify(q), q.createdAt, q.expiresAt)
     .run();
 }
 
 /** The buyer's own quote by id, or null when it does not exist or belongs to another buyer. */
 export async function getQuote(env: Env, buyerId: string, id: string): Promise<Quote | null> {
-  const row = await env.DB.prepare('SELECT body FROM quotes WHERE id = ? AND buyer_id = ?').bind(id, buyerId).first<{ body: string }>();
+  const row = await db(env).prepare('SELECT body FROM quotes WHERE id = ? AND buyer_id = ?').bind(id, buyerId).first<{ body: string }>();
   return row ? (JSON.parse(row.body) as Quote) : null;
 }
 
 /** Loads a buyer's stored draft that is confirmed; anything else is a QuoteError. */
 async function loadDraft(env: Env, buyerId: string, draftId: string): Promise<Draft> {
-  const row = await env.DB.prepare('SELECT body FROM drafts WHERE id = ? AND buyer_id = ?').bind(draftId, buyerId).first<{ body: string }>();
+  const row = await db(env).prepare('SELECT body FROM drafts WHERE id = ? AND buyer_id = ?').bind(draftId, buyerId).first<{ body: string }>();
   if (!row) throw new QuoteError('DRAFT_NOT_FOUND', `no draft ${draftId}`);
   const body = JSON.parse(row.body) as { status?: string };
   if (body.status !== 'confirmed') throw new QuoteError('DRAFT_NOT_CONFIRMED', `draft ${draftId} is ${body.status ?? 'not confirmed'}`);
@@ -81,8 +82,8 @@ async function findCandidates(env: Env, d: Draft): Promise<CatalogProduct[]> {
  * (HELD orders and quotes reserve nothing); only products Valio currently lets us order are considered.
  */
 async function acceptedUnits(env: Env, products: CatalogProduct[], offers: Offers, at: Date, deliverBy: string): Promise<Map<string, number>> {
-  const { results } = await env.DB.prepare(
-    "SELECT product_id, delivery_date, SUM(sales_units) AS units FROM order_lines WHERE state = 'ACCEPTED' AND product_id IN (SELECT value FROM json_each(?)) GROUP BY product_id, delivery_date",
+  const { results } = await db(env).prepare(
+    "SELECT product_id, delivery_date, SUM(sales_units) AS units FROM order_lines WHERE state = 'ACCEPTED' AND product_id IN (SELECT jsonb_array_elements_text(?::text::jsonb)) GROUP BY product_id, delivery_date",
   )
     .bind(JSON.stringify(products.map((p) => p.id)))
     .all<{ product_id: string; delivery_date: string; units: number }>();
@@ -122,7 +123,7 @@ export async function createQuote(env: Env, buyerId: string, input: QuoteInput, 
   } else {
     draft = draftSchema.parse('draft' in input ? input.draft : input) as Draft;
     draftId = newId('d');
-    await env.DB.prepare('INSERT INTO drafts(id, buyer_id, body, created_at) VALUES (?,?,?,?)')
+    await db(env).prepare('INSERT INTO drafts(id, buyer_id, body, created_at) VALUES (?,?,?,?)')
       .bind(draftId, buyerId, JSON.stringify({ ...draft, status: 'confirmed' }), helsinkiIso(at))
       .run();
   }

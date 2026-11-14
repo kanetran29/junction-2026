@@ -4,21 +4,15 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 
 ## Cần Kane quyết định
 
-**1. Deploy đang bị chặn bởi giới hạn ghi D1 miễn phí (quyết định mua là của Kane).**
-- Worker đã chạy ở **https://lazydoor.lazydoor.workers.dev** (`/health` OK), nhưng mọi thao tác ghi trả 500 với
-  `D1_ERROR: Your account has exceeded D1's free tier daily row write limit`. Nguyên nhân: nạp dữ liệu lên D1 từ xa (17.546 sản phẩm +
-  35.881 GTIN + replay + tên nhóm, cộng các dòng index) đã dùng hết hạn mức 100.000 dòng ghi/ngày của account hackathon (gói Free).
-- Hạn mức tự reset lúc **00:00 UTC = 02:00 sáng Chủ nhật 15/11 giờ Helsinki**. Sau đó demo chỉ ghi vài trăm–vài nghìn dòng mỗi lần, dư sức.
-- Lựa chọn: (a) **chờ tới 02:00 Chủ nhật** rồi chạy 3 lệnh dưới (khuyên dùng; miễn phí); (b) nâng account hackathon lên **Workers Paid
-  (5 USD/tháng)** để ghi được ngay — đây là mua hàng nên mình không tự làm.
-- Sau khi ghi được lại (từ thư mục repo; key chỉ đọc từ file, không in ra):
-  ```
-  export GATEWAY_URL=https://lazydoor.lazydoor.workers.dev ADMIN_KEY="$(cat .data/valio/keys/deploy-admin.key)"
-  pnpm acceptance && pnpm scenarios
-  curl -s -X POST $GATEWAY_URL/admin/reset -H "Authorization: Bearer $ADMIN_KEY" -H 'content-type: application/json' -d '{"clock":"2026-11-13T21:10:00+02:00","replay":"replies_2026-11-16"}' > /dev/null
-  curl -s -X POST $GATEWAY_URL/admin/judge-key -H "Authorization: Bearer $ADMIN_KEY"   # judge key cho giám khảo / trang demo
-  ```
-  Đừng chạy lại `index:load:remote` (chính nó tốn hạn mức). Bản local (`wrangler dev`) không bị ảnh hưởng: 49/49, scenarios 11/11.
+**1. Token Cloudflare hackathon chưa có quyền Hyperdrive (cần Kane sửa token, 1 phút).**
+- Phần ghi đã chuyển sang Aiven PostgreSQL và chạy xanh trên máy (Postgres 18 trong Docker). Bản deploy cần một Hyperdrive config đứng
+  trước Aiven, nhưng API trả **403 (code 10000)** khi tạo Hyperdrive, và cả khi upload CA của Aiven.
+- Không đi đường TCP thẳng được: cert của Aiven do "Project CA" riêng ký, mà Worker không cho cài CA riêng. Đã thử: dùng CA công khai →
+  `SELF_SIGNED_CERT_IN_CHAIN`; dùng `aiven-ca.pem` → OK (PostgreSQL 18.7, có `aiven_extras`).
+- Cách sửa: dashboard → My Profile → API Tokens → sửa token hackathon, thêm **Account › Hyperdrive › Edit**. Nếu muốn Hyperdrive kiểm CA
+  của Aiven (verify-full) thì thêm **Account › SSL and Certificates › Edit**. Chỉ sửa quyền thì giá trị token giữ nguyên, `cf.env` không
+  phải đổi. Có quyền rồi thì mình tạo Hyperdrive, deploy, chạy nghiệm thu trên URL thật, rồi reset và mint judge key.
+- Hạn mức ghi D1 (mục cũ) không còn chặn gì: D1 giờ chỉ còn danh mục, chỉ đọc.
 
 ## Nhật ký
 
@@ -183,3 +177,28 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 - Kiểm chứng local: vitest **315/315**, nghiệm thu **49/49** (2 lần), scenarios **11/11**. Đã push `9206da1` và **deploy** (phiên bản
   `a9222b44`): `/health`, `/v1/reason-codes`, `/v1/rules` trên URL thật trả nội dung mới. Kiểm thử có ghi trên URL thật vẫn chờ hạn mức D1
   reset lúc 00:00 UTC (mục đầu file).
+
+### C1. Phần ghi chuyển sang Aiven PostgreSQL (code xong, deploy chờ quyền Hyperdrive)
+- **Ruling (thiết kế):**
+  1. Mọi bảng ghi sang Postgres: `settings` (đồng hồ, replay), `api_keys`, `buyer_keys`, `approver_keys`, `mandates`, `drafts`, `quotes`,
+     `baskets`, `orders`, `order_lines`, `events`, `rate_limits`. Danh mục (`products`, `product_gtins`, `category_names`,
+     `valio_replies`) ở lại D1, chỉ đọc; không chạy lại `index:load:remote`.
+  2. Hyperdrive đứng trước Aiven, **tắt cache** (đọc luôn thấy lần ghi cuối), giới hạn kết nối tới origin 10 (Aiven cho tối đa 15).
+     Driver `postgres` 3.4.9 (bản 4.x mới ra 2 tuần, chưa dùng), bật `nodejs_compat`. Mỗi request có client riêng (`src/index.ts` copy
+     `env`), tối đa 3 socket/request để còn chỗ cho Valio và Gemini (Worker giới hạn 6 kết nối mở).
+  3. `src/db.ts`: lớp mỏng mang dạng D1 (`prepare/bind/first/all/run/batch`), đổi `?` → `$n`; các store giữ nguyên lời gọi, chỉ đổi SQL
+     của SQLite (json_each → jsonb, `INSERT OR IGNORE` → `ON CONFLICT DO NOTHING`, `rowid` → cột `id`).
+  4. Kho cho đơn ACCEPTED vẫn là một lần commit nguyên khối: mỗi `batch` là **một transaction** và lấy trước `pg_advisory_xact_lock(1)`,
+     nên hai lần commit sổ kho không bao giờ xen nhau (giống D1 vốn ghi tuần tự). Giới hạn: mọi commit đi một hàng; nâng cấp = khoá
+     theo (sản phẩm, ngày) nếu có hàng đợi.
+  5. Event: insert lấy `pg_advisory_xact_lock(2)` để seq commit đúng thứ tự, nên client đọc `seq > since` không bỏ sót event.
+  6. Schema là `CREATE TABLE IF NOT EXISTS`, chạy ở `/admin/reset`, `/admin/judge-key` và lúc setup test; không cần script migrate riêng.
+  7. `/health` thêm `store`: `aiven-postgres` khi server có extension `aiven_extras`, ngược lại `postgres`.
+  8. Test: Postgres 18 trong Docker (`pnpm pg:local`, cổng 54329, mật khẩu dev công khai `lazydoor`); setup tạo bảng và TRUNCATE mỗi file
+     test, các file chạy tuần tự (dùng chung một Postgres). Đường test thật sự đi qua binding Hyperdrive của miniflare → Postgres.
+- Kiểm chứng local: vitest **319/319** (thêm `test/db.test.ts`; các test race 20 đơn/6 đơn vị, hai lần duyệt cùng token, idempotency giờ
+  chạy đồng thời thật trên Postgres), `wrangler dev` + Postgres 18: nghiệm thu **49/49**, scenarios **11/11**; `check-secrets` OK
+  (nó quét cả `~/.config/junction2026/aiven.env`, đã chạy thử).
+- Ghi chú: mở Docker Desktop để chạy Postgres local làm vài container cũ của Kane (restart policy) tự chạy lại; mình không đụng tới chúng.
+- README có mục "Aiven PostgreSQL holds every write": sổ kho một transaction, audit log thứ tự chặt, không còn hạn mức ghi theo dòng.
+

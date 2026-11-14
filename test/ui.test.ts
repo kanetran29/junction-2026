@@ -10,6 +10,7 @@ import { createQuote } from '../src/quote/store';
 import { uiRoutes } from '../src/ui/approve';
 import { clearValioBlock } from '../src/valio/client';
 import { fakeValio, product, type Row } from './quote-helpers';
+import { db } from '../src/db';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'test-key' };
 const rows: Record<string, Row> = { QS: { price: 3, stock: 250 }, QU: { price: 3 } };
@@ -33,12 +34,12 @@ beforeAll(async () => {
   const names = (id: string) => [{ language: 'fi', value: `Maito <i>${id}</i>` }];
   await e.DB.batch(insertStatements(['QS', 'QU'].map((id) => product(id, { names: names(id) }))).map((s) => e.DB.prepare(s)));
   await seedMandate(e, 'hotel-a');
-  await e.DB.prepare('DELETE FROM approver_keys').run();
-  await e.DB.prepare('INSERT INTO approver_keys(key_hash, buyer_id, approver) VALUES (?,?,?)').bind(await sha256Hex('ak-a'), 'hotel-a', 'Kitchen manager').run();
+  await db(e).prepare('DELETE FROM approver_keys').run();
+  await db(e).prepare('INSERT INTO approver_keys(key_hash, buyer_id, approver) VALUES (?,?,?)').bind(await sha256Hex('ak-a'), 'hotel-a', 'Kitchen manager').run();
 });
 
 beforeEach(async () => {
-  for (const t of ['events', 'quotes', 'drafts', 'baskets', 'order_lines', 'orders']) await e.DB.prepare(`DELETE FROM ${t}`).run();
+  for (const t of ['events', 'quotes', 'drafts', 'baskets', 'order_lines', 'orders']) await db(e).prepare(`DELETE FROM ${t}`).run();
   await setClock(e, '2026-11-13T19:10:00Z');
 });
 
@@ -54,10 +55,10 @@ describe('GET /approve/:token', () => {
 
   it('is write-free: the order stays HELD and no event is logged', async () => {
     const { token, orderId } = await hold('QS');
-    const before = (await e.DB.prepare('SELECT COUNT(*) AS c FROM events').first<{ c: number }>())!.c;
+    const before = (await db(e).prepare('SELECT COUNT(*) AS c FROM events').first<{ c: number }>())!.c;
     await get(`/approve/${token}`);
-    expect((await e.DB.prepare('SELECT state FROM orders WHERE id = ?').bind(orderId).first<{ state: string }>())!.state).toBe('HELD');
-    expect((await e.DB.prepare('SELECT COUNT(*) AS c FROM events').first<{ c: number }>())!.c).toBe(before);
+    expect((await db(e).prepare('SELECT state FROM orders WHERE id = ?').bind(orderId).first<{ state: string }>())!.state).toBe('HELD');
+    expect((await db(e).prepare('SELECT COUNT(*) AS c FROM events').first<{ c: number }>())!.c).toBe(before);
   });
 
   it('escapes the agent reason and product names', async () => {

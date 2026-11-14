@@ -10,7 +10,8 @@ const OUT = '.data/valio/build/mandates.sql';
 
 /**
  * Generates an Ed25519 key pair per demo buyer, saves each private JWK under the gitignored `.data/valio/keys/`
- * (never printed), signs the default mandate and writes the SQL that loads `buyer_keys` and `mandates` into D1.
+ * (never printed), signs the default mandate and writes the Postgres SQL that loads `buyer_keys` and `mandates` (the write
+ * store; `/admin/reset` seeds the same rows for the demo).
  */
 async function main(): Promise<void> {
   mkdirSync(KEYS_DIR, { recursive: true, mode: 0o700 });
@@ -22,8 +23,8 @@ async function main(): Promise<void> {
     const [h, p, s] = (await signMandate(defaultMandate(buyerId), keys.privateJwk)).split('.');
     const pub = JSON.stringify(keys.publicJwk);
     sql.push(
-      `INSERT OR REPLACE INTO buyer_keys(buyer_id, public_key) VALUES(${lit(buyerId)}, ${lit(pub)});`,
-      `INSERT OR REPLACE INTO mandates(buyer_id, payload, signature) VALUES(${lit(buyerId)}, ${lit(`${h}.${p}`)}, ${lit(s)});`,
+      `INSERT INTO buyer_keys(buyer_id, public_key) VALUES(${lit(buyerId)}, ${lit(pub)}) ON CONFLICT (buyer_id) DO UPDATE SET public_key = excluded.public_key;`,
+      `INSERT INTO mandates(buyer_id, payload, signature) VALUES(${lit(buyerId)}, ${lit(`${h}.${p}`)}, ${lit(s)}) ON CONFLICT (buyer_id) DO UPDATE SET payload = excluded.payload, signature = excluded.signature;`,
     );
     console.log(`${buyerId}: key saved to ${KEYS_DIR}/${buyerId}.private.jwk.json, mandate signed`);
   }

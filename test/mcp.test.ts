@@ -97,8 +97,8 @@ describe('mcp', () => {
     expect(held).toMatchObject({ isError: false, structuredContent: { state: 'HELD' } });
     expect((await rpc(key, 'tools/call', { name: 'nope', arguments: {} })).error.code).toBe(-32602);
     expect((await app.request('/mcp', { headers: { Authorization: `Bearer ${key}`, Accept: 'text/event-stream' } }, e)).status).toBe(405);
-    const db = { prepare: (sql: string) => (sql.includes('api_keys') ? e.DB.prepare(sql) : (() => { throw new TypeError('secret internals'); })()), batch: e.DB.batch.bind(e.DB) } as unknown as D1Database;
-    const masked = (await (await app.request('/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${key}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_families', arguments: {} } }) }, { ...e, DB: db })).json()) as any;
+    const broken = { prepare: () => { throw new TypeError('secret internals'); } } as unknown as D1Database;
+    const masked = (await (await app.request('/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${key}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_families', arguments: {} } }) }, { ...e, DB: broken })).json()) as any;
     expect(masked.result).toMatchObject({ isError: true, content: [{ text: JSON.stringify({ error: 'INTERNAL_ERROR', detail: 'unexpected failure' }) }] });
   });
 

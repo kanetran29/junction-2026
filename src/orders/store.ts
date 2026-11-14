@@ -12,6 +12,7 @@ import type { Offer, OfferLine, Quote } from '../quote/build';
 import { createQuote, getQuote } from '../quote/store';
 import { newId, sha256Hex } from '../util';
 import { ValioError, fetchOffers, type Offers } from '../valio/client';
+import { db } from '../db';
 
 export type OrderState = 'PLACING' | 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED';
 
@@ -140,22 +141,22 @@ function view(r: Row): OrderView {
 
 /** Reads one order row by id. */
 async function rowById(env: Env, id: string): Promise<Row | null> {
-  return env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Row>();
+  return db(env).prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Row>();
 }
 
 /** The buyer's own order as a reply view, or null when it does not exist, is another buyer's or is still being placed. */
 export async function getOrder(env: Env, buyerId: string, id: string): Promise<OrderView | null> {
-  const r = await env.DB.prepare("SELECT * FROM orders WHERE id = ? AND buyer_id = ? AND state <> 'PLACING'").bind(id, buyerId).first<Row>();
+  const r = await db(env).prepare("SELECT * FROM orders WHERE id = ? AND buyer_id = ? AND state <> 'PLACING'").bind(id, buyerId).first<Row>();
   return r ? view(r) : null;
 }
 
 /** SQL: true when no checked product has less free stock than the order needs; `n` numbers the parameter holding the checks JSON. */
 const noShortLine = (n: number) =>
-  `NOT EXISTS (SELECT 1 FROM json_each(?${n}) c WHERE json_extract(c.value, '$.limit') IS NOT NULL AND json_extract(c.value, '$.limit') - COALESCE((SELECT SUM(l.sales_units) FROM order_lines l WHERE l.product_id = json_extract(c.value, '$.productId') AND l.delivery_date = json_extract(c.value, '$.deliveryDate') AND l.state = 'ACCEPTED'), 0) < json_extract(c.value, '$.needed') - 1e-9)`;
+  `NOT EXISTS (SELECT 1 FROM jsonb_array_elements(?${n}::text::jsonb) c WHERE c->>'limit' IS NOT NULL AND (c->>'limit')::float8 - COALESCE((SELECT SUM(l.sales_units) FROM order_lines l WHERE l.product_id = c->>'productId' AND l.delivery_date = c->>'deliveryDate' AND l.state = 'ACCEPTED'), 0) < (c->>'needed')::float8 - 1e-9)`;
 
 /** Appends the order's lines to the ledger (state ACCEPTED) as the lines JSON in parameter 3 says. */
 const INSERT_LINES = `INSERT INTO order_lines(order_id, buyer_id, product_id, delivery_date, sales_units, state)
-  SELECT ?1, ?2, json_extract(j.value, '$.productId'), json_extract(j.value, '$.deliveryDate'), json_extract(j.value, '$.salesUnits'), 'ACCEPTED' FROM json_each(?3) j`;
+  SELECT ?1::text, ?2::text, j->>'productId', j->>'deliveryDate', (j->>'salesUnits')::float8, 'ACCEPTED' FROM jsonb_array_elements(?3::text::jsonb) j`;
 
 /** The key of a Valio limit: one per product and delivery day. */
 export const limitKey = (l: Pick<OfferLine, 'productId' | 'deliveryDate'>) => `${l.productId}|${l.deliveryDate}`;
@@ -211,7 +212,7 @@ async function readLimits(env: Env, lines: OfferLine[], at: Date, ref: Ref, fetc
 
 /** Sales units of ACCEPTED ledger lines for a product on a delivery day. */
 async function acceptedUnits(env: Env, productId: string, deliveryDate: string): Promise<number> {
-  const r = await env.DB.prepare("SELECT COALESCE(SUM(sales_units), 0) AS u FROM order_lines WHERE product_id = ? AND delivery_date = ? AND state = 'ACCEPTED'").bind(productId, deliveryDate).first<{ u: number }>();
+  const r = await db(env).prepare("SELECT COALESCE(SUM(sales_units), 0) AS u FROM order_lines WHERE product_id = ? AND delivery_date = ? AND state = 'ACCEPTED'").bind(productId, deliveryDate).first<{ u: number }>();
   return r!.u;
 }
 
@@ -247,13 +248,13 @@ async function shortChecks(env: Env, checks: Check[]): Promise<{ productId: stri
  * A PLACING row older than a minute belonged to a dead invocation: it is deleted and null is returned so the caller retries.
  */
 async function earlierReply(env: Env, buyerId: string, key: string, hash: string, at: Date): Promise<PlaceReply | null> {
-  const r = await env.DB.prepare('SELECT * FROM orders WHERE buyer_id = ? AND idempotency_key = ?').bind(buyerId, key).first<Row & { created_at: string }>();
+  const r = await db(env).prepare('SELECT * FROM orders WHERE buyer_id = ? AND idempotency_key = ?').bind(buyerId, key).first<Row & { created_at: string }>();
   if (!r) throw new OrderError(409, 'IDEMPOTENCY_CONFLICT', 'a request with this key is in progress');
   if (r.request_hash !== hash) throw new OrderError(422, 'IDEMPOTENCY_KEY_REUSED', 'this Idempotency-Key was used with a different request body');
   if (r.reply) return JSON.parse(r.reply) as PlaceReply;
   if (r.state !== 'PLACING') return (await finalize(env, r)).reply;
   if (at.getTime() - Date.parse(r.created_at) > PLACING_TTL_MS) {
-    await env.DB.prepare("DELETE FROM orders WHERE id = ? AND state = 'PLACING'").bind(r.id).run();
+    await db(env).prepare("DELETE FROM orders WHERE id = ? AND state = 'PLACING'").bind(r.id).run();
     return null;
   }
   throw new OrderError(409, 'IDEMPOTENCY_IN_PROGRESS', 'a request with this key is still being processed');
@@ -280,7 +281,7 @@ async function finalize(env: Env, row: Row): Promise<{ reply: PlaceReply; decisi
     decision = { outcome: 'REJECT', reasons: [...decision.reasons, { code: 'OVER_DAY_HARD', detail: 'the day total crossed the hard limit while this order was placed' }] };
   }
   const reply: PlaceReply = { ...view({ ...row, decision: JSON.stringify(decision) }), ...extra };
-  await env.DB.prepare('UPDATE orders SET decision = ?, reply = ? WHERE id = ?').bind(JSON.stringify(decision), JSON.stringify(reply), row.id).run();
+  await db(env).prepare('UPDATE orders SET decision = ?, reply = ? WHERE id = ?').bind(JSON.stringify(decision), JSON.stringify(reply), row.id).run();
   return { reply, decision, shorts };
 }
 
@@ -300,7 +301,7 @@ async function resolvePicks(env: Env, req: PlaceRequest): Promise<{ picks: { quo
   };
   if ('quoteId' in req) return { picks: [await pick(req.buyerId, req.quoteId, req.offerId)], unmet: [] };
 
-  const basket = await env.DB.prepare('SELECT body FROM baskets WHERE id = ? AND buyer_id = ?').bind(req.basketId, req.buyerId).first<{ body: string }>();
+  const basket = await db(env).prepare('SELECT body FROM baskets WHERE id = ? AND buyer_id = ?').bind(req.basketId, req.buyerId).first<{ body: string }>();
   if (!basket) throw new OrderError(404, 'BASKET_NOT_FOUND', `no basket ${req.basketId}`);
   const { quoteIds } = JSON.parse(basket.body) as { quoteIds: string[] };
   const chosen = req.selections.map((s) => s.quoteId);
@@ -320,7 +321,7 @@ async function resolvePicks(env: Env, req: PlaceRequest): Promise<{ picks: { quo
 
 /** The buyer's committed (ACCEPTED) and pending (HELD) net cents for a delivery day. */
 async function dayTotals(env: Env, buyerId: string, date: string): Promise<{ committed: number; pending: number }> {
-  const { results } = await env.DB.prepare("SELECT state, COALESCE(SUM(net_cents), 0) AS cents FROM orders WHERE buyer_id = ? AND delivery_date = ? AND state IN ('ACCEPTED','HELD') GROUP BY state")
+  const { results } = await db(env).prepare("SELECT state, COALESCE(SUM(net_cents), 0) AS cents FROM orders WHERE buyer_id = ? AND delivery_date = ? AND state IN ('ACCEPTED','HELD') GROUP BY state")
     .bind(buyerId, date)
     .all<{ state: string; cents: number }>();
   const by = (s: string) => results.find((r) => r.state === s)?.cents ?? 0;
@@ -329,8 +330,8 @@ async function dayTotals(env: Env, buyerId: string, date: string): Promise<{ com
 
 /**
  * Places an order: one quote offer, or one offer per need of a basket, becomes one order. Idempotent (the key row is
- * inserted first, so a concurrent duplicate gets 409 and never a second order). The policy decides; the commit is ONE D1
- * batch that books the order and, only when the order is ACCEPTED and every finite line still fits Valio's limit less the
+ * inserted first, so a concurrent duplicate gets 409 and never a second order). The policy decides; the commit is ONE Postgres
+ * transaction (under the global write lock, `src/db.ts`) that books the order and, only when the order is ACCEPTED and every finite line still fits Valio's limit less the
  * accepted lines, inserts its lines into the ledger, otherwise rejects it STOCK_TAKEN. The day total is re-checked inside
  * that batch, so concurrent orders cannot jointly pass the daily auto limit. A quote or a held order reserves nothing.
  * A HELD order gets an approval token that only `approverInbox` reveals; no reply carries it.
@@ -342,8 +343,8 @@ export async function placeOrder(env: Env, req: PlaceRequest, fetchFn: typeof fe
   const hash = await sha256Hex(JSON.stringify([...sel, 'basketId' in req ? req.basketId : null, req.agentReason ?? null]));
   const id = newId('ord');
   const at = await now(env);
-  const ins = await env.DB.prepare(
-    "INSERT OR IGNORE INTO orders(id, buyer_id, quote_id, basket_id, idempotency_key, request_hash, state, body, created_at) VALUES (?,?,?,?,?,?, 'PLACING', '{}', ?)",
+  const ins = await db(env).prepare(
+    "INSERT INTO orders(id, buyer_id, quote_id, basket_id, idempotency_key, request_hash, state, body, created_at) VALUES (?,?,?,?,?,?, 'PLACING', '{}', ?) ON CONFLICT DO NOTHING",
   )
     .bind(id, req.buyerId, 'quoteId' in req ? req.quoteId : null, 'basketId' in req ? req.basketId : null, key, hash, helsinkiIso(at))
     .run();
@@ -354,7 +355,7 @@ export async function placeOrder(env: Env, req: PlaceRequest, fetchFn: typeof fe
   try {
     return await commitOrder(env, id, req, at, fetchFn);
   } catch (err) {
-    await env.DB.prepare("DELETE FROM orders WHERE id = ? AND state = 'PLACING'").bind(id).run();
+    await db(env).prepare("DELETE FROM orders WHERE id = ? AND state = 'PLACING'").bind(id).run();
     throw err;
   }
 }
@@ -397,8 +398,9 @@ async function commitOrder(env: Env, id: string, req: PlaceRequest, at: Date, fe
   const checksJson = JSON.stringify(checks);
   const approver = mandate?.approver.name ?? null;
 
-  await env.DB.batch([
-    env.DB.prepare(
+  const s = db(env);
+  await s.batch([
+    s.prepare(
       `WITH day AS (SELECT COALESCE(SUM(net_cents), 0) AS total FROM orders WHERE buyer_id = ?1 AND delivery_date = ?2 AND state IN ('ACCEPTED','HELD'))
        UPDATE orders SET
          state = CASE WHEN ?3 = 'REJECT' THEN 'REJECTED'
@@ -414,9 +416,9 @@ async function commitOrder(env: Env, id: string, req: PlaceRequest, at: Date, fe
       req.buyerId, deliveryDate, decision.outcome, net, hardDay, autoDay, firstReject, gross, JSON.stringify(decision), JSON.stringify({ lines, unmet, checks }),
       req.agentReason ?? null, mandate?.version ?? null, approver, mandate ? await linesHash(lines, req.buyerId, mandate.version) : null, token, closing, id,
     ),
-    env.DB.prepare(`${INSERT_LINES} WHERE (SELECT state FROM orders WHERE id = ?1) = 'ACCEPTED' AND ${noShortLine(4)}`).bind(id, req.buyerId, linesJson, checksJson),
-    env.DB.prepare("UPDATE orders SET state = 'REJECTED', reason = 'STOCK_TAKEN' WHERE id = ?1 AND state = 'ACCEPTED' AND NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = ?1)").bind(id),
-    env.DB.prepare("UPDATE orders SET approval_token = NULL, expires_at = NULL WHERE id = ? AND state <> 'HELD'").bind(id),
+    s.prepare(`${INSERT_LINES} WHERE (SELECT state FROM orders WHERE id = ?1) = 'ACCEPTED' AND ${noShortLine(4)}`).bind(id, req.buyerId, linesJson, checksJson),
+    s.prepare("UPDATE orders SET state = 'REJECTED', reason = 'STOCK_TAKEN' WHERE id = ?1 AND state = 'ACCEPTED' AND NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = ?1)").bind(id),
+    s.prepare("UPDATE orders SET approval_token = NULL, expires_at = NULL WHERE id = ? AND state <> 'HELD'").bind(id),
   ]);
 
   const row = (await rowById(env, id))!;
@@ -431,14 +433,14 @@ async function commitOrder(env: Env, id: string, req: PlaceRequest, at: Date, fe
 
 /** Loads a stored order by approval token; unknown is 404. The token never appears outside the approver inbox. */
 async function byToken(env: Env, token: string): Promise<Row> {
-  const r = await env.DB.prepare('SELECT * FROM orders WHERE approval_token = ?').bind(token).first<Row>();
+  const r = await db(env).prepare('SELECT * FROM orders WHERE approval_token = ?').bind(token).first<Row>();
   if (!r) throw new OrderError(404, 'TOKEN_UNKNOWN', 'no order for this approval token');
   return r;
 }
 
 /** Ends a HELD order as EXPIRED with a reason; 409 when another request resolved it first. */
 async function expireOrder(env: Env, row: Row, reason: ReasonCode, extra: { available?: number } = {}): Promise<ApproveReply> {
-  const res = await env.DB.prepare("UPDATE orders SET state = 'EXPIRED', reason = ? WHERE id = ? AND state = 'HELD'").bind(reason, row.id).run();
+  const res = await db(env).prepare("UPDATE orders SET state = 'EXPIRED', reason = ? WHERE id = ? AND state = 'HELD'").bind(reason, row.id).run();
   if (!res.meta.changes) throw new OrderError(409, 'TOKEN_USED', 'this approval was already resolved');
   await logEvent(env, { buyerId: row.buyer_id, orderId: row.id, type: 'approval.expired', data: {} });
   return { orderId: row.id, state: 'EXPIRED', reason, ...extra };
@@ -477,10 +479,11 @@ export async function approve(env: Env, token: string, opts: { callerRole: 'appr
   const checks = toChecks(lines, limits);
   const checksJson = JSON.stringify(checks);
   const linesJson = JSON.stringify(lines.map((l) => ({ productId: l.productId, deliveryDate: l.deliveryDate, salesUnits: l.salesUnits })));
-  const res = await env.DB.batch([
-    env.DB.prepare(`UPDATE orders SET state = 'ACCEPTED', reason = NULL WHERE id = ?1 AND state = 'HELD' AND ${noShortLine(2)}`).bind(row.id, checksJson),
-    env.DB.prepare(`${INSERT_LINES} WHERE (SELECT state FROM orders WHERE id = ?1) = 'ACCEPTED' AND NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = ?1)`).bind(row.id, row.buyer_id, linesJson),
-    env.DB.prepare("UPDATE orders SET state = 'EXPIRED', reason = 'STOCK_TAKEN' WHERE id = ? AND state = 'HELD'").bind(row.id),
+  const s = db(env);
+  const res = await s.batch([
+    s.prepare(`UPDATE orders SET state = 'ACCEPTED', reason = NULL WHERE id = ?1 AND state = 'HELD' AND ${noShortLine(2)}`).bind(row.id, checksJson),
+    s.prepare(`${INSERT_LINES} WHERE (SELECT state FROM orders WHERE id = ?1) = 'ACCEPTED' AND NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = ?1)`).bind(row.id, row.buyer_id, linesJson),
+    s.prepare("UPDATE orders SET state = 'EXPIRED', reason = 'STOCK_TAKEN' WHERE id = ? AND state = 'HELD'").bind(row.id),
   ]);
   if (res[0].meta.changes) {
     await logEvent(env, { ...ref, type: 'approval.approved', data: {} });
@@ -498,7 +501,7 @@ export async function approve(env: Env, token: string, opts: { callerRole: 'appr
 export async function reject(env: Env, token: string, opts: { callerRole: 'approver' | 'agent' }): Promise<ApproveReply> {
   if (opts?.callerRole !== 'approver') throw new OrderError(403, 'AGENT_CANNOT_APPROVE', 'only the approver can reject an order');
   const row = await byToken(env, token);
-  const res = await env.DB.prepare("UPDATE orders SET state = 'REJECTED' WHERE id = ? AND state = 'HELD'").bind(row.id).run();
+  const res = await db(env).prepare("UPDATE orders SET state = 'REJECTED' WHERE id = ? AND state = 'HELD'").bind(row.id).run();
   if (!res.meta.changes) throw new OrderError(409, 'TOKEN_USED', 'this approval was already resolved');
   await logEvent(env, { buyerId: row.buyer_id, orderId: row.id, ...(row.quote_id ? { quoteId: row.quote_id } : {}), type: 'approval.rejected', data: {} });
   return { orderId: row.id, state: 'REJECTED' };
@@ -512,9 +515,9 @@ export async function approverInbox(
   env: Env,
   approverKey: string,
 ): Promise<{ approver: string; buyerId: string; pending: { orderId: string; token: string; netCents: number; grossCents: number; approvalExpiresAt: string }[] }> {
-  const who = await env.DB.prepare('SELECT buyer_id, approver FROM approver_keys WHERE key_hash = ?').bind(await sha256Hex(approverKey)).first<{ buyer_id: string; approver: string }>();
+  const who = await db(env).prepare('SELECT buyer_id, approver FROM approver_keys WHERE key_hash = ?').bind(await sha256Hex(approverKey)).first<{ buyer_id: string; approver: string }>();
   if (!who) throw new OrderError(401, 'APPROVER_KEY_UNKNOWN', 'unknown approver key');
-  const { results } = await env.DB.prepare("SELECT id, approval_token, net_cents, gross_cents, expires_at FROM orders WHERE buyer_id = ? AND state = 'HELD' ORDER BY created_at, id")
+  const { results } = await db(env).prepare("SELECT id, approval_token, net_cents, gross_cents, expires_at FROM orders WHERE buyer_id = ? AND state = 'HELD' ORDER BY created_at, id")
     .bind(who.buyer_id)
     .all<{ id: string; approval_token: string; net_cents: number; gross_cents: number; expires_at: string }>();
   return {
@@ -534,7 +537,7 @@ export async function createBasket(env: Env, buyerId: string, needs: unknown[], 
   for (const draft of needs) quotes.push(await createQuote(env, buyerId, { draft }, fetchFn));
   const expiresAt = quotes.map((q) => q.expiresAt).sort((a, b) => Date.parse(a) - Date.parse(b))[0];
   const basketId = newId('b');
-  await env.DB.prepare('INSERT INTO baskets(id, buyer_id, body, created_at, expires_at) VALUES (?,?,?,?,?)')
+  await db(env).prepare('INSERT INTO baskets(id, buyer_id, body, created_at, expires_at) VALUES (?,?,?,?,?)')
     .bind(basketId, buyerId, JSON.stringify({ quoteIds: quotes.map((q) => q.id) }), helsinkiIso(await now(env)), expiresAt)
     .run();
   return { basketId, quotes, expiresAt };

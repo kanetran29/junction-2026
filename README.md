@@ -22,6 +22,16 @@ The door decides by published rules. Each rule has a named owner. Models transla
 - **Approver:** a held order is accepted only when the named human approves it through their own link.
 - **The only model step:** turning free text into a typed draft (Gemini, `interpret_request`). Policy and money never read that output directly.
 
+## Aiven PostgreSQL holds every write
+
+The door has two stores. The Valio catalog (17,546 products, their GTINs, category names and the recorded Valio replies) is read-only and stays in Cloudflare D1. Everything the door writes lives in **Aiven for PostgreSQL** (PostgreSQL 18), reached through Cloudflare Hyperdrive, which pools the connections: orders and the stock ledger, approvals and their tokens, signed mandates and buyer keys, drafts, quotes and baskets, the event log, API keys, rate counters and the demo clock. `GET /health` answers `"store": "aiven-postgres"` when the server offers Aiven's `aiven_extras` extension.
+
+What Aiven does for Lazydoor:
+
+- **The stock ledger commits in one transaction.** Placing or approving an order runs one transaction under a transaction-scoped advisory lock (`pg_advisory_xact_lock`). It books the order, re-checks the buyer's day total and inserts the order's lines only if each one still fits Valio's limit less the lines already accepted. Either all of it happens or none of it does. A test races 20 orders of 4 units for a 6-unit product against Postgres: exactly one is accepted, the rest get `STOCK_TAKEN`.
+- **The audit log.** Every step appends an event with a strictly increasing sequence number. A second advisory lock orders the inserts, so a reader polling `seq > since` (the SSE stream, the demo page, a judge) never skips an event that commits late.
+- **No row-write quota.** D1's free tier stops at 100,000 row writes a day, and loading the catalog used that up. Aiven bills by plan, not per row, so the demo keeps writing.
+
 ## Quick start
 
 You need Node 24, pnpm 10 and wrangler 4.
@@ -48,13 +58,14 @@ pnpm index:build
 pnpm replies:build
 pnpm categories:build
 pnpm dev:load                 # migrations, product index, recorded replies, categories (local D1)
+pnpm pg:local                 # Postgres 18 in Docker on port 54329 (the write store; tables are created on first reset)
 pnpm wrangler dev             # serves the Worker on http://localhost:8787
 ```
 
 Then, in another shell:
 
 ```bash
-pnpm test                     # unit tests (vitest in workerd, real D1)
+pnpm test                     # unit tests (vitest in workerd, real D1 and the local Postgres)
 pnpm acceptance               # 49 acceptance cases against the running Worker
 ```
 
@@ -88,7 +99,7 @@ The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/searc
 
 **Judge key.** The operator mints a read-everything key with `POST /admin/judge-key` (admin key, `DEMO_MODE=1`); it returns `{ key }` once. The key acts as buyer `hotel-b` (it can place orders as `hotel-b`) and reads every buyer's events. It survives `/admin/reset`; agent and approver keys do not.
 
-**Deploying.** The remote D1 database is filled with `pnpm migrate:remote`, `pnpm index:load:remote`, `pnpm replies:load:remote` and `pnpm categories:load:remote` (the local `dev:load` equivalents run against `--local`).
+**Deploying.** The remote D1 catalog is filled once with `pnpm migrate:remote`, `pnpm index:load:remote`, `pnpm replies:load:remote` and `pnpm categories:load:remote` (the local `dev:load` equivalents run against `--local`). The write store is a Hyperdrive config (caching disabled, so every read sees the last write) in front of the Aiven service; its id goes in `wrangler.jsonc`, and `POST /admin/reset` creates the tables.
 
 The agent never receives the approval link. `place_order` returns only the approval status and the approver's name. The link goes to the approver inbox.
 
@@ -105,8 +116,8 @@ These flows are acceptance cases and run against recorded Valio replies.
 
 Be clear about what this prototype does not do.
 
-- **Order acceptance is simulated.** Valio has no order endpoint in the challenge. The receipt says "Accepted = binding order, invoiced on delivery (simulated)". The ledger is a **mock ledger adapter** in the Worker's D1 database. Valio's order API and allocation rule would replace it at the same call.
-- **Allocation is a stand-in.** Stock is allocated first come, first served against the Valio availability amount less accepted ledger lines. One SQL statement inserts all lines of an order or none. A quote and a held order reserve nothing.
+- **Order acceptance is simulated.** Valio has no order endpoint in the challenge. The receipt says "Accepted = binding order, invoiced on delivery (simulated)". The ledger is a **mock ledger adapter** in the door's PostgreSQL (Aiven). Valio's order API and allocation rule would replace it at the same call.
+- **Allocation is a stand-in.** Stock is allocated first come, first served against the Valio availability amount less accepted ledger lines. One transaction inserts all lines of an order or none. A quote and a held order reserve nothing.
 - **Replay.** After Sunday 15 Nov 17:00 (Helsinki) the gateway serves the recording made on Friday 13 Nov at 21:08 instead of calling Valio. Before that it calls Valio live. Replay switches on by itself only when the gateway clock is real time (no override) and has passed Sun 15 Nov 17:00 Helsinki; a demo reset with a set clock must pass `replay: "replies_2026-11-16"` to replay. Running the scenarios or acceptance against a deployed URL leaves that run's last state, so finish with one explicit demo reset (`clock: 2026-11-13T21:10:00+02:00`, `replay: replies_2026-11-16`). The demo clock can be set with the demo-only admin routes (`DEMO_MODE=1` and the admin key; otherwise 404). The deployed instance keeps `DEMO_MODE=1` so the demo can set the clock and replay. Its admin routes are protected by a long random `ADMIN_KEY` Worker secret.
 - **Payments, invoices and delivery** are not implemented.
 - **Mandate.** A mandate is a bearer JWS (Ed25519, signed per buyer, checked on every order). It has no key binding to the agent, so anyone holding it could present it. AP2-style key binding is out of scope.

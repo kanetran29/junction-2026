@@ -12,6 +12,7 @@ import { STOCK_UNKNOWN_NOTE } from '../offers/orderable';
 import { ValioRateLimited } from '../valio/client';
 import { lineNet } from '../domain/money';
 import { eur, productName, qty, renderReceipt } from '../receipt/render';
+import { db } from '../db';
 
 /** Escapes a value for HTML text and double-quoted attributes; every interpolated value goes through it. */
 export function escapeHtml(s: unknown): string {
@@ -45,7 +46,7 @@ interface Meta {
 async function draftsOf(env: Env, m: Meta): Promise<Draft[]> {
   const ids = m.quote_id ? [m.quote_id] : [];
   if (m.basket_id) {
-    const b = await env.DB.prepare('SELECT body FROM baskets WHERE id = ? AND buyer_id = ?').bind(m.basket_id, m.buyer_id).first<{ body: string }>();
+    const b = await db(env).prepare('SELECT body FROM baskets WHERE id = ? AND buyer_id = ?').bind(m.basket_id, m.buyer_id).first<{ body: string }>();
     if (b) ids.push(...(JSON.parse(b.body) as { quoteIds: string[] }).quoteIds);
   }
   const quotes = await Promise.all(ids.map((id) => getQuote(env, m.buyer_id, id)));
@@ -72,7 +73,7 @@ const notFound = (what: string) => ({ status: 404 as const, html: page('Lazydoor
  * final state and no forms. An unknown token is 404.
  */
 export async function renderApprovePage(env: Env, token: string, fetchFn: typeof fetch = fetch): Promise<{ status: 200 | 404; html: string }> {
-  const m = await env.DB.prepare('SELECT id, buyer_id, quote_id, basket_id, agent_reason, expires_at FROM orders WHERE approval_token = ?').bind(token).first<Meta & { id: string }>();
+  const m = await db(env).prepare('SELECT id, buyer_id, quote_id, basket_id, agent_reason, expires_at FROM orders WHERE approval_token = ?').bind(token).first<Meta & { id: string }>();
   const view = m && (await getOrder(env, m.buyer_id, m.id));
   if (!m || !view) return notFound('No order for this approval link.');
   const { order, decision } = view;
@@ -135,7 +136,7 @@ function resultPage(r: ApproveReply): string {
  * given) belongs to another buyer. Without `buyerId` the order id itself is the capability (the public receipt page).
  */
 export async function receiptText(env: Env, orderId: string, buyerId?: string): Promise<string | null> {
-  const m = await env.DB.prepare("SELECT buyer_id, quote_id, basket_id, agent_reason, expires_at FROM orders WHERE id = ?1 AND state <> 'PLACING' AND (?2 IS NULL OR buyer_id = ?2)").bind(orderId, buyerId ?? null).first<Meta>();
+  const m = await db(env).prepare("SELECT buyer_id, quote_id, basket_id, agent_reason, expires_at FROM orders WHERE id = ?1 AND state <> 'PLACING' AND (?2::text IS NULL OR buyer_id = ?2)").bind(orderId, buyerId ?? null).first<Meta>();
   const view: OrderView | null = m && (await getOrder(env, m.buyer_id, orderId));
   if (!m || !view) return null;
   const products = await getProducts(env, view.order.lines.map((l) => l.productId));

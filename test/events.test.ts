@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { setClock } from '../src/clock';
 import type { Env } from '../src/env';
 import { listEvents, logEvent } from '../src/events/log';
+import { db } from '../src/db';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1' };
 
 describe('events', () => {
   beforeEach(async () => {
-    await e.DB.prepare('DELETE FROM events').run();
+    await db(e).prepare('DELETE FROM events').run();
     await setClock(e, '2026-11-13T19:10:00Z');
   });
 

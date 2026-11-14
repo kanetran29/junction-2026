@@ -2,8 +2,9 @@ import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-worker
 import { defineConfig } from 'vitest/config';
 
 /**
- * Runs every test under test/ in workerd with a real D1; the migrations are read here (Node) and
- * applied per test file by test/setup.ts, so later D1 code is tested the same way.
+ * Runs every test under test/ in workerd with a real D1 (catalog) and the local Postgres behind the Hyperdrive binding
+ * (writes; `localConnectionString` in wrangler.jsonc). The D1 migrations are read here (Node) and applied per test file by
+ * test/setup.ts, which also empties the Postgres tables. The files share one Postgres, so they run one at a time.
  */
 export default defineConfig(async () => {
   const migrations = await readD1Migrations('./migrations');
@@ -17,6 +18,7 @@ export default defineConfig(async () => {
     test: {
       include: ['test/**/*.test.ts'],
       setupFiles: ['./test/setup.ts'],
+      fileParallelism: false,
     },
   };
 });

@@ -7,6 +7,7 @@ import { logEvent } from '../events/log';
 import { seedMandate } from '../mandate/jws';
 import { newId, sha256Hex } from '../util';
 import { HttpError, identify } from './auth';
+import { db, ensureSchema } from '../db';
 
 const BUYERS = ['hotel-a', 'hotel-b'] as const;
 const DEFAULT_DELIVERY = '2026-11-16';
@@ -33,19 +34,20 @@ const cents = (eur: number) => Math.round(eur * 100);
 
 /** Stores a settings row, or removes it when `value` is null. */
 async function setSetting(env: Env, key: string, value: string | null): Promise<void> {
-  if (value === null) await env.DB.prepare('DELETE FROM settings WHERE key = ?').bind(key).run();
-  else await env.DB.prepare('INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(key, value).run();
+  if (value === null) await db(env).prepare('DELETE FROM settings WHERE key = ?').bind(key).run();
+  else await db(env).prepare('INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(key, value).run();
 }
 
 /** Appends a settled ACCEPTED order (for the day total and the ledger) that the case file says exists already. */
 async function insertPriorOrder(env: Env, buyerId: string, netCents: number, line?: { productId: string; salesUnits: number }): Promise<void> {
   const id = newId('ord_prior');
   const body = JSON.stringify({ lines: [], unmet: [] });
+  const s = db(env);
   const stmts = [
-    env.DB.prepare("INSERT INTO orders(id, buyer_id, state, net_cents, gross_cents, delivery_date, body, created_at) VALUES (?,?,'ACCEPTED',?,?,?,?,?)").bind(id, buyerId, netCents, netCents, DEFAULT_DELIVERY, body, helsinkiIso(await now(env))),
+    s.prepare("INSERT INTO orders(id, buyer_id, state, net_cents, gross_cents, delivery_date, body, created_at) VALUES (?,?,'ACCEPTED',?,?,?,?,?)").bind(id, buyerId, netCents, netCents, DEFAULT_DELIVERY, body, helsinkiIso(await now(env))),
   ];
-  if (line) stmts.push(env.DB.prepare("INSERT INTO order_lines(order_id, buyer_id, product_id, delivery_date, sales_units, state) VALUES (?,?,?,?,?,'ACCEPTED')").bind(id, buyerId, line.productId, DEFAULT_DELIVERY, line.salesUnits));
-  await env.DB.batch(stmts);
+  if (line) stmts.push(s.prepare("INSERT INTO order_lines(order_id, buyer_id, product_id, delivery_date, sales_units, state) VALUES (?,?,?,?,?,'ACCEPTED')").bind(id, buyerId, line.productId, DEFAULT_DELIVERY, line.salesUnits));
+  await s.batch(stmts);
 }
 
 /**
@@ -81,7 +83,9 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
         throw new HttpError(400, 'INVALID_REQUEST', (err as Error).message);
       }
     }
-    await env.DB.batch(['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'mandates', 'buyer_keys'].map((t) => env.DB.prepare(`DELETE FROM ${t}`)).concat(env.DB.prepare("DELETE FROM api_keys WHERE role <> 'judge'")));
+    await ensureSchema(env);
+    const s = db(env);
+    await s.batch(['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'mandates', 'buyer_keys'].map((t) => s.prepare(`DELETE FROM ${t}`)).concat(s.prepare("DELETE FROM api_keys WHERE role <> 'judge'")));
     await setClock(env, b.clock ?? null);
     await setSetting(env, 'replay', b.replay ? '1' : null);
     await setSetting(env, 'recording', b.replay ?? null);
@@ -106,9 +110,9 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
     for (const buyer of BUYERS) {
       agentKeys[buyer] = newKey('ld');
       approverKeys[buyer] = newKey('ap');
-      await env.DB.batch([
-        env.DB.prepare("INSERT INTO api_keys(key_hash, buyer_id, label, role) VALUES (?,?,'demo agent','agent')").bind(await sha256Hex(agentKeys[buyer]), buyer),
-        env.DB.prepare('INSERT INTO approver_keys(key_hash, buyer_id, approver) VALUES (?,?,?)').bind(await sha256Hex(approverKeys[buyer]), buyer, m.approver ?? 'Kitchen manager'),
+      await s.batch([
+        s.prepare("INSERT INTO api_keys(key_hash, buyer_id, label, role) VALUES (?,?,'demo agent','agent')").bind(await sha256Hex(agentKeys[buyer]), buyer),
+        s.prepare('INSERT INTO approver_keys(key_hash, buyer_id, approver) VALUES (?,?,?)').bind(await sha256Hex(approverKeys[buyer]), buyer, m.approver ?? 'Kitchen manager'),
       ]);
     }
     await logEvent(env, { buyerId: 'admin', type: 'clock.set', data: { now: helsinkiIso(await now(env)) } });
@@ -121,7 +125,8 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
    */
   admin.post('/admin/judge-key', async (c) => {
     const key = newKey('jd');
-    await c.env.DB.prepare("INSERT INTO api_keys(key_hash, buyer_id, label, role) VALUES (?,?,'judge','judge')").bind(await sha256Hex(key), 'hotel-b').run();
+    await ensureSchema(c.env);
+    await db(c.env).prepare("INSERT INTO api_keys(key_hash, buyer_id, label, role) VALUES (?,?,'judge','judge')").bind(await sha256Hex(key), 'hotel-b').run();
     return c.json({ key, buyer: 'hotel-b', role: 'judge' }, 201);
   });
 
@@ -154,13 +159,13 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
   /** The orders stored under one Idempotency-Key, to show a retry made exactly one. */
   admin.get('/admin/orders', async (c) => {
     const key = c.req.query('idempotencyKey') ?? '';
-    const { results } = await c.env.DB.prepare('SELECT id, buyer_id, state, net_cents FROM orders WHERE idempotency_key = ?').bind(key).all();
+    const { results } = await db(c.env).prepare('SELECT id, buyer_id, state, net_cents FROM orders WHERE idempotency_key = ?').bind(key).all();
     return c.json({ count: results.length, orders: results });
   });
 
   /** A buyer's ACCEPTED ledger lines (what already took stock). */
   admin.get('/admin/ledger', async (c) => {
-    const { results } = await c.env.DB.prepare("SELECT order_id, product_id, delivery_date, sales_units FROM order_lines WHERE buyer_id = ? AND state = 'ACCEPTED' ORDER BY rowid").bind(c.req.query('buyer') ?? '').all();
+    const { results } = await db(c.env).prepare("SELECT order_id, product_id, delivery_date, sales_units FROM order_lines WHERE buyer_id = ? AND state = 'ACCEPTED' ORDER BY id").bind(c.req.query('buyer') ?? '').all();
     return c.json({ count: results.length, lines: results });
   });
 

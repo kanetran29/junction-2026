@@ -6,6 +6,7 @@ import { logEvent } from '../src/events/log';
 import { createApp } from '../src/http/routes';
 import { sha256Hex } from '../src/util';
 import { product } from './quote-helpers';
+import { db } from '../src/db';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', ADMIN_KEY: 'adm' };
 const app = createApp(async () => {
@@ -32,7 +33,7 @@ beforeAll(async () => {
   );
   await e.DB.prepare("INSERT OR REPLACE INTO category_names(category, names, tag_source) VALUES ('63235','Party food','reviewed')").run();
   for (const [key, role, buyer] of [['adm-agent', 'agent', 'hotel-a'], ['other-agent', 'agent', 'hotel-b'], ['the-judge', 'judge', 'hotel-a']])
-    await e.DB.prepare('INSERT OR REPLACE INTO api_keys(key_hash, buyer_id, label, role) VALUES (?,?,?,?)').bind(await sha256Hex(key), buyer, 'test', role).run();
+    await db(e).prepare('INSERT INTO api_keys(key_hash, buyer_id, label, role) VALUES (?,?,?,?) ON CONFLICT (key_hash) DO UPDATE SET buyer_id = excluded.buyer_id, label = excluded.label, role = excluded.role').bind(await sha256Hex(key), buyer, 'test', role).run();
 });
 
 describe('resolve', () => {
@@ -122,7 +123,7 @@ describe('rules and reason codes', () => {
 
 describe('events', () => {
   beforeAll(async () => {
-    await e.DB.prepare('DELETE FROM events').run();
+    await db(e).prepare('DELETE FROM events').run();
     await logEvent(e, { type: 'draft.confirmed', buyerId: 'hotel-a', data: {} });
     await logEvent(e, { type: 'draft.confirmed', buyerId: 'hotel-b', data: {} });
     await logEvent(e, { type: 'search.done', buyerId: 'hotel-a', data: { count: 1, categories: ['10400'] } });

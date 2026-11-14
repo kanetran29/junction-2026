@@ -4,13 +4,14 @@ import { setClock } from '../src/clock';
 import type { Env } from '../src/env';
 import { fetchOffers } from '../src/valio/client';
 import fixture from './fixtures/valio-replies.json';
+import { db } from '../src/db';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'test-key-123' };
 
 describe('fetchOffers in replay', () => {
   const REC = 'replies_test';
   beforeEach(async () => {
-    await e.DB.prepare("DELETE FROM settings WHERE key IN ('replay', 'clock', 'recording', 'variants')").run();
+    await db(e).prepare("DELETE FROM settings WHERE key IN ('replay', 'clock', 'recording', 'variants')").run();
     await e.DB.prepare('DELETE FROM valio_replies').run();
     const rows = (['availability', 'price'] as const).flatMap((kind) =>
       (fixture[kind][0].products as { productId: string }[]).map((p) =>
@@ -18,13 +19,13 @@ describe('fetchOffers in replay', () => {
       ),
     );
     await e.DB.batch(rows);
-    await e.DB.batch([
-      e.DB.prepare("INSERT INTO settings(key, value) VALUES ('replay', '1')"),
-      e.DB.prepare("INSERT INTO settings(key, value) VALUES ('recording', ?)").bind(REC),
+    await db(e).batch([
+      db(e).prepare("INSERT INTO settings(key, value) VALUES ('replay', '1')"),
+      db(e).prepare("INSERT INTO settings(key, value) VALUES ('recording', ?)").bind(REC),
     ]);
   });
   afterEach(async () => {
-    await e.DB.prepare("DELETE FROM settings WHERE key IN ('replay', 'recording', 'variants')").run();
+    await db(e).prepare("DELETE FROM settings WHERE key IN ('replay', 'recording', 'variants')").run();
   });
 
   const never = vi.fn(async () => {
@@ -46,7 +47,7 @@ describe('fetchOffers in replay', () => {
   });
 
   it('replays by the clock alone once now() reaches Sun 15 Nov 15:00 UTC, with the default recording', async () => {
-    await e.DB.prepare("DELETE FROM settings WHERE key IN ('replay', 'recording')").run();
+    await db(e).prepare("DELETE FROM settings WHERE key IN ('replay', 'recording')").run();
     await e.DB.prepare('UPDATE valio_replies SET recording = ?').bind('replies_2026-11-16').run();
     await setClock(e, '2026-11-15T15:00:00Z');
     const r = await fetchOffers(e, ['T0004'], '2026-11-16', never);
@@ -56,14 +57,14 @@ describe('fetchOffers in replay', () => {
   });
 
   it('variant out_of_stock empties that product schedule lines only', async () => {
-    await e.DB.prepare("INSERT INTO settings(key, value) VALUES ('variants', ?)").bind(JSON.stringify({ T0004: 'out_of_stock' })).run();
+    await db(e).prepare("INSERT INTO settings(key, value) VALUES ('variants', ?)").bind(JSON.stringify({ T0004: 'out_of_stock' })).run();
     const r = await fetchOffers(e, ['T0004', 'T0001'], '2026-11-16', never);
     expect(r.availability.get('T0004')?.scheduleLines).toEqual([]);
     expect(r.availability.get('T0001')?.scheduleLines).toHaveLength(1);
   });
 
   it('variant price_plus_10pct multiplies catalog and comparison prices, cents half up', async () => {
-    await e.DB.prepare("INSERT INTO settings(key, value) VALUES ('variants', ?)").bind(JSON.stringify({ T0004: 'price_plus_10pct' })).run();
+    await db(e).prepare("INSERT INTO settings(key, value) VALUES ('variants', ?)").bind(JSON.stringify({ T0004: 'price_plus_10pct' })).run();
     const r = await fetchOffers(e, ['T0004', 'T0001'], '2026-11-16', never);
     expect(r.price.get('T0004')?.catalogPrice?.value).toBe(4.95);
     expect(r.price.get('T0004')?.comparisonPrice?.value).toBe(0.99);

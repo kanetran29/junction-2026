@@ -1,4 +1,5 @@
 import type { Env } from './env';
+import { db } from './db';
 
 const REPLAY_FROM = Date.parse('2026-11-15T15:00:00Z');
 
@@ -6,12 +7,12 @@ const REPLAY_FROM = Date.parse('2026-11-15T15:00:00Z');
  * Reads one row of the key/value `settings` table (clock override, replay flag, recording, variant); null when unset.
  */
 export async function getSetting(env: Env, key: string): Promise<string | null> {
-  const row = await env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first<{ value: string }>();
+  const row = await db(env).prepare('SELECT value FROM settings WHERE key = ?').bind(key).first<{ value: string }>();
   return row?.value ?? null;
 }
 
 /**
- * The gateway's current time: the D1-stored override when DEMO_MODE is "1" and one is set, else real time.
+ * The gateway's current time: the stored override when DEMO_MODE is "1" and one is set, else real time.
  * Every cutoff, expiry and replay decision reads this, so demos can run on a scripted clock.
  */
 export async function now(env: Env): Promise<Date> {
@@ -29,10 +30,10 @@ export async function now(env: Env): Promise<Date> {
  */
 export async function setClock(env: Env, iso: string | null): Promise<void> {
   if (iso === null) {
-    await env.DB.prepare("DELETE FROM settings WHERE key = 'clock'").run();
+    await db(env).prepare("DELETE FROM settings WHERE key = 'clock'").run();
     return;
   }
-  await env.DB.prepare("INSERT INTO settings(key, value) VALUES('clock', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+  await db(env).prepare("INSERT INTO settings(key, value) VALUES('clock', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
     .bind(normaliseClock(iso))
     .run();
 }

@@ -31,7 +31,7 @@ export async function readEvents(c: Ctx): Promise<{ events: Event[]; next: numbe
 }
 
 /**
- * `GET /v1/events/stream`: Server-Sent Events built on a ReadableStream that polls `listEvents` (a Worker has no push from D1).
+ * `GET /v1/events/stream`: Server-Sent Events built on a ReadableStream that polls `listEvents` (Hyperdrive pools in transaction mode, so no LISTEN/NOTIFY push).
  * Sends `: ping` every 15 s and closes after about 60 s; the client resumes with `since` or `Last-Event-ID`.
  */
 export async function streamEvents(c: Ctx): Promise<Response> {
@@ -58,7 +58,7 @@ export async function streamEvents(c: Ctx): Promise<Response> {
         }
         ctl.close();
       } catch {
-        // a D1 error or a departed client ends the stream; the client reconnects with Last-Event-ID
+        // a database error or a departed client ends the stream; the client reconnects with Last-Event-ID
       }
     },
     cancel() {

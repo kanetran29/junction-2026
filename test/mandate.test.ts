@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MANDATE_AUD, defaultMandate } from '../src/domain/constants';
 import { generateBuyerKeys, loadMandate, saveMandate, seedMandate, signMandate, verifyMandate } from '../src/mandate/jws';
+import { db } from '../src/db';
 
 const NOW = new Date('2026-11-13T21:10:00+02:00');
 const ctx = { now: NOW, aud: MANDATE_AUD };
@@ -124,7 +125,7 @@ describe('mandate jws', () => {
 
 describe('mandate store', () => {
   beforeEach(async () => {
-    await env.DB.batch([env.DB.prepare('DELETE FROM mandates'), env.DB.prepare('DELETE FROM buyer_keys')]);
+    await db(env).batch([db(env).prepare('DELETE FROM mandates'), db(env).prepare('DELETE FROM buyer_keys')]);
   });
 
   it('save then load round trips', async () => {
@@ -154,16 +155,16 @@ describe('mandate store', () => {
 
   it('an unparseable stored row makes the save fail, not pass', async () => {
     const k = await generateBuyerKeys();
-    await env.DB.batch([
-      env.DB.prepare("INSERT INTO buyer_keys(buyer_id, public_key) VALUES('hotel-a', '{}')"),
-      env.DB.prepare("INSERT INTO mandates(buyer_id, payload, signature) VALUES('hotel-a', 'x.y', 'z')"),
+    await db(env).batch([
+      db(env).prepare("INSERT INTO buyer_keys(buyer_id, public_key) VALUES('hotel-a', '{}')"),
+      db(env).prepare("INSERT INTO mandates(buyer_id, payload, signature) VALUES('hotel-a', 'x.y', 'z')"),
     ]);
     expect(await code(saveMandate(env, 'hotel-a', await signMandate(m, k.privateJwk), k.publicJwk))).toBe('MANDATE_INVALID');
   });
 
   it('an unparseable stored public key loads as MANDATE_INVALID', async () => {
     await seedMandate(env, 'hotel-a');
-    await env.DB.prepare("UPDATE buyer_keys SET public_key = 'not json' WHERE buyer_id = 'hotel-a'").run();
+    await db(env).prepare("UPDATE buyer_keys SET public_key = 'not json' WHERE buyer_id = 'hotel-a'").run();
     expect(await code(loadMandate(env, 'hotel-a', ctx))).toBe('MANDATE_INVALID');
   });
 
