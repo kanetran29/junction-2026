@@ -1,6 +1,6 @@
-// Bounding-box check of every word on screen at 1920×1080: steps Story frame by frame and replays the recorded Live file,
+// Bounding-box check of every word on screen at 1920×1080: steps Story frame by frame, then watches Live while the server replays a run,
 // collects the visible cards, chips, signs and HUD panels, and prints every pair that overlaps or any that leaves the stage.
-// Usage: node demo/dev/label-overlap.mjs [base URL]   (needs a running server for demo/, e.g. on port 8790)
+// Usage: node demo/dev/label-overlap.mjs [base URL]   (needs a fresh `fake-gateway.mjs --replay` for demo/; LIVE_SECONDS, default 95, is how long Live is watched)
 // PLAYWRIGHT_CORE and CHROME point at a playwright-core install and a Chrome binary when they are not on the default paths.
 const base = process.argv[2] ?? "http://localhost:8790/";
 const pw = await import(process.env.PLAYWRIGHT_CORE ?? "playwright-core");
@@ -111,17 +111,10 @@ for (let t = 0; t <= duration + 0.01; t += 0.25) {
   check(sample, `story ${t.toFixed(2)} s`);
 }
 
-await page.goto(`${base}?kiosk=1&mode=live&gateway=${encodeURIComponent("fixtures/sample-events.json")}`);
+await page.goto(`${base}?kiosk=1&mode=live`);
 const start = Date.now();
-while (Date.now() - start < 70000) {
+while (Date.now() - start < Number(process.env.LIVE_SECONDS || 95) * 1000) {
   check(await page.evaluate(collect), `live ${((Date.now() - start) / 1000).toFixed(1)} s`);
-  if ((await page.evaluate(() => document.getElementById("chip").textContent)) === "ended" && Date.now() - start > 5000) {
-    for (let i = 0; i < 20; i++) {
-      await page.waitForTimeout(150);
-      check(await page.evaluate(collect), "live ended");
-    }
-    break;
-  }
   await page.waitForTimeout(100);
 }
 await browser.close();

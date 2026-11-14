@@ -100,7 +100,6 @@ const SCRIPT = [
   [3, 0.1, "story.card", card("The agent's order · HELD", ["1,010.00 € is over 500 € an order", "Waiting for the Kitchen manager"], { tone: "hold", link: "agent" })],
   [3, 0.1, ...caption("Over the kitchen's own 500 € order limit: the door holds it.")],
   [3, 3.7, ...gw("approval.requested")],
-  [3, 3.7, "story.mail", { kind: "lazydoor", from: "gate", to: "phone" }],
   [3, 3.7, ...caption("Lazydoor sends the request to the kitchen manager. Not Valio. Not the agent.")],
   [3, 5, "story.card", card("Kitchen manager's phone", ["Approve order · 1,000 × 1 l", "Net 1,010.00 € · Gross 1,146.35 €", "Decide within 43 h 50 min"], { tone: "hold", link: "phone" })],
   [3, 8.3, "story.agent", { at: "door", carry: "approve" }],
@@ -146,7 +145,6 @@ const SCRIPT = [
   [6, 0.8, ...gw("valio.called")],
   [6, 1, ...gw("valio.called")],
   [6, 1.2, ...gw("approval.approved")],
-  [6, 1.2, "story.mail", { kind: "approved", from: "phone", to: "gate" }],
   [6, 2.6, ...gw("order.accepted")],
   [6, 2.6, "story.card", card("Milk · ACCEPTED", ["1,000 × 1 l · 1,010.00 €", "Accepted Sat · ships Mon 16 Nov"], { tone: "auto", link: "agent" })],
 
@@ -181,7 +179,6 @@ const SCRIPT = [
   [8, 7.6, ...gw("policy.decided")],
   [8, 7.6, "story.split", {}],
   [8, 8, ...gw("approval.requested")],
-  [8, 8, "story.mail", { kind: "lazydoor", from: "gate", to: "phone" }],
   [8, 8.3, "story.card", card("Kitchen manager's phone", ["Approve basket · 3 lines", "Net 666.00 € · Gross 755.91 €", "Decide by Sun 17:00"], { tone: "hold", link: "phone" })],
   [8, 9.2, "story.clock", { now: "2026-11-15T16:59:00+02:00" }],
   [8, 9.6, ...gw("clock.set")],

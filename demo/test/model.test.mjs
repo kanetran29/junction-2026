@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { initialState, reduce, euro, countdown, SHELVES } from "../model.mjs";
+import { initialState, liveState, reduce, plain, euro, countdown, SHELVES } from "../model.mjs";
 
 const B = "hotel-1";
 let seq = 0;
@@ -170,4 +170,34 @@ test("reduce: the naive steps move the one agent: take at the chef, enter at the
   assert.deepEqual([s.agent.at, s.agent.carry, s.agent.since], ["door", "draft", 11]);
   s = reduce(s, { type: "story.naive", data: { step: "gone" } }, 27);
   assert.deepEqual([s.agent.at, s.agent.carry], ["home", null]);
+});
+
+test("live: the scene follows its own buyer; another hotel's events only reach the ticker, the caption and the shelf", () => {
+  const ev2 = (type, data, buyerId, extra = {}) => ({ seq: ++seq, ts: "2026-11-13T21:10:00+02:00", type, buyerId, data, ...extra });
+  let s = liveState("hotel-a");
+  assert.deepEqual([s.hold, s.rules, s.gate.built], [true, true, true]);
+  s = run([ev2("search.done", { count: 1 }, "hotel-b", { draftId: "d9" }), ev2("policy.decided", { outcome: "REJECT", reasons: ["STOCK_TAKEN"] }, "hotel-b"), ev2("stock.denied", { productId: "470746", remaining: 2 }, "hotel-b")], s);
+  assert.equal(s.agent.at, "home");
+  assert.equal(s.door.stamp, null);
+  assert.ok(s.rival && s.flash);
+  assert.equal(s.shelves.find((x) => x.productId === "470746").remaining, 2);
+  assert.match(s.log.at(-2).plain, /^Another hotel: refused, STOCK_TAKEN/);
+});
+
+test("plain: Live captions are plain words, never raw event text", () => {
+  assert.equal(plain({ type: "clock.set", data: { now: "2026-11-15T17:05:00+02:00" } }), "The door's clock: Sun 15 Nov 17:05.");
+  assert.equal(plain({ type: "policy.decided", data: { outcome: "NEEDS_APPROVAL", reasons: ["OVER_ORDER_AUTO", "PACK_SIZE_CHANGED"] } }), "Over the kitchen's own limit: the door holds it.");
+  assert.equal(plain({ type: "quote.created", data: { offers: [{ netCents: 101000 }], rejections: [{}, {}] } }), "Best offer: 1,010.00 €, fixed. 2 refused, each with a reason code.");
+  assert.match(plain({ type: "draft.created", data: { crossCheck: { result: "disagreed", fields: ["deliverBy"] } } }), /^Gemini and Gemma read it differently: the door asks/);
+  assert.equal(plain({ type: "valio.called", data: {} }), null);
+});
+
+test("live: an accepted order waits on the pallet until the door's clock reaches delivery day", () => {
+  let s = liveState("hotel-a");
+  s = run([ev("order.accepted", { lines: [{ productId: "470746", salesUnits: 4, deliveryDate: "2026-11-16" }], netCents: 19092 }, { buyerId: "hotel-a" })], s);
+  assert.deepEqual([s.pallet.crates, s.truck.status], [1, "parked"]);
+  s = run([ev("clock.set", { now: "2026-11-15T17:05:00+02:00" }, { buyerId: "admin" })], s);
+  assert.equal(s.truck.status, "parked");
+  s = run([ev("clock.set", { now: "2026-11-16T07:00:00+02:00" }, { buyerId: "admin" })], s);
+  assert.deepEqual([s.truck.status, s.truck.crates, s.pallet.crates], ["loading", 1, 0]);
 });

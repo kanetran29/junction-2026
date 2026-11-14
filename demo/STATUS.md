@@ -18,7 +18,7 @@ Lệch so với 14.3 (lý do):
 3. Dòng "Approve order · Net 1,010.00 € · Gross 1,146.35 € · Decide within 43 h" là thẻ Z3 nối tới điện thoại (màn hình điện thoại quá nhỏ để đọc); ghi "43 h 50 min" như trang duyệt thật đếm.
 4. "6 left", "STOCK_TAKEN · 2 left" và "403 AGENT_CANNOT_APPROVE" nằm trong thẻ Z3/Z4; ở khe cổng chỉ có dấu ✕.
 5. Lịch bếp dời sang trái (trên đầu chef) và kệ đĩa còn 2 đĩa, nhường đầu phải quầy cho điện thoại manager.
-6. Bản ghi Live mẫu (`fixtures/sample-events.json`) chưa đổi.
+6. Live đã làm lại theo v2.1 (mục 25): chỉ xem, không key, theo dõi `hotel-a`; bản ghi Live mẫu cũ đã xoá.
 
 Sửa theo Kane (SCRIPT.md mục 16, giọng không đổi): cảnh 1 có hậu quả (lịch MON 16 dấu đỏ "NO MILK", caption "Closed Thu 15:00. Monday: no milk."); cờ "Next delivery Mon 16 Nov" ở bến và thẻ "Accepted … · ships Mon 16 Nov" giải thích vì sao xe chỉ chạy Thứ Hai; một door cho mọi bếp (giá thẻ ba khe trên trụ cổng, thẻ của Kitchen B, C và Hotel Aurora bay vào, thẻ Aurora sáng; bảng "Valio's rules · same for every buyer" và "Hotel Aurora's rules · signed by its kitchen"; ghi chú "Another hotel: same door, its own rules.").
 
@@ -26,7 +26,7 @@ Cảnh 1 nhảy tới Thứ Hai rồi tua về Thứ Sáu (SCRIPT.md 16.4): Stor
 
 Màn kết ghi cách agent nối vào (host, `/openapi.json`, `/mcp` 9 tool) thay cho hai icon phích cắm.
 
-Kiểm tra: 44 test pass; `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 s và Live; thêm bảng luật, cờ tên điện thoại, biển pallet vào danh sách chữ, điện thoại manager vào vật cấm). Live phát file mẫu không lỗi console.
+Kiểm tra: 44 test pass; `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 s và Live; thêm bảng luật, cờ tên điện thoại, biển pallet vào danh sách chữ, điện thoại manager vào vật cấm). Live xem lần chạy thật phát qua gateway giả không lỗi console.
 
 ## Nhật ký
 
@@ -204,7 +204,15 @@ Vấn đề tìm thấy:
 - Bỏ hai icon phích cắm "OpenAPI"/"MCP". Thay bằng "Any agent connects the same way:", `lazydoor.lazydoor.workers.dev`, "HTTP API · /openapi.json", "MCP · /mcp (9 tools)" (theo README trên `main`).
 - Chữ màn kết dùng `clamp` có cỡ tối thiểu. Đã chụp kiểm ở 1920×1080, điện thoại dọc 375×812 (sau "Watch anyway") và ngang 812×375: không tràn, không chồng chữ.
 
+### 25. Live làm lại cho v2.1: người xem chỉ xem, door thật, không key
+- Trang bỏ ô Gateway URL, API key, Buyer, Connect, "Play recorded file", ô "Request to the gateway" và câu "The page acts as a minimal buyer agent…". Live chỉ xem; agent là chương trình riêng gọi door. Dưới sân khấu có một dòng giải thích (ẩn trong kiosk).
+- Gateway là `?gateway=` nếu có (xem door thật từ máy: `?mode=live&gateway=https://lazydoor.lazydoor.workers.dev`), không thì `location.origin` (khi trang nằm ở `/demo` trên door). Không gửi key. `live.mjs`: `readBacklog` đọc hết log một lần, cảnh bắt đầu sau event mới nhất (chỉ giữ giờ của door, không chạy lại hoạt hình cũ), rồi `connectLive` theo SSE, rớt về polling, thử lại khi door không trả lời. Chip: "Connecting to the door…", "Watching the door live · connected", "… · checking every few seconds", "The door is not answering · retrying".
+- Cảnh theo `hotel-a` (= Hotel Aurora, `?buyer=` để đổi); buyer khác thành "another hotel": phong thư bay vào từ mép trái, dấu ✕, kệ "2 left", dòng ticker "another hotel · …", caption riêng. Event tới cùng lúc được xếp hàng, mỗi 0,45 s một event; caption bằng chữ thường (`plain` trong `model.mjs`), mỗi caption ít nhất 2,5 s và đủ đọc ở 17 ký tự/giây, dồn thì chỉ giữ hai câu mới nhất. Ticker ghi giờ dạng "Fri 13 Nov 21:10" thay chuỗi ISO (cả Story).
+- Hình v2.1 trong Live: giá thẻ luật đủ ba thẻ, bảng luật của Aurora và thanh đo tổng ngày (suy từ quyết định của door), điện thoại manager, phong thư Lazydoor/approved (giờ suy từ `approval.requested`/`approved`, Story bỏ cue riêng), pallet và cờ "Next delivery Mon 16 Nov"; đơn được nhận nằm pallet, xe chỉ chạy khi giờ của door tới ngày giao (`clock.set` ≥ Mon 16 06:00). Thẻ Z3 Live theo chữ Story: yêu cầu có kiểu (kèm câu gốc), báo giá, "ACCEPTED · on the pallet · ships on delivery day", câu hỏi của door.
+- `dev/fake-gateway.mjs`: đọc log không cần key, trả mọi buyer; `--replay [file] [--pace n]` phát lại một lần chạy (mặc định `fixtures/story-v2.json`, hoặc `~/junction-2026/.data/story-v2.1-run.json`), bắt đầu khi có người xem đọc log; bỏ `--story`. Xoá `fixtures/sample-events.json`, `replayFile`, `sendRequest`.
+- Kiểm tra: 46 test pass (thêm test backlog không key, gateway `--replay` mọi buyer, caption chữ thường, buyer khác không kéo robot, pallet chờ ngày giao); `label-overlap.mjs` (Story + 95 s Live trên gateway giả phát lần chạy thật) báo `label overlaps: 0`. Door thật đã mở log không key: Live kết nối SSE, lấy giờ door (Fri 13 Nov 21:10) và đứng chờ agent, không lỗi console.
+
 ## Còn lại / cần làm sau
 - Quay `demo/story.mp4` khi Kane duyệt Story mới (ghép giọng từ `VOICE`).
-- Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).
+- Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

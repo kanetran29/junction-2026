@@ -2,6 +2,8 @@
 
 export const SHELVES = 4;
 export const CUTOFF = "2026-11-15T17:00:00+02:00";
+/** The delivery day of every order in the demo chain: the truck runs then, not when an order is accepted. */
+const DELIVERY_DAY = "2026-11-16";
 const LOG_KEEP = 9;
 const OUTCOMES = new Set(["AUTO", "NEEDS_APPROVAL", "REJECT"]);
 const CROSSING = new Set(["NEW_ALLERGEN", "SUBTYPE_MISMATCH", "CLAIM_MISSING", "TEMP_CLASS_CHANGED", "UNIT_MISMATCH", "BRAND_EXCLUDED"]);
@@ -78,6 +80,22 @@ export function dayTotal(state) {
   return { accepted: sum("accepted"), pending: sum("pending") };
 }
 
+/** "Sat 14 Nov 10:15" in Helsinki time. */
+export function clockText(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Helsinki", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(date).map((p) => [p.type, p.value]));
+  return `${parts.weekday} ${parts.day} ${parts.month} ${parts.hour}:${parts.minute}`;
+}
+
+/**
+ * Live mode's starting scene: the door standing with every kitchen's signed rules in its rack, Hotel Aurora's rule board,
+ * and accepted orders waiting on the pallet for delivery day; the scene follows `buyer`, other buyers are "another hotel".
+ */
+export function liveState(buyer) {
+  return { ...initialState(), buyer, hold: true, rules: true, rulesSince: -60, mandates: { since: -60 } };
+}
+
 /** Formats integer cents as "1,010.00 €". */
 export function euro(cents) {
   return (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -107,10 +125,52 @@ export function summary(ev) {
     case "approval.requested": return `phone · until ${String(d.expiresAt ?? "").slice(0, 16)}`;
     case "order.accepted": return Number.isFinite(d.netCents) ? euro(d.netCents) : "accepted";
     case "stock.denied": return `${d.productId} · ${d.remaining} left`;
-    case "clock.set": return String(d.now ?? "");
+    case "clock.set": return clockText(d.now) || String(d.now ?? "");
     default: return "";
   }
 }
+
+/**
+ * One plain-English line per gateway event, for Live's caption, in the words Story uses; null for small steps that only
+ * the ticker shows. `other` marks another buyer's event at the same door.
+ */
+export function plain(ev, other = false) {
+  const d = ev.data || {};
+  const codes = codesOf(d.reasons);
+  if (other) {
+    if (ev.type === "search.done") return "Another hotel's agent at the same door, with its own rules.";
+    if (ev.type === "policy.decided") return d.outcome === "REJECT" ? `Another hotel: refused, ${codes.join(", ") || "no reason given"}.` : `Another hotel: ${d.outcome === "AUTO" ? "accepted" : "held for its own approver"}.`;
+    if (ev.type === "stock.denied") return `Another hotel's agent is told: only ${d.remaining} left.`;
+    return null;
+  }
+  const offer = d.offers?.[0];
+  const refused = d.rejections?.length ?? 0;
+  switch (ev.type) {
+    case "clock.set": return d.now ? `The door's clock: ${clockText(d.now)}.` : null;
+    case "draft.created":
+      if (d.crossCheck?.result === "disagreed") return "Gemini and Gemma read it differently: the door asks, never guesses.";
+      if (d.unclear?.length) return `The door needs more before it orders: ${d.unclear.join(", ")}.`;
+      return "The door reads the agent's request as a typed request.";
+    case "search.done": return `${d.count} candidates in Valio's catalogue: Valio is asked about these only.`;
+    case "quote.created":
+      if (!offer) return `No offer: ${refused} refused, each with a reason code.`;
+      return `Best offer: ${Number.isFinite(offer.netCents) ? euro(offer.netCents) : "priced"}, fixed.${refused ? ` ${refused} refused, each with a reason code.` : ""}`;
+    case "policy.decided":
+      if (d.outcome === "AUTO") return "Inside the kitchen's limits: accepted, no human needed.";
+      if (d.outcome === "NEEDS_APPROVAL") return "Over the kitchen's own limit: the door holds it.";
+      return `Refused by the door: ${codes.join(", ") || "no reason given"}.`;
+    case "approval.requested": return "Lazydoor sends the request to the kitchen manager. Not Valio. Not the agent.";
+    case "approval.approved": return "The kitchen manager approves on the phone.";
+    case "approval.rejected": return "The kitchen manager says no.";
+    case "approval.expired": return "Approved too late: expired, nothing ships.";
+    case "order.accepted": return `Accepted${Number.isFinite(d.netCents) ? `: ${euro(d.netCents)}` : ""}. On the pallet for delivery day.`;
+    case "stock.denied": return `Only ${d.remaining} left of ${d.productId}.`;
+    default: return null;
+  }
+}
+
+/** The log entry an event leaves for the ticker (text) and Live's caption (plain). */
+const logEntry = (ev, other = false) => ({ seq: ev.seq ?? null, type: ev.type, text: other ? `another hotel · ${summary(ev)}` : summary(ev), plain: plain(ev, other) });
 
 /** Puts product rows on the shelf slots in order; the last slot counts any overflow in `more`. */
 function shelvesFor(rows, t = 0) {
@@ -136,6 +196,7 @@ const orderEntry = (s, id) => s.day.find((o) => id && o.orderId === id) ?? s.day
  * door refuses that buyer, and on the shelf when it learns the stock left. Our own state stays untouched.
  */
 function rivalEvent(s, ev, d, t) {
+  if ((ev.type === "search.done" || ev.type === "quote.created") && !(s.rival && t - s.rival.since < 6)) s.rival = { since: t, outcome: null, reasons: [] };
   if (ev.type === "policy.decided" && d.outcome === "REJECT") {
     s.rival = { ...s.rival, since: s.rival?.since ?? t, outcome: d.outcome, reasons: codesOf(d.reasons) };
     s.flash = { tone: "reject", since: t };
@@ -156,7 +217,7 @@ export function reduce(state, ev, t) {
   const buyer = ev.buyerId && ev.buyerId !== "admin" && !ev.type.startsWith("story.") ? ev.buyerId : null;
   if (buyer && !s.buyer) s.buyer = buyer;
   if (buyer && buyer !== s.buyer && rivalEvent(s, ev, d, t)) {
-    s.log = [...s.log, { seq: ev.seq ?? null, type: ev.type, text: summary(ev) }].slice(-LOG_KEEP);
+    s.log = [...s.log, logEntry(ev, true)].slice(-LOG_KEEP);
     return s;
   }
 
@@ -210,6 +271,7 @@ export function reduce(state, ev, t) {
       s.phone = { status: "buzzing", orderId: d.orderId ?? ev.orderId ?? null, expiresAt: d.expiresAt ?? null, cents: d.netCents ?? s.quote?.offers?.[0]?.netCents ?? null, since: t };
       const entry = orderEntry(s, s.phone.orderId);
       if (entry) entry.orderId = s.phone.orderId;
+      s.mail = { kind: "lazydoor", from: "gate", to: "phone", since: t };
       break;
     }
     case "approval.approved": {
@@ -217,6 +279,7 @@ export function reduce(state, ev, t) {
       const entry = orderEntry(s, ev.orderId ?? s.phone.orderId);
       if (entry) Object.assign(entry, { status: "accepted", since: t });
       if (entry?.reasons && s.door.stamp !== "NEEDS_APPROVAL") s.door = { scan: false, stamp: "NEEDS_APPROVAL", reasons: entry.reasons, since: t };
+      s.mail = { kind: "approved", from: "phone", to: "gate", since: t };
       break;
     }
     case "approval.rejected":
@@ -234,7 +297,7 @@ export function reduce(state, ev, t) {
       if (entry) Object.assign(entry, { status: "accepted", cents: Number.isFinite(d.netCents) ? d.netCents : entry.cents });
       if (s.hold) {
         const added = Math.min(4 - s.pallet.crates, cratesFor(d.lines));
-        s.pallet = { crates: s.pallet.crates + added, added, since: t };
+        s.pallet = { crates: s.pallet.crates + added, added, since: t, day: d.lines?.[0]?.deliveryDate ?? s.pallet.day ?? DELIVERY_DAY };
       }
       else {
         const units = (Array.isArray(d.lines) ? d.lines : []).reduce((sum, l) => sum + (Number(l?.salesUnits) || 0), 0);
@@ -253,6 +316,11 @@ export function reduce(state, ev, t) {
     case "clock.set":
     case "story.clock":
       if (d.now) Object.assign(s, { now: d.now, clockSet: true });
+      // The door's clock reaching delivery day sends the waiting pallet out (Live; Story ships with story.ship).
+      if (ev.type === "clock.set" && s.hold && s.pallet.crates && Date.parse(d.now) >= Date.parse(`${s.pallet.day ?? DELIVERY_DAY}T06:00:00+02:00`)) {
+        s.truck = { status: "loading", crates: s.pallet.crates, naive: false, since: t, fromPallet: true };
+        s.pallet = { crates: 0, since: t };
+      }
       break;
     case "story.hold":
       s.hold = true;
@@ -330,6 +398,6 @@ export function reduce(state, ev, t) {
       s.close = true;
       break;
   }
-  if (!ev.type.startsWith("story.")) s.log = [...s.log, { seq: ev.seq ?? null, type: ev.type, text: summary(ev) }].slice(-LOG_KEEP);
+  if (!ev.type.startsWith("story.")) s.log = [...s.log, logEntry(ev, Boolean(buyer && s.buyer && buyer !== s.buyer))].slice(-LOG_KEEP);
   return s;
 }

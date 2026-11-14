@@ -1,8 +1,8 @@
 // Wires the scene to its two sources: the story timeline and the live gateway (or a recorded file).
-import { initialState, reduce, countdown, shownNow } from "./model.mjs";
+import { initialState, liveState, reduce, countdown, shownNow, clockText } from "./model.mjs";
 import { STORY, DURATION, VOICE, stateAt } from "./story.mjs";
-import { connectLive, replayFile, sendRequest } from "./live.mjs";
-import { buildScene, clockText } from "./scene.mjs";
+import { connectLive, readBacklog } from "./live.mjs";
+import { buildScene } from "./scene.mjs";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -20,7 +20,10 @@ const still = matchMedia("(prefers-reduced-motion: reduce)");
 
 let mode = params.get("mode") === "live" ? "live" : "story";
 const story = { t: 0, next: 0, state: initialState(), playing: false, snap: true };
-const live = { state: initialState(), t0: performance.now() / 1000, abort: null };
+/** Live watches the door at ?gateway= (a local preview against the deployed door) or the page's own origin, and follows ?buyer=. */
+const GATEWAY = params.get("gateway") || location.origin;
+const BUYER = params.get("buyer") || "hotel-a";
+const live = { state: liveState(BUYER), t0: performance.now() / 1000, abort: null, queue: [], nextAt: 0, lines: [], caption: "", captionUntil: 0, snap: false };
 const voice = { audio: new Audio(), seg: -1, muted: store.get("muted") === "1" };
 
 /** Jumps the story to t seconds: state rebuilt from the timeline, moving parts snapped. */
@@ -53,7 +56,7 @@ const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStar
 
 /** Updates the HTML overlays from state at scene time t: caption, ticker, clock, rewind label, replay badge, end card. */
 function overlays(state, t = 0) {
-  const caption = mode === "story" ? state.caption : state.log.at(-1) ? `${state.log.at(-1).type} · ${state.log.at(-1).text}` : "Waiting for gateway events…";
+  const caption = mode === "story" ? state.caption : live.caption;
   const ending = mode === "story" && state.close;
   const shown = ending ? "" : caption;
   if ($("caption").textContent !== shown) $("caption").textContent = shown;
@@ -99,8 +102,11 @@ function render(dt) {
     if (document.activeElement !== scrub) scrub.value = story.t.toFixed(1);
     $("time").textContent = `${clock(story.t)} / ${clock(DURATION)}`;
   } else {
-    scene.draw(live.state, performance.now() / 1000 - live.t0, dt, { calm: still.matches });
-    overlays(live.state);
+    const t = performance.now() / 1000 - live.t0;
+    paceLive(t);
+    scene.draw(live.state, t, dt, { calm: still.matches, snap: live.snap });
+    live.snap = false;
+    overlays(live.state, t);
   }
 }
 
@@ -158,37 +164,67 @@ function rotateGate() {
   }
 }
 
-/** Shows the live connection status chip. */
-function status(s, detail) {
+/** The status chip in words for a viewer. */
+const STATUS = { connecting: "Connecting to the door…", streaming: "Watching the door live · connected", polling: "Watching the door live · checking every few seconds", down: "The door is not answering · retrying" };
+function status(s) {
   const chip = $("chip");
-  chip.hidden = false;
+  chip.hidden = mode !== "live";
   chip.dataset.s = s;
-  chip.textContent = detail ? `${s} · ${detail}` : s;
+  chip.textContent = STATUS[s] ?? s;
 }
 
-/** Applies a live event at live scene time. */
-const onLive = (ev) => (live.state = reduce(live.state, ev, performance.now() / 1000 - live.t0));
+/** Queues a live event: the door often sends several in the same instant, and the scene shows them one after another. */
+const onLive = (ev) => live.queue.push(ev);
 
-/** (Re)connects the live source: a .json path replays a recording, anything else is a gateway base URL. */
-function connect() {
+/**
+ * Applies queued live events at most one every 0.45 s (faster when many wait), and keeps each plain-words caption up for
+ * at least 2.5 s and long enough to read at 17 characters a second; when captions pile up, only the newest two are kept.
+ */
+function paceLive(t) {
+  while (live.queue.length && t >= live.nextAt) {
+    const ev = live.queue.shift();
+    live.state = reduce(live.state, ev, t);
+    const line = live.state.seq === ev.seq ? live.state.log.at(-1)?.plain : null;
+    if (line) live.lines = [...live.lines, line].slice(-2);
+    live.nextAt = t + (live.queue.length > 12 ? 0.08 : 0.45);
+  }
+  if (live.lines.length && t >= live.captionUntil) {
+    live.caption = live.lines.shift();
+    live.captionUntil = t + Math.max(2.5, live.caption.length / 17);
+  }
+}
+
+/**
+ * (Re)connects to the door: reads its event log once and starts after the newest event, keeping only the door's clock
+ * from the past (no burst of old animations), then follows new events as they come. Retries while the door is down.
+ */
+async function connect() {
   live.abort?.abort();
-  live.abort = new AbortController();
-  live.state = initialState();
-  live.t0 = performance.now() / 1000;
-  const gw = $("gw").value.trim();
-  const key = $("key").value;
-  const buyer = $("buyer").value.trim();
-  store.set("gw", gw);
-  store.set("buyer", buyer);
-  if (/\.json(\?|$)/.test(gw)) replayFile({ url: gw, onEvent: onLive, onStatus: status, signal: live.abort.signal });
-  else connectLive({ base: gw || location.origin, key, buyer, since: 0, onEvent: onLive, onStatus: status, signal: live.abort.signal });
+  const ctl = (live.abort = new AbortController());
+  Object.assign(live, { state: liveState(BUYER), t0: performance.now() / 1000, queue: [], nextAt: 0, lines: [], caption: "Watching the door. Waiting for an agent…", captionUntil: 0, snap: true });
+  status("connecting");
+  let since = 0;
+  for (;;) {
+    try {
+      const backlog = await readBacklog({ base: GATEWAY, signal: ctl.signal });
+      since = backlog.last;
+      const clock = backlog.events.findLast((ev) => ev.type === "clock.set");
+      if (clock) live.state = reduce(live.state, clock, -60);
+      break;
+    } catch {
+      if (ctl.signal.aborted) return;
+      status("down");
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+  connectLive({ base: GATEWAY, since, onEvent: onLive, onStatus: status, signal: ctl.signal });
 }
 
 function setMode(next) {
   mode = next;
   document.querySelectorAll(".modes button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
   $("story-controls").hidden = mode !== "story";
-  $("live-controls").hidden = mode !== "live";
+  $("live-note").hidden = mode !== "live";
   $("mode-tag").textContent = mode === "story" ? "Story" : "Live";
   $("chip").hidden = mode !== "live";
   if (mode === "live") {
@@ -227,24 +263,6 @@ document.addEventListener("keydown", (e) => {
   if (e.key === " ") { e.preventDefault(); $("play").click(); }
   if (e.key === "ArrowRight") seek(story.t + 5);
   if (e.key === "ArrowLeft") seek(story.t - 5);
-});
-
-$("gw").value = params.get("gateway") ?? store.get("gw") ?? "";
-$("key").value = params.get("key") ?? "";
-$("buyer").value = params.get("buyer") ?? store.get("buyer") ?? "hotel-aurora";
-$("connect").addEventListener("submit", (e) => { e.preventDefault(); connect(); });
-$("sample").addEventListener("click", () => { $("gw").value = "fixtures/sample-events.json"; connect(); });
-$("ask").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = $("ask-text").value.trim();
-  if (!text) return;
-  const out = $("ask-status");
-  out.dataset.ok = "";
-  out.textContent = "sending…";
-  const gw = $("gw").value.trim();
-  const result = await sendRequest({ base: /\.json(\?|$)/.test(gw) || !gw ? location.origin : gw, key: $("key").value, buyer: $("buyer").value.trim(), text });
-  out.dataset.ok = String(result.ok);
-  out.textContent = result.ok ? `order placed: ${result.order?.orderId ?? ""} ${result.order?.state ?? ""}`.trim() : `stopped at ${result.step}: ${result.error}`;
 });
 
 seek(Number(params.get("t")) || 0);

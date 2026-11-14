@@ -1,16 +1,16 @@
 // Development stand-in for the Lazydoor gateway: serves demo/ and the event endpoints from the docs/events.md schema.
-// Run: node demo/dev/fake-gateway.mjs [--port 8790] [--no-sse] [--story]
-//   --no-sse  the stream endpoint answers 404, so the page falls back to polling
-//   --story   replays the story's gateway events once, paced, right after start
+// Run: node demo/dev/fake-gateway.mjs [--port 8790] [--no-sse] [--replay [file]] [--pace 1]
+//   --no-sse   the stream endpoint answers 404, so the page falls back to polling
+//   --replay   replays a recorded run (default fixtures/story-v2.json) once a viewer reads the event log; --pace scales its gaps
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { gatewayEvents } from "../story.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const arg = (name) => process.argv.includes(name);
-const PORT = Number(process.argv[process.argv.indexOf("--port") + 1]) || 8790;
+const option = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined);
+const PORT = Number(option("--port")) || 8790;
 const TYPES = { ".html": "text/html", ".mjs": "text/javascript", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".mp4": "video/mp4", ".mp3": "audio/mpeg", ".svg": "image/svg+xml" };
 const events = [];
 const listeners = new Set();
@@ -19,7 +19,7 @@ let ids = 0;
 
 /** Appends an event to the log and pushes it to every open stream. */
 function emit(type, data, extra = {}) {
-  const ev = { seq: events.length + 1, ts: new Date().toISOString(), type, buyerId: extra.buyerId ?? "hotel-aurora", ...extra, data };
+  const ev = { seq: events.length + 1, ts: new Date().toISOString(), type, buyerId: extra.buyerId ?? "hotel-a", ...extra, data };
   events.push(ev);
   for (const send of listeners) send(ev);
   return ev;
@@ -48,7 +48,9 @@ function interpret(text) {
 }
 
 async function api(req, res, url) {
-  const buyerId = url.searchParams.get("buyer") || "hotel-aurora";
+  const buyerId = url.searchParams.get("buyer") || "hotel-a";
+  // Reads need no key and return every buyer's events, like the door's event log in demo mode.
+  if (req.method === "GET" && url.pathname.startsWith("/v1/events")) startReplay().catch((error) => console.error(`replay: ${error.message}`));
   if (req.method === "GET" && url.pathname === "/v1/events/stream") {
     if (arg("--no-sse")) return json(res, 404, { error: "stream disabled" });
     const since = Number(url.searchParams.get("since")) || 0;
@@ -157,18 +159,26 @@ createServer(async (req, res) => {
   } catch {
     json(res, 404, { error: "not found" });
   }
-}).listen(PORT, () => console.log(`fake gateway on http://localhost:${PORT}  (demo at /, story events ${arg("--story") ? "replaying" : "off"})`));
+}).listen(PORT, () => console.log(`fake gateway on http://localhost:${PORT}  (demo at /, replay ${arg("--replay") ? "starts when a viewer connects" : "off"})`));
 
-if (arg("--story")) {
-  (async () => {
-    let prev = null;
-    for (const ev of gatewayEvents()) {
-      const at = Date.parse(ev.ts);
-      await later(prev === null ? 1500 : Math.min(2500, at - prev));
-      prev = at;
-      const { seq, ts, type, data, ...ids } = ev;
-      void seq, void ts;
-      emit(type, data, ids);
-    }
-  })();
+/** Seconds to wait before each replayed event, by type: long enough for the scene to show one step at a time. */
+const PACE = { "clock.set": 1.6, "draft.created": 2.2, "draft.confirmed": 1, "search.done": 1.2, "quote.created": 2, "policy.decided": 2, "approval.requested": 2, "approval.approved": 2.4, "approval.expired": 2.4, "order.accepted": 1.6, "stock.denied": 1.4 };
+let replaying = false;
+
+/**
+ * With --replay <file> (a recorded run: a JSON array or { events }, e.g. ~/junction-2026/.data/story-v2.1-run.json),
+ * plays its events into the log in order, paced by PACE (scaled by --pace), starting when the first viewer reads the log.
+ */
+async function startReplay() {
+  if (replaying || !arg("--replay")) return;
+  replaying = true;
+  const file = option("--replay")?.startsWith("--") || !option("--replay") ? join(ROOT, "fixtures/story-v2.json") : option("--replay");
+  const recorded = JSON.parse(await readFile(file, "utf8"));
+  const scale = Number(option("--pace")) || 1;
+  for (const ev of Array.isArray(recorded) ? recorded : recorded.events) {
+    await later((PACE[ev.type] ?? 0.7) * 1000 * scale);
+    const { seq, ts, type, data, ...ids } = ev;
+    void seq, void ts;
+    emit(type, data, ids);
+  }
 }

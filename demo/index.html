@@ -58,21 +58,7 @@
     <button type="button" id="mute" aria-pressed="false">Sound on</button>
   </section>
 
-  <section id="live-controls" class="controls live-panel" aria-label="Live controls" hidden>
-    <form id="connect">
-      <label>Gateway URL or recorded .json<input type="text" id="gw" spellcheck="false" placeholder="https://… or fixtures/sample-events.json"></label>
-      <label>API key<input type="password" id="key" autocomplete="off"></label>
-      <label>Buyer<input type="text" id="buyer" spellcheck="false" value="hotel-aurora"></label>
-      <button type="submit" id="connect-btn">Connect</button>
-      <button type="button" id="sample">Play recorded file</button>
-    </form>
-    <form id="ask">
-      <label class="ask-label">Request to the gateway<input type="text" id="ask-text" placeholder="1,000 l lactose-free milk by Monday"></label>
-      <button type="submit">Send</button>
-    </form>
-    <p id="ask-status" class="ask-status"></p>
-    <p class="hint">The page acts as a minimal buyer agent: interpret, confirm, quote, order offer 0. The gateway decides; its events animate the scene.</p>
-  </section>
+  <p id="live-note" class="live-note" hidden>Live: the scene follows Hotel Aurora's agent at the door, as it happens; other hotels' agents show as letters from the left. Nothing is sent from this page.</p>
 </main>
 <script type="module" src="main.mjs"></script>
 </body>

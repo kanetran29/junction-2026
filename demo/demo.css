@@ -89,19 +89,12 @@ body { background: radial-gradient(ellipse at 50% -10%, #0d4654 0%, #031419 62%)
 .controls[hidden] { display: none; }
 .controls input[type="range"] { flex: 1; min-width: 200px; accent-color: var(--brand); }
 .controls .time { font: 600 14px var(--anatomy-mono); min-width: 7em; color: var(--ink); }
-.controls form { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; flex: 1; }
-.controls label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-dim); }
-.controls input[type="text"], .controls input[type="password"] { font: 14px var(--anatomy-mono); color: var(--ink); background: var(--petrol-900); border: 1px solid #1d5e6c; border-radius: var(--radius); padding: 8px 12px; min-width: 12em; }
 .controls input:focus-visible, .controls button:focus-visible, .modes button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.ask-label { flex: 1; }
-.ask-label input { width: 100%; }
-.live-panel { display: grid; gap: 10px; }
-.ask-status { font: 14px var(--anatomy-mono); color: var(--ink-dim); margin: 0; min-height: 1.5em; }
-.ask-status[data-ok="false"] { color: var(--reject); }
-.hint { font-size: 13px; color: var(--ink-dim); margin: 0; }
+.live-note { font-size: 14px; color: var(--ink-dim); margin: 0; }
+.live-note[hidden] { display: none; }
 
 body.kiosk .page { width: 100vw; height: 100vh; margin: 0; display: block; }
-body.kiosk .bar, body.kiosk .controls { display: none; }
+body.kiosk .bar, body.kiosk .controls, body.kiosk .live-note { display: none; }
 body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 0; box-shadow: none; top: 50%; transform: translateY(-50%); }
 
 /* Materials: one colour per group; side tones mix toward a petrol shadow, tops toward warm light. */

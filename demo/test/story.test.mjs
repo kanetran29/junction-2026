@@ -101,11 +101,10 @@ test("story: the other hotel's events never move our robot; it is refused STOCK_
 
 test("story: Lazydoor's letter goes to the manager's phone at every approval request; the approval comes back from the phone", () => {
   for (const item of STORY.filter((x) => x.ev.type === "approval.requested")) {
-    assert.ok(STORY.some((x) => x.at === item.at && x.ev.type === "story.mail" && x.ev.data.kind === "lazydoor" && x.ev.data.to === "phone"));
+    assert.deepEqual(stateAt(item.at + 0.01).mail, { kind: "lazydoor", from: "gate", to: "phone", since: item.at });
   }
-  const back = STORY.find((x) => x.ev.type === "story.mail" && x.ev.data.kind === "approved");
-  assert.equal(back.ev.data.from, "phone");
-  assert.equal(back.at, firstAt((ev) => ev.type === "approval.approved"));
+  const approved = firstAt((ev) => ev.type === "approval.approved");
+  assert.deepEqual(stateAt(approved + 0.01).mail, { kind: "approved", from: "phone", to: "gate", since: approved });
 });
 
 test("story: the numbers and words checked on the door (SCRIPT.md 12, 13, 14.3)", () => {

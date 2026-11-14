@@ -1,7 +1,6 @@
-// Live event sources: the gateway's SSE stream (polling fallback), a recorded event file, and the judge's request box.
+// Live mode's link to the door: its public event log (no key, every buyer), read once for the backlog, then followed live.
 
 const trim = (base) => String(base || "").replace(/\/+$/, "");
-const authOf = (key) => (key ? { Authorization: `Bearer ${key}` } : {});
 
 /** Resolves after ms, or at once when the signal aborts. */
 function sleep(ms, signal) {
@@ -34,15 +33,35 @@ export function sseFeed() {
 }
 
 /**
- * Follows the gateway's events for one buyer until the signal aborts: SSE first, polling when the stream is
- * unavailable, exponential retry while the gateway is down. Each seq is passed on once. Never rejects.
+ * Reads the door's whole event log once, page by page (oldest first, at most 500 per call), without a key: the door
+ * opens it to viewers in demo mode. Returns { events, last }, the events and the highest seq seen.
  */
-export async function connectLive({ base, key, buyer = "", since = 0, onEvent, onStatus = () => {}, fetchImpl = fetch, signal, pollMs = 1500, retryMs = 2000 }) {
+export async function readBacklog({ base, fetchImpl = fetch, signal }) {
+  const events = [];
+  let last = 0;
+  for (;;) {
+    const res = await fetchImpl(`${trim(base)}/v1/events?since=${last}`, { signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json();
+    const page = Array.isArray(body) ? body : body?.events ?? [];
+    for (const ev of page) {
+      if (typeof ev?.seq !== "number" || ev.seq <= last) continue;
+      events.push(ev);
+      last = ev.seq;
+    }
+    if (page.length < 500) return { events, last };
+  }
+}
+
+/**
+ * Follows the door's events (every buyer, no key) after seq `since` until the signal aborts: SSE first, polling when
+ * the stream is unavailable, exponential retry while the door is down. Each seq is passed on once. Never rejects.
+ */
+export async function connectLive({ base, since = 0, onEvent, onStatus = () => {}, fetchImpl = fetch, signal, pollMs = 1500, retryMs = 2000 }) {
   let last = since;
   let tryStream = true;
   let delay = retryMs;
-  const headers = authOf(key);
-  const url = (path) => `${trim(base)}${path}?buyer=${encodeURIComponent(buyer)}&since=${last}`;
+  const url = (path) => `${trim(base)}${path}?since=${last}`;
   const emit = (ev) => {
     if (!ev || typeof ev !== "object") return;
     if (typeof ev.seq === "number") {
@@ -55,7 +74,7 @@ export async function connectLive({ base, key, buyer = "", since = 0, onEvent, o
   while (!signal?.aborted) {
     try {
       if (tryStream) {
-        const res = await fetchImpl(url("/v1/events/stream"), { headers: { ...headers, Accept: "text/event-stream" }, signal });
+        const res = await fetchImpl(url("/v1/events/stream"), { headers: { Accept: "text/event-stream" }, signal });
         if (res.ok && res.body && (res.headers.get("content-type") || "").includes("event-stream")) {
           onStatus("streaming");
           delay = retryMs;
@@ -73,7 +92,7 @@ export async function connectLive({ base, key, buyer = "", since = 0, onEvent, o
         }
         tryStream = false;
       }
-      const res = await fetchImpl(url("/v1/events"), { headers, signal });
+      const res = await fetchImpl(url("/v1/events"), { signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = await res.json();
       onStatus("polling");
@@ -87,66 +106,5 @@ export async function connectLive({ base, key, buyer = "", since = 0, onEvent, o
       delay = Math.min(delay * 2, 10000);
       tryStream = true;
     }
-  }
-}
-
-/** Plays a recorded event file (a JSON array, or { events }) with its own timing, gaps capped at maxGap seconds. */
-export async function replayFile({ url, onEvent, onStatus = () => {}, signal, speed = 1, maxGap = 2.5, fetchImpl = fetch }) {
-  try {
-    const res = await fetchImpl(url, { signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const body = await res.json();
-    const events = Array.isArray(body) ? body : body?.events ?? [];
-    onStatus("replaying");
-    let prev = null;
-    for (const ev of events) {
-      const at = Date.parse(ev.ts);
-      const gap = prev === null || Number.isNaN(at) ? 0 : Math.min(Math.max(0, (at - prev) / 1000), maxGap);
-      prev = Number.isNaN(at) ? prev : at;
-      await sleep((gap * 1000) / speed, signal);
-      if (signal?.aborted) return;
-      onEvent(ev);
-    }
-    onStatus("ended");
-  } catch (error) {
-    if (!signal?.aborted) onStatus("down", error?.message ?? String(error));
-  }
-}
-
-/**
- * Sends a judge's sentence through the normal flow as a minimal agent: interpret, confirm, quote, order offer 0.
- * The gateway decides everything and its events animate the scene. Returns { ok, step, error?, order? }.
- */
-export async function sendRequest({ base, key, buyer, text, fetchImpl = fetch }) {
-  const call = async (step, path, body, extra = {}) => {
-    const res = await fetchImpl(`${trim(base)}${path}`, { method: "POST", headers: { "Content-Type": "application/json", ...authOf(key), ...extra }, body: JSON.stringify(body) });
-    let json = null;
-    try {
-      json = await res.json();
-    } catch {
-      json = null;
-    }
-    if (!res.ok) throw Object.assign(new Error(`${res.status} ${json?.error?.message ?? json?.error ?? res.statusText ?? ""}`.trim()), { step });
-    return json ?? {};
-  };
-  let step = "interpret";
-  try {
-    const interpreted = await call(step, "/v1/interpret", { buyerId: buyer, text });
-    const draft = interpreted.draft ?? interpreted;
-    const draftId = draft.id ?? draft.draftId ?? interpreted.draftId;
-    const unclear = draft.unclear ?? interpreted.unclear ?? [];
-    if (unclear.length) return { ok: false, step, error: `the door needs: ${unclear.join(", ")}` };
-    step = "confirm";
-    await call(step, `/v1/drafts/${encodeURIComponent(draftId)}/confirm`, { fill: {} });
-    step = "quote";
-    const quoted = await call(step, "/v1/quotes", { draftId });
-    const quote = quoted.quote ?? quoted;
-    const offer = quote.offers?.[0];
-    if (!offer) return { ok: false, step, error: `no offer: ${(quote.rejections ?? []).map((r) => r.code).join(", ") || "none feasible"}` };
-    step = "order";
-    const order = await call(step, "/v1/orders", { quoteId: quote.id ?? quote.quoteId, offerId: offer.offerId, agentReason: "Request typed on the demo page." }, { "Idempotency-Key": crypto.randomUUID() });
-    return { ok: true, step, order };
-  } catch (error) {
-    return { ok: false, step: error.step ?? step, error: error.message };
   }
 }

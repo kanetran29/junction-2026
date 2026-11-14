@@ -3,7 +3,7 @@
 // are driven from model state and scene time (no wall clock), so Story mode renders the same frames every time.
 import * as k from "./kit/iso-kit.mjs";
 import { glCamera, glLayer } from "./kit/gl.mjs";
-import { euro, countdown, dayTotal, shownNow, CUTOFF } from "./model.mjs";
+import { euro, countdown, dayTotal, shownNow, clockText, CUTOFF } from "./model.mjs";
 import { ICONS } from "./icons.mjs";
 
 export const W = 1600;
@@ -1426,7 +1426,7 @@ ${dockFlag()}
    */
   function drawZones(state, t, calm, story, ax, ay) {
     let typing = false;
-    let card = story ? state.card : liveCard(state);
+    let card = story ? state.card : liveCard(state, t);
     if (state.say) {
       const text = state.say.text;
       const shown = calm ? text.length : Math.floor((t - state.say.since) * 18);
@@ -1493,23 +1493,28 @@ ${dockFlag()}
   return { draw, svg: root };
 }
 
-/** Live mode's Z3 card from the gateway state: the manager's phone while an approval waits, else what the robot carries. */
-function liveCard(state) {
+/**
+ * Live mode's Z3 card from the door's state at time t, in Story's words: the manager's phone while an approval waits, an
+ * order just accepted onto the pallet, else what the robot carries (the typed request, the quote, a question, a refusal).
+ */
+function liveCard(state, t) {
   const { carry } = state.agent;
   const d = state.draft;
   const q = state.quote;
   const ph = state.phone;
   const claim = (c) => String(c).replace(/^FREE_FROM_/, "").toLowerCase().replace(/_/g, " ") + "-free";
-  if (ph.status === "buzzing") return { title: "Kitchen manager's phone · approver inbox", tone: "hold", link: "phone", lines: [ph.cents !== null ? `${euro(ph.cents)} net` : "Order held", `Decide within ${countdown(state.now, ph.expiresAt ?? CUTOFF)}`] };
-  if (carry === "question") return { title: "The door asks", tone: "hold", link: "agent", lines: [`Needs: ${(d?.unclear ?? []).join(", ")}`] };
+  if (ph.status === "buzzing") return { title: "Kitchen manager's phone", tone: "hold", link: "phone", lines: [ph.cents !== null ? `Approve order · ${euro(ph.cents)} net` : "Approve order", `Decide within ${countdown(state.now, ph.expiresAt ?? CUTOFF)}`] };
+  if (state.pallet.crates && t - state.pallet.since < 6) return { title: "ACCEPTED · on the pallet", tone: "auto", link: "agent", lines: [`Ships on delivery day, ${clockText(`${state.pallet.day ?? "2026-11-16"}T12:00:00+02:00`).slice(0, 10)}`, "The truck runs then, not now"] };
+  if (carry === "question") return { title: "The door asks before ordering", tone: "hold", link: "agent", lines: [`Needs input: ${(d?.unclear ?? []).join(", ") || "a detail"}`, "It never guesses"] };
   if (carry === "draft" && d) {
-    const qty = d.quantity ? `${Number(d.quantity.value).toLocaleString("en-US")} ${d.quantity.unit}` : "? qty";
-    return { title: "Typed request", link: "agent", lines: [[qty, ...(d.claims ?? []).map(claim)].join(" · "), d.deliverBy ? `by ${d.deliverBy}` : ""].filter(Boolean) };
+    const qty = d.quantity ? `${Number(d.quantity.value).toLocaleString("en-US")} ${d.quantity.unit}` : "quantity to confirm";
+    return { title: "Typed request", link: "agent", lines: [...(d.text ? wrap(`“${d.text}”`, 46).slice(0, 2) : []), [qty, ...(d.claims ?? []).map(claim)].join(" · ")] };
   }
   if (carry === "quote" && q) {
     const best = q.offers[0];
     const line = best?.lines?.[0];
-    return { title: "Best offer · quote", link: "agent", lines: best ? [line ? `${line.productId} × ${line.salesUnits}` : "offer", Number.isFinite(best.netCents) ? euro(best.netCents) : ""].filter(Boolean) : ["No offer"] };
+    const refused = q.rejections.length ? `${q.rejections.length} refused, each with a reason code` : "";
+    return { title: best ? "Best offer · quote" : "No offer", tone: best ? "" : "reject", link: "agent", lines: [best && line ? `${line.productId} × ${line.salesUnits}` : "", best && Number.isFinite(best.netCents) ? `${euro(best.netCents)} · fixed price` : "", refused].filter(Boolean) };
   }
   if (carry === "rejected") return { title: "Refused", tone: "reject", link: "agent", lines: [reasonText(state.door.reasons[0] ?? (ph.status === "rejected" ? "by manager" : ""))] };
   return null;
@@ -1523,14 +1528,6 @@ function liveList(state) {
   if (refused.length > 3) rows.push({ text: `+${refused.length - 3} more refused`, tone: "dim" });
   const rack = state.shelves.findIndex((x) => x.productId && x.productId === String(refused[0].productId));
   return { rows, rack: rack >= 0 ? rack : undefined };
-}
-
-/** "Sat 14 Nov 10:15" in Helsinki time. */
-export function clockText(iso) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Helsinki", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(date).map((p) => [p.type, p.value]));
-  return `${parts.weekday} ${parts.day} ${parts.month} ${parts.hour}:${parts.minute}`;
 }
 
 /** Greedy word wrap to at most width characters per line. */
