@@ -12,7 +12,7 @@ exactly this schema; a change here is announced in `research/STATUS.md`.
 
 - `since` is exclusive (events with `seq > since`); default 0. `buyer` is optional (all buyers).
 - Auth: `Authorization: Bearer <key>`. A judge or admin key reads every buyer; an agent key reads only its own buyer's events. Keys are never accepted in the query string.
-- A `since` or `Last-Event-ID` that is not a non-negative integer is treated as 0.
+- A `since` that is not a non-negative integer gets 400 `INVALID_REQUEST`; a `Last-Event-ID` that is not one is treated as 0.
 - Browsers: `EventSource` cannot send an `Authorization` header, so use `fetch(url, { headers: { Authorization: 'Bearer <key>' } })` and read the response body stream (parse the `id:`/`event:`/`data:` lines yourself), or poll `GET /v1/events?since=`. Both events routes answer cross-origin requests (`Access-Control-Allow-Origin: *`, `Authorization` allowed, `OPTIONS` preflight answered, no credentials or cookies); no other route does.
 
 ## Event
