@@ -113,12 +113,45 @@ describe('fetchOffers honours Valio 429', () => {
     expect(byDate.retryAfter).toBe(45);
   });
 
-  it('is not tied to the demo clock', async () => {
+  it('is not tied to the demo clock: with the demo clock frozen, 30 s of real time ends the block', async () => {
     await setClock(e, '2020-01-01T00:00:00Z');
     await fetchOffers(e, ['T0001'], '2026-11-16', limited()).catch(() => undefined);
+    vi.setSystemTime(new Date('2026-11-14T10:00:30Z'));
     const v = fakeValio();
-    const err = await fetchOffers(e, ['T0001'], '2026-11-16', v.fn).catch((x) => x);
-    expect(err).toBeInstanceOf(ValioRateLimited);
-    expect(v.calls).toEqual([]);
+    await fetchOffers(e, ['T0001'], '2026-11-16', v.fn);
+    expect(v.calls).toHaveLength(2);
+  });
+
+  it.each([
+    ['86400', 300],
+    ['1e308', 300],
+    ['1e21', 300],
+    ['0', 1],
+    ['Fri, 01 Jan 2100 00:00:00 GMT', 300],
+  ])('clamps Retry-After %s to %s whole seconds', async (header, secs) => {
+    const err = await fetchOffers(e, ['T0001'], '2026-11-16', limited(header)).catch((x) => x);
+    expect(err.retryAfter).toBe(secs);
+    expect(Number.isInteger(err.retryAfter)).toBe(true);
+  });
+
+  it('replay mode ignores an active block', async () => {
+    await fetchOffers(e, ['T0001'], '2026-11-16', limited()).catch(() => undefined);
+    await e.DB.prepare("INSERT OR REPLACE INTO settings(key, value) VALUES ('replay', '1')").run();
+    const r = await fetchOffers(e, ['T0001'], '2026-11-16', fakeValio().fn);
+    await e.DB.prepare("DELETE FROM settings WHERE key = 'replay'").run();
+    expect(r.replay).toBe(true);
+  });
+
+  it('a block another request learns during one batch stops the next batch', async () => {
+    const ids = Array.from({ length: 2500 }, (_, i) => `X${i}`);
+    const v = fakeValio();
+    let other: Promise<unknown> | undefined;
+    const fn = vi.fn(async (url: string, init: RequestInit) => {
+      other ??= fetchOffers(e, ['T0001'], '2026-11-16', limited()).catch(() => undefined);
+      await other;
+      return (v.fn as unknown as (u: string, i: RequestInit) => Promise<Response>)(url, init);
+    }) as unknown as typeof fetch;
+    await expect(fetchOffers(e, ids, '2026-11-16', fn)).rejects.toBeInstanceOf(ValioRateLimited);
+    expect(fn).toHaveBeenCalledTimes(2);
   });
 });

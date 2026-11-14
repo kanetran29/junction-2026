@@ -286,7 +286,7 @@ describe('buyer routes', () => {
 });
 
 describe('Valio 429', () => {
-  it('answers 503 VALIO_RATE_LIMITED with a Retry-After header and retryAfter in the body, and lists 503 on the quote route', async () => {
+  it('answers 503 VALIO_RATE_LIMITED with a Retry-After header and retryAfter in the body, ', async () => {
     clearValioBlock();
     const keys = await reset();
     const limited = createApp((async () => new Response('slow', { status: 429, headers: { 'Retry-After': '7' } })) as unknown as typeof fetch);
@@ -295,6 +295,11 @@ describe('Valio 429', () => {
     expect(r.status).toBe(503);
     expect(r.headers.get('Retry-After')).toBe('7');
     expect(await json(r)).toEqual({ error: 'VALIO_RATE_LIMITED', detail: expect.any(String), retryAfter: 7 });
+  });
+
+  it('documents 503 on the quote route in /openapi.json', async () => {
+    const doc = await json(await call('/openapi.json'));
+    expect(doc.paths['/v1/quotes'].post.responses).toHaveProperty('503');
   });
 });
 

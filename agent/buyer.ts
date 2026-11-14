@@ -148,7 +148,7 @@ export async function runBuyer(opts: BuyerOptions): Promise<Trace> {
     return current;
   };
 
-  /** Runs one tool call with the agent's own adjustments: profile fill on confirm, a recommendation on quotes, an idempotency key and the wait on orders. */
+  /** Runs one tool call with the agent's own adjustments: profile fill on confirm, a recommendation on quotes, an idempotency key and the wait on orders; a VALIO_RATE_LIMITED reply of at most 60 s is waited out and the same call retried once. */
   const execute = async (name: string, rawArgs: Json): Promise<Json> => {
     let args = rawArgs ?? {};
     if (name === 'confirm_draft') args = { ...args, fill: { ...fillUnclear(lastDraft ?? { unclear: [] }, profile), ...(args.fill ?? {}) } };

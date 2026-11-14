@@ -82,11 +82,14 @@ function assertNotBlocked(): void {
   if (left > 0) throw new ValioRateLimited(Math.max(1, Math.ceil(left / 1000)));
 }
 
-/** Seconds to wait from a `Retry-After` header (delta seconds or an HTTP date); 30 when it is absent or unreadable. */
+/** Longest block honoured, in seconds: Valio says 30, so a larger `Retry-After` is clamped rather than trusted. */
+const MAX_BLOCK_SECONDS = 300;
+
+/** Whole seconds to wait from a `Retry-After` header (delta seconds or an HTTP date), clamped to 1..300; 30 when it is absent or unreadable. */
 function retryAfterSeconds(header: string | null): number {
   const n = Number(header);
   const secs = header && Number.isFinite(n) ? n : header ? (Date.parse(header) - Date.now()) / 1000 : 30;
-  return Number.isFinite(secs) ? Math.max(1, Math.ceil(secs)) : 30;
+  return Number.isFinite(secs) ? Math.min(MAX_BLOCK_SECONDS, Math.max(1, Math.ceil(secs))) : 30;
 }
 
 const BATCH = 1000;
@@ -190,6 +193,7 @@ export async function fetchOffers(env: Env, ids: string[], date: string, fetchFn
   const availability = new Map<string, AvailabilityRow>();
   const price = new Map<string, PriceRow>();
   for (let i = 0; i < unique.length; i += BATCH) {
+    assertNotBlocked();
     const batch = unique.slice(i, i + BATCH);
     const [a, p] = await Promise.all([post(env, 'availability', batch, date, fetchFn), post(env, 'price', batch, date, fetchFn)]);
     for (const x of a.products as AvailabilityRow[]) availability.set(x.productId, x);
