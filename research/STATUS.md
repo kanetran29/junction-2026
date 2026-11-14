@@ -85,3 +85,11 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 - Chạy 49 case với `wrangler dev` (replay bản ghi Thứ Sáu, Gemini thật): **43 PASS / 6 FAIL / 0 BLOCKED**. AC01, AC24, AC44 (cần model) đã
   PASS với `gemini-3.8-flash`. 6 FAIL đều là route chưa làm: resolve (AC41–43), families (AC45), rules (AC47), MCP (AC26).
 - Đang chạy: review Opus cho 10a (bảo mật route), và Task 10b (resolve, families, rules, event stream cho trang demo).
+
+### B7. Resolve / families / rules / events + MCP (xong, đang review)
+- Task 10b (`b5e5f80`, `73a5958`): resolve (GTIN, tên trùng, thương hiệu không có → không tự sửa), families + tìm theo dịp, `/v1/rules`,
+  `/v1/reason-codes`, `GET /v1/events` + SSE `/v1/events/stream` đúng `docs/events.md`. Review: sạch sau 1 vòng sửa.
+- Task 11 (`34a9781`): MCP server `lazydoor`, 9 tool, cùng schema với HTTP.
+- **Nghiệm thu với `wrangler dev`: 49/49 PASS, 0 BLOCKED** (3 lần chạy; một lần trước đó 48/49 chưa rõ case nào → mình sẽ chạy lặp để bắt).
+- Đang chạy: sửa review Task 10a (JSON hỏng trả 500 thay vì 400; chuyển xác thực thành middleware), review Task 11.
+- Còn lại: Task 13 (agent mua hàng Gemini + kịch bản demo), README (Task 14a), review toàn nhánh (Opus), deploy (Task 14b).
