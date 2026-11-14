@@ -1,0 +1,1518 @@
+{
+ "source": "The v2.1 chain run once on the live door (2026-11-13T21:10:00+02:00, replay replies_2026-11-16, mandate 500 € an order and 1,500 € a day); gateway events only, trimmed to what the Story shows.",
+ "events": [
+  {
+   "seq": 630,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "clock.set",
+   "buyerId": "admin",
+   "data": {
+    "now": "2026-11-13T21:10:00+02:00"
+   }
+  },
+  {
+   "seq": 631,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "draft.created",
+   "buyerId": "hotel-a",
+   "draftId": "d_4337a3d696964029",
+   "data": {
+    "text": "1,000 litres of lactose-free milk by Monday, in 10-litre boxes if you can.",
+    "category": "10400",
+    "claims": [
+     "FREE_FROM_LACTOSE"
+    ],
+    "quantity": {
+     "value": 1000,
+     "unit": "l"
+    },
+    "unclear": [],
+    "crossCheck": {
+     "model": "gemma-4-31b-it",
+     "result": "agreed",
+     "fields": []
+    }
+   }
+  },
+  {
+   "seq": 632,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "draft.confirmed",
+   "buyerId": "hotel-a",
+   "draftId": "d_4337a3d696964029",
+   "data": {}
+  },
+  {
+   "seq": 633,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "search.done",
+   "buyerId": "hotel-a",
+   "draftId": "d_4337a3d696964029",
+   "quoteId": "q_3603af9efd93448a",
+   "data": {
+    "count": 35,
+    "categories": [
+     "10400"
+    ]
+   }
+  },
+  {
+   "seq": 634,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_4337a3d696964029",
+   "quoteId": "q_3603af9efd93448a",
+   "data": {
+    "endpoint": "availability",
+    "ids": 35,
+    "replay": true
+   }
+  },
+  {
+   "seq": 635,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_4337a3d696964029",
+   "quoteId": "q_3603af9efd93448a",
+   "data": {
+    "endpoint": "price",
+    "ids": 35,
+    "replay": true
+   }
+  },
+  {
+   "seq": 636,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "quote.created",
+   "buyerId": "hotel-a",
+   "draftId": "d_4337a3d696964029",
+   "quoteId": "q_3603af9efd93448a",
+   "data": {
+    "offers": [
+     {
+      "offerId": "o1",
+      "lines": [
+       {
+        "productId": "464306",
+        "salesUnits": 1000
+       }
+      ],
+      "netCents": 101000,
+      "changes": [
+       "PACK_SIZE_CHANGED"
+      ]
+     },
+     {
+      "offerId": "o2"
+     },
+     {
+      "offerId": "o3"
+     },
+     {
+      "offerId": "o4"
+     },
+     {
+      "offerId": "o5"
+     },
+     {
+      "offerId": "o6"
+     },
+     {
+      "offerId": "o7"
+     }
+    ],
+    "rejections": [
+     {
+      "productId": "462626",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462775",
+      "code": "STOCK_LIMITED"
+     },
+     {
+      "productId": "462921",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463038",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463203",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "463380",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "464119",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464179",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464198",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464237",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "464399",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464440",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "464768",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "465039",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "465149",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "466288",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469119",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469266",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469287",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469330",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469331",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469363",
+      "code": "STOCK_LIMITED"
+     },
+     {
+      "productId": "469386",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "472492",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "473142",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "476240",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "476957",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "477050",
+      "code": "SUBTYPE_MISMATCH"
+     }
+    ]
+   }
+  },
+  {
+   "seq": 637,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "policy.decided",
+   "buyerId": "hotel-a",
+   "quoteId": "q_3603af9efd93448a",
+   "orderId": "ord_013572e772c44e79",
+   "data": {
+    "outcome": "NEEDS_APPROVAL",
+    "reasons": [
+     "OVER_ORDER_AUTO",
+     "PACK_SIZE_CHANGED"
+    ]
+   }
+  },
+  {
+   "seq": 638,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "approval.requested",
+   "buyerId": "hotel-a",
+   "quoteId": "q_3603af9efd93448a",
+   "orderId": "ord_013572e772c44e79",
+   "data": {
+    "orderId": "ord_013572e772c44e79",
+    "expiresAt": "2026-11-15T17:00:00+02:00"
+   }
+  },
+  {
+   "seq": 639,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "search.done",
+   "buyerId": "hotel-a",
+   "draftId": "d_ffb9e45602dd4462",
+   "quoteId": "q_97cf39d0fa6d4416",
+   "data": {
+    "count": 1,
+    "categories": [
+     "18750"
+    ]
+   }
+  },
+  {
+   "seq": 640,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_ffb9e45602dd4462",
+   "quoteId": "q_97cf39d0fa6d4416",
+   "data": {
+    "endpoint": "availability",
+    "ids": 1,
+    "replay": true
+   }
+  },
+  {
+   "seq": 641,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_ffb9e45602dd4462",
+   "quoteId": "q_97cf39d0fa6d4416",
+   "data": {
+    "endpoint": "price",
+    "ids": 1,
+    "replay": true
+   }
+  },
+  {
+   "seq": 642,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "quote.created",
+   "buyerId": "hotel-a",
+   "draftId": "d_ffb9e45602dd4462",
+   "quoteId": "q_97cf39d0fa6d4416",
+   "data": {
+    "offers": [
+     {
+      "offerId": "o1",
+      "lines": [
+       {
+        "productId": "470746",
+        "salesUnits": 4
+       }
+      ],
+      "netCents": 19092,
+      "changes": []
+     }
+    ],
+    "rejections": []
+   }
+  },
+  {
+   "seq": 643,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "search.done",
+   "buyerId": "hotel-b",
+   "draftId": "d_31a7f8b7420148ec",
+   "quoteId": "q_2429ae046c5f4edf",
+   "data": {
+    "count": 1,
+    "categories": [
+     "18750"
+    ]
+   }
+  },
+  {
+   "seq": 644,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-b",
+   "draftId": "d_31a7f8b7420148ec",
+   "quoteId": "q_2429ae046c5f4edf",
+   "data": {
+    "endpoint": "availability",
+    "ids": 1,
+    "replay": true
+   }
+  },
+  {
+   "seq": 645,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-b",
+   "draftId": "d_31a7f8b7420148ec",
+   "quoteId": "q_2429ae046c5f4edf",
+   "data": {
+    "endpoint": "price",
+    "ids": 1,
+    "replay": true
+   }
+  },
+  {
+   "seq": 646,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "quote.created",
+   "buyerId": "hotel-b",
+   "draftId": "d_31a7f8b7420148ec",
+   "quoteId": "q_2429ae046c5f4edf",
+   "data": {
+    "offers": [
+     {
+      "offerId": "o1",
+      "lines": [
+       {
+        "productId": "470746",
+        "salesUnits": 4
+       }
+      ],
+      "netCents": 19092,
+      "changes": []
+     }
+    ],
+    "rejections": []
+   }
+  },
+  {
+   "seq": 647,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "quoteId": "q_97cf39d0fa6d4416",
+   "orderId": "ord_0821d0d47f084968",
+   "data": {
+    "endpoint": "availability",
+    "ids": 1,
+    "replay": true
+   }
+  },
+  {
+   "seq": 648,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "quoteId": "q_97cf39d0fa6d4416",
+   "orderId": "ord_0821d0d47f084968",
+   "data": {
+    "endpoint": "price",
+    "ids": 1,
+    "replay": true
+   }
+  },
+  {
+   "seq": 649,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "policy.decided",
+   "buyerId": "hotel-a",
+   "quoteId": "q_97cf39d0fa6d4416",
+   "orderId": "ord_0821d0d47f084968",
+   "data": {
+    "outcome": "AUTO",
+    "reasons": []
+   }
+  },
+  {
+   "seq": 650,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "order.accepted",
+   "buyerId": "hotel-a",
+   "quoteId": "q_97cf39d0fa6d4416",
+   "orderId": "ord_0821d0d47f084968",
+   "data": {
+    "lines": [
+     {
+      "productId": "470746",
+      "salesUnits": 4
+     }
+    ],
+    "netCents": 19092
+   }
+  },
+  {
+   "seq": 651,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-b",
+   "quoteId": "q_2429ae046c5f4edf",
+   "orderId": "ord_f8e3c041e0b54495",
+   "data": {
+    "endpoint": "availability",
+    "ids": 1,
+    "replay": true
+   }
+  },
+  {
+   "seq": 652,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-b",
+   "quoteId": "q_2429ae046c5f4edf",
+   "orderId": "ord_f8e3c041e0b54495",
+   "data": {
+    "endpoint": "price",
+    "ids": 1,
+    "replay": true
+   }
+  },
+  {
+   "seq": 653,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "policy.decided",
+   "buyerId": "hotel-b",
+   "quoteId": "q_2429ae046c5f4edf",
+   "orderId": "ord_f8e3c041e0b54495",
+   "data": {
+    "outcome": "REJECT",
+    "reasons": [
+     "STOCK_TAKEN"
+    ]
+   }
+  },
+  {
+   "seq": 654,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "stock.denied",
+   "buyerId": "hotel-b",
+   "quoteId": "q_2429ae046c5f4edf",
+   "orderId": "ord_f8e3c041e0b54495",
+   "data": {
+    "productId": "470746",
+    "remaining": 2
+   }
+  },
+  {
+   "seq": 655,
+   "ts": "2026-11-13T21:10:00+02:00",
+   "type": "draft.created",
+   "buyerId": "hotel-a",
+   "draftId": "d_be00335b4b2d4343",
+   "data": {
+    "text": "We need 40 kg of chicken breast fillet for Friday, Atria only.",
+    "category": "18750",
+    "claims": [],
+    "quantity": {
+     "value": 40,
+     "unit": "kg"
+    },
+    "unclear": [],
+    "crossCheck": {
+     "model": "gemma-4-31b-it",
+     "result": "disagreed",
+     "fields": [
+      "deliverBy"
+     ]
+    }
+   }
+  },
+  {
+   "seq": 656,
+   "ts": "2026-11-14T10:15:00+02:00",
+   "type": "clock.set",
+   "buyerId": "admin",
+   "data": {
+    "now": "2026-11-14T10:15:00+02:00"
+   }
+  },
+  {
+   "seq": 657,
+   "ts": "2026-11-14T10:15:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "quoteId": "q_3603af9efd93448a",
+   "orderId": "ord_013572e772c44e79",
+   "data": {
+    "endpoint": "availability",
+    "ids": 1,
+    "replay": true
+   }
+  },
+  {
+   "seq": 658,
+   "ts": "2026-11-14T10:15:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "quoteId": "q_3603af9efd93448a",
+   "orderId": "ord_013572e772c44e79",
+   "data": {
+    "endpoint": "price",
+    "ids": 1,
+    "replay": true
+   }
+  },
+  {
+   "seq": 659,
+   "ts": "2026-11-14T10:15:00+02:00",
+   "type": "approval.approved",
+   "buyerId": "hotel-a",
+   "quoteId": "q_3603af9efd93448a",
+   "orderId": "ord_013572e772c44e79",
+   "data": {}
+  },
+  {
+   "seq": 660,
+   "ts": "2026-11-14T10:15:00+02:00",
+   "type": "order.accepted",
+   "buyerId": "hotel-a",
+   "quoteId": "q_3603af9efd93448a",
+   "orderId": "ord_013572e772c44e79",
+   "data": {
+    "lines": [
+     {
+      "productId": "464306",
+      "salesUnits": 1000
+     }
+    ],
+    "netCents": 101000
+   }
+  },
+  {
+   "seq": 661,
+   "ts": "2026-11-14T10:15:00+02:00",
+   "type": "search.done",
+   "buyerId": "hotel-a",
+   "draftId": "d_cf4bb01332b4472f",
+   "quoteId": "q_a3116dd73003416a",
+   "data": {
+    "count": 2,
+    "categories": [
+     "10402"
+    ]
+   }
+  },
+  {
+   "seq": 662,
+   "ts": "2026-11-14T10:15:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_cf4bb01332b4472f",
+   "quoteId": "q_a3116dd73003416a",
+   "data": {
+    "endpoint": "availability",
+    "ids": 2,
+    "replay": true
+   }
+  },
+  {
+   "seq": 663,
+   "ts": "2026-11-14T10:15:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_cf4bb01332b4472f",
+   "quoteId": "q_a3116dd73003416a",
+   "data": {
+    "endpoint": "price",
+    "ids": 2,
+    "replay": true
+   }
+  },
+  {
+   "seq": 664,
+   "ts": "2026-11-14T10:15:00+02:00",
+   "type": "quote.created",
+   "buyerId": "hotel-a",
+   "draftId": "d_cf4bb01332b4472f",
+   "quoteId": "q_a3116dd73003416a",
+   "data": {
+    "offers": [],
+    "rejections": [
+     {
+      "productId": "468465",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "470863",
+      "code": "NEW_ALLERGEN"
+     }
+    ]
+   }
+  },
+  {
+   "seq": 665,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "clock.set",
+   "buyerId": "admin",
+   "data": {
+    "now": "2026-11-15T15:50:00+02:00"
+   }
+  },
+  {
+   "seq": 666,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "search.done",
+   "buyerId": "hotel-a",
+   "draftId": "d_6cd7fa59b9ec474a",
+   "quoteId": "q_39c8286910744fd8",
+   "data": {
+    "count": 35,
+    "categories": [
+     "10400"
+    ]
+   }
+  },
+  {
+   "seq": 667,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_6cd7fa59b9ec474a",
+   "quoteId": "q_39c8286910744fd8",
+   "data": {
+    "endpoint": "availability",
+    "ids": 35,
+    "replay": true
+   }
+  },
+  {
+   "seq": 668,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_6cd7fa59b9ec474a",
+   "quoteId": "q_39c8286910744fd8",
+   "data": {
+    "endpoint": "price",
+    "ids": 35,
+    "replay": true
+   }
+  },
+  {
+   "seq": 669,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "quote.created",
+   "buyerId": "hotel-a",
+   "draftId": "d_6cd7fa59b9ec474a",
+   "quoteId": "q_39c8286910744fd8",
+   "data": {
+    "offers": [
+     {
+      "offerId": "o1",
+      "lines": [
+       {
+        "productId": "464306",
+        "salesUnits": 300
+       }
+      ],
+      "netCents": 30300,
+      "changes": []
+     },
+     {
+      "offerId": "o2"
+     },
+     {
+      "offerId": "o3"
+     },
+     {
+      "offerId": "o4"
+     },
+     {
+      "offerId": "o5"
+     },
+     {
+      "offerId": "o6"
+     },
+     {
+      "offerId": "o7"
+     },
+     {
+      "offerId": "o8"
+     }
+    ],
+    "rejections": [
+     {
+      "productId": "462626",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462775",
+      "code": "STOCK_LIMITED"
+     },
+     {
+      "productId": "462921",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463038",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463203",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "463380",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "464119",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464179",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464198",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464237",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "464399",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464440",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "464768",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "465039",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "465149",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "466288",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469119",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469266",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469287",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469330",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469331",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469386",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "472492",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "473142",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "476240",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "476957",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "477050",
+      "code": "SUBTYPE_MISMATCH"
+     }
+    ]
+   }
+  },
+  {
+   "seq": 670,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "search.done",
+   "buyerId": "hotel-a",
+   "draftId": "d_16928cd0bed14bb7",
+   "quoteId": "q_8fb41476abec45e6",
+   "data": {
+    "count": 20,
+    "categories": [
+     "10500"
+    ]
+   }
+  },
+  {
+   "seq": 671,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_16928cd0bed14bb7",
+   "quoteId": "q_8fb41476abec45e6",
+   "data": {
+    "endpoint": "availability",
+    "ids": 20,
+    "replay": true
+   }
+  },
+  {
+   "seq": 672,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_16928cd0bed14bb7",
+   "quoteId": "q_8fb41476abec45e6",
+   "data": {
+    "endpoint": "price",
+    "ids": 20,
+    "replay": true
+   }
+  },
+  {
+   "seq": 673,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "quote.created",
+   "buyerId": "hotel-a",
+   "draftId": "d_16928cd0bed14bb7",
+   "quoteId": "q_8fb41476abec45e6",
+   "data": {
+    "offers": [
+     {
+      "offerId": "o1",
+      "lines": [
+       {
+        "productId": "464411",
+        "salesUnits": 40
+       }
+      ],
+      "netCents": 13200,
+      "changes": []
+     },
+     {
+      "offerId": "o2"
+     },
+     {
+      "offerId": "o3"
+     },
+     {
+      "offerId": "o4"
+     },
+     {
+      "offerId": "o5"
+     },
+     {
+      "offerId": "o6"
+     },
+     {
+      "offerId": "o7"
+     }
+    ],
+    "rejections": [
+     {
+      "productId": "463435",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463744",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463798",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464205",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464761",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "471792",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "472127",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "474681",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "475708",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "476584",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "476731",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "476815",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "476821",
+      "code": "CUTOFF_PASSED"
+     }
+    ]
+   }
+  },
+  {
+   "seq": 674,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "search.done",
+   "buyerId": "hotel-a",
+   "draftId": "d_b4ce78c44f6b48ae",
+   "quoteId": "q_33e13481a4d74910",
+   "data": {
+    "count": 107,
+    "categories": [
+     "18750"
+    ]
+   }
+  },
+  {
+   "seq": 675,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_b4ce78c44f6b48ae",
+   "quoteId": "q_33e13481a4d74910",
+   "data": {
+    "endpoint": "availability",
+    "ids": 107,
+    "replay": true
+   }
+  },
+  {
+   "seq": 676,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "valio.called",
+   "buyerId": "hotel-a",
+   "draftId": "d_b4ce78c44f6b48ae",
+   "quoteId": "q_33e13481a4d74910",
+   "data": {
+    "endpoint": "price",
+    "ids": 107,
+    "replay": true
+   }
+  },
+  {
+   "seq": 677,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "quote.created",
+   "buyerId": "hotel-a",
+   "draftId": "d_b4ce78c44f6b48ae",
+   "quoteId": "q_33e13481a4d74910",
+   "data": {
+    "offers": [
+     {
+      "offerId": "o1",
+      "lines": [
+       {
+        "productId": "472673",
+        "salesUnits": 30
+       }
+      ],
+      "netCents": 23100,
+      "changes": []
+     },
+     {
+      "offerId": "o2"
+     },
+     {
+      "offerId": "o3"
+     }
+    ],
+    "rejections": [
+     {
+      "productId": "461587",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462176",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "462225",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462270",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462306",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462466",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462519",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462544",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462690",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "462713",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462922",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462924",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462946",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "462960",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "462981",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463005",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463007",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463033",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463037",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463204",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463222",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463229",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463232",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463239",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463245",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463247",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463248",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463249",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463264",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463268",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463276",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463288",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463298",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463553",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "463703",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463740",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "463747",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464044",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464075",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "464138",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464171",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "464786",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "465085",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "465126",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "465176",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "465469",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "466012",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "466046",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "466261",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "466331",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "466370",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "466482",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "466568",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "466675",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "466698",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "466869",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "466904",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467141",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "467154",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467236",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467238",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467241",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "467259",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467282",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "467303",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467318",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467341",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "467442",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467443",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467507",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467588",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467593",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467642",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467703",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467779",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "467814",
+      "code": "SUBTYPE_MISMATCH"
+     },
+     {
+      "productId": "468619",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "468663",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "468762",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "468834",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "468853",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "468876",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "468936",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469013",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "469520",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "470355",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "470403",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "470461",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "470507",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "470598",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "470622",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "470634",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "470746",
+      "code": "STOCK_LIMITED"
+     },
+     {
+      "productId": "470774",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "471355",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "472509",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "472584",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "473879",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "474017",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "474021",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "474179",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "475199",
+      "code": "CUTOFF_PASSED"
+     },
+     {
+      "productId": "475219",
+      "code": "NOT_ORDERABLE"
+     },
+     {
+      "productId": "476666",
+      "code": "CUTOFF_PASSED"
+     }
+    ]
+   }
+  },
+  {
+   "seq": 678,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "policy.decided",
+   "buyerId": "hotel-a",
+   "orderId": "ord_660f36c80fbc4445",
+   "data": {
+    "outcome": "NEEDS_APPROVAL",
+    "reasons": [
+     "OVER_ORDER_AUTO",
+     "OVER_DAY_AUTO"
+    ]
+   }
+  },
+  {
+   "seq": 679,
+   "ts": "2026-11-15T15:50:00+02:00",
+   "type": "approval.requested",
+   "buyerId": "hotel-a",
+   "orderId": "ord_660f36c80fbc4445",
+   "data": {
+    "orderId": "ord_660f36c80fbc4445",
+    "expiresAt": "2026-11-15T17:00:00+02:00"
+   }
+  },
+  {
+   "seq": 680,
+   "ts": "2026-11-15T17:05:00+02:00",
+   "type": "clock.set",
+   "buyerId": "admin",
+   "data": {
+    "now": "2026-11-15T17:05:00+02:00"
+   }
+  },
+  {
+   "seq": 681,
+   "ts": "2026-11-15T17:05:00+02:00",
+   "type": "approval.expired",
+   "buyerId": "hotel-a",
+   "orderId": "ord_660f36c80fbc4445",
+   "data": {}
+  }
+ ]
+}
