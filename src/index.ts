@@ -1,3 +1,7 @@
 import { createApp } from './http/routes';
+import { mcpRoutes } from './mcp/tools';
 
-export default createApp();
+const app = createApp();
+app.route('/', mcpRoutes());
+
+export default app;

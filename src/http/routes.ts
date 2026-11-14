@@ -16,7 +16,7 @@ import { HttpError, rateLimit, requireBuyer } from './auth';
 import { readEvents, streamEvents } from './events';
 import * as S from './schemas';
 
-const INTERPRET_PER_MINUTE = 20;
+export const INTERPRET_PER_MINUTE = 20;
 
 const json = <T extends z.ZodType>(schema: T, description: string) => ({ description, content: { 'application/json': { schema } } });
 
@@ -176,7 +176,7 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
 }
 
 /** Maps a thrown error from any module onto an HTTP status, machine-readable code and message; null for a bug. */
-function errorBody(err: unknown): { status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 502 | 503; code: string; detail: string } | null {
+export function errorBody(err: unknown): { status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 502 | 503; code: string; detail: string } | null {
   if (err instanceof HttpError || err instanceof OrderError || err instanceof InterpretError) return { status: err.status, code: err.code, detail: err.message };
   if (err instanceof QuoteError) {
     const status = err.code === 'DRAFT_NOT_FOUND' ? 404 : err.code === 'UPSTREAM_ERROR' ? 502 : 409;
