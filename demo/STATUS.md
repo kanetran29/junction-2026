@@ -6,14 +6,15 @@ Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 
 Mở http://localhost:8790/ (dev server đang chạy, phục vụ thẳng thư mục `demo/`), bấm Play hoặc kéo thanh thời gian. Chưa quay video mới: `demo/story.mp4` vẫn là bản cũ, sẽ quay lại sau khi Kane duyệt.
 
-Cần xem (kịch bản dựng lại thành hai hồi, một agent; ảnh: [các hồi](shots/after-acts.png)):
-1. Hồi 1 (0:00 đến 0:28): chưa có Lazydoor trong cảnh (không hàng rào, cổng, biển, máy quét, vạch dừng). Chef gõ yêu cầu; agent tới lấy đơn ở chef (0:10), đi tới ranh giới kho, gửi phong thư thẳng tới kệ theo đường cong xám (API thô của Valio, 0:13); kệ trả "999999?" (0:15); thùng 10 l novobox bị cổng bến từ chối "Cut-off Thu 12 Nov 15:00" (0:20); xe trống, quầy bếp trống, chef nhún vai; agent về chỗ.
-2. Chuyển cảnh (0:28 đến 0:32): phụ đề "So we built a door in front of the warehouse."; cổng được lắp từng phần, hạ xuống đúng chỗ: hàng rào, trụ sau, trụ trước và dầm có máy quét, cánh cổng, biển LAZYDOOR, vạch dừng.
-3. Hồi 2 (từ 0:32): cùng một robot (không còn robot thứ hai) đi tới cổng mới, thả phong thư vào khe, đứng chờ ngoài; cổng kiểm tra luật; phần còn lại giữ nguyên: duyệt, đơn được nhận, xe chở tới bếp, tấn công chia nhỏ, chất thay thế có gây dị ứng, phê duyệt hết hạn.
-4. Live: cổng có sẵn từ đầu, không có cảnh lắp.
-5. Sáu sửa của vòng trước vẫn giữ (chef cân đối, xe không chữ, thanh chắn mở một lần mỗi chuyến: 1:03,7 đến 1:14,7 và 1:21,9 đến 1:33,0; màu hồng đậm tiết chế; chữ nhỏ hơn một bậc).
+Story giờ dài 1:48,5 (trước 2:04), để video pitch 2 phút còn khoảng 10 giây cho màn tiêu đề hoặc màn kết. Cần xem:
+1. Hồi 1 (0:00 đến 0:22): chưa có Lazydoor. Chef gõ yêu cầu; agent lấy đơn (0:06), gửi phong thư thẳng tới kệ theo đường cong xám (API thô); kệ trả "999999?" (0:11); bến từ chối "Cut-off Thu 12 Nov 15:00" (0:15); agent về chỗ (0:22).
+2. Chuyển cảnh (0:22 đến 0:26): "So we built a door in front of the warehouse."; cổng lắp từng phần.
+3. Hồi 2 (từ 0:26): "The same agent comes back. The door carries the kitchen's own signed rules."; phong thư vào khe; báo giá (0:37); NEEDS_APPROVAL với phụ đề "Over the kitchen's own 500 € limit, and boxes became cartons: NEEDS_APPROVAL." (0:42); chef duyệt (0:52); xe chở tới bếp (0:54 đến 1:05); đơn AUTO 334 l (1:10); OVER_DAY_AUTO (1:16); REJECT 20.000 l (1:25); NEW_ALLERGEN (1:32); phê duyệt hết hạn (1:37); màn kết (1:41,5 đến 1:48,5).
+4. Mỗi phụ đề hiện đủ lâu để đọc: ít nhất 2 giây và không nhanh hơn 17 ký tự/giây (có test).
+5. Agent đi nhanh hơn một chút; xe chạy tới bếp 2,6 giây (trước 3,4), đứng 3 giây (trước 3,8), về 2,4 giây (trước 3,2). Thanh chắn vẫn mở một lần mỗi chuyến: 0:56,6 đến 1:05,2 và 1:12,1 đến 1:20,8.
+6. Không có chữ "unlimited" trong cảnh hay phụ đề; kệ ghi "999999?" và phụ đề trích nguyên giá trị API "999999 available Monday".
 
-Kiểm tra: `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 giây, Live phát hết file mẫu); 34 test pass. Kịch bản dài 124 giây.
+Kiểm tra: `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 giây, Live phát hết file mẫu); 36 test pass.
 
 ## Nhật ký
 
@@ -137,6 +138,13 @@ Vấn đề tìm thấy:
 - Model: thêm `gate: { built, since }`. Live mặc định có cổng; Story dùng tín hiệu `story.gate` để bỏ cổng ở đầu và dựng cổng sau hồi 1. Các bước `story.naive` giờ điều khiển chính agent: `take` (tới chef lấy đơn), `enter` (tới ranh giới kho), `gone` (về chỗ, tay không). Test mới cho cả ba điều này và cho thứ tự kịch bản (bỏ cổng, chạy hồi 1, dựng cổng, rồi mới tới đơn qua cổng).
 - Cảnh: bỏ robot xám thứ hai. Khi chưa có cổng, phong thư của agent bay theo đường cong tới kệ 0 (API thô) thay vì vào khe. Các phần của cổng nằm trong nhóm riêng, hạ xuống và hiện dần theo thứ tự, mỗi phần 0,9 giây.
 - Phụ đề hồi 1 và chuyển cảnh viết lại cho khớp: "The agent orders straight from Valio's raw API. Nothing checks the order.", "The agent learns it after the fact, at the dock.", "So we built a door in front of the warehouse.", "The same agent tries again, through the door. Every decision is a published rule.". Các mốc hồi 2 lùi 1 giây.
+
+### 16. Story 1:48,5 cho video pitch 2 phút (theo yêu cầu của Kane)
+- Ban tổ chức: video pitch dài tối đa 2 phút, kiểm rất chặt. Story rút từ 124 giây còn 108,5 giây: bớt các khoảng đứng, agent đi nhanh hơn (tốc độ tối đa 130, trước 95), xe chạy nhanh hơn. Giữ đủ mọi nhịp: hồi 1 không cổng, dựng cổng, cùng agent quay lại, đơn AUTO, NEEDS_APPROVAL rồi chef duyệt, giao hàng tới bếp, REJECT và hết hạn.
+- Giới hạn 500 € là luật riêng của bếp, không phải của Valio (Valio không ép duyệt; khách tự đặt giới hạn). Phụ đề đổi thành "Over the kitchen's own 500 € limit, and boxes became cartons: NEEDS_APPROVAL." và "The same agent comes back. The door carries the kitchen's own signed rules.".
+- Phụ đề rút gọn để vừa thời gian: "The dock refuses the load: its cut-off was Thursday 12 Nov 15:00.", "The chef's terminal asks for approval, valid until the cut-off, Sun 17:00.", "The chef approves, 30 hours before the cut-off.".
+- Các phần cổng giờ hạ xuống từ độ cao 20 (trước 40): với nhịp mới, biển LAZYDOOR đang mờ dần lướt qua logo Valio Aimo ở 0:24,75 và kiểm tra chồng chữ bắt được.
+- Test mới: Story không quá 110 giây, mỗi phụ đề đủ thời gian đọc, phụ đề giới hạn của bếp và luật ký của bếp có mặt, không có "unlimited". Thanh kéo `max` 108,5.
 
 ## Còn lại / cần làm sau
 - Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).

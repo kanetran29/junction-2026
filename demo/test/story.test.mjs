@@ -4,8 +4,8 @@ import { STORY, DURATION, stateAt, gatewayEvents } from "../story.mjs";
 
 const firstAt = (pred) => STORY.find((item) => pred(item.ev))?.at;
 
-test("story: sorted, about two minutes, seq strictly increasing", () => {
-  assert.ok(DURATION >= 115 && DURATION <= 125);
+test("story: sorted, at most 1:50 so a two-minute pitch video keeps 10 s for a title, seq strictly increasing", () => {
+  assert.ok(DURATION >= 100 && DURATION <= 110);
   STORY.forEach((item, i) => i && assert.ok(item.at >= STORY[i - 1].at));
   assert.ok(STORY.at(-1).at <= DURATION);
   const seqs = STORY.map((item) => item.ev.seq);
@@ -71,4 +71,22 @@ test("story: Act 1 has no door, the door is built after the naive run, the same 
   assert.equal(stateAt(DURATION).gate.built, true);
   const caption = STORY.find((item) => item.at >= built - 1 && item.ev.type === "story.caption");
   assert.match(caption.ev.data.text, /built a door/);
+});
+
+test("story: every caption stays up long enough to read at 17 characters a second, and at least 2 s", () => {
+  const captions = STORY.filter((item) => item.ev.type === "story.caption");
+  captions.forEach((item, i) => {
+    const shown = (captions[i + 1]?.at ?? DURATION) - item.at;
+    const need = Math.max(2, item.ev.data.text.length / 17);
+    assert.ok(shown >= need, `${item.ev.data.text} is up ${shown.toFixed(1)} s, needs ${need.toFixed(1)} s`);
+  });
+});
+
+test("story: the approval limit is the kitchen's own rule, and the door carries the kitchen's signed rules", () => {
+  const texts = STORY.filter((item) => item.ev.type === "story.caption").map((item) => item.ev.data.text);
+  assert.ok(texts.includes("Over the kitchen's own 500 € limit, and boxes became cartons: NEEDS_APPROVAL."));
+  const built = firstAt((ev) => ev.type === "story.gate" && ev.data.built === true);
+  const draft = firstAt((ev) => ev.type === "draft.created");
+  assert.ok(STORY.some((item) => item.at >= built && item.at <= draft && item.ev.type === "story.caption" && /kitchen's own signed rules/.test(item.ev.data.text)));
+  assert.ok(!texts.some((text) => /unlimited/i.test(text)));
 });

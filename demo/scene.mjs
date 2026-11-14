@@ -513,23 +513,24 @@ const RAIN = Array.from({ length: 18 }, () => ({ x: (RNG() - 0.5) * 2, phase: RN
 export function truckRun(tr, age) {
   const n = Math.max(1, tr.crates || 1);
   if (tr.status === "loading" && !tr.naive) {
+    const [drive, stay, driveBack] = [2.6, 3, 2.4];
     const load = n * 0.22 + 0.45;
     const go = load + 0.35;
-    const arrive = go + 3.4;
+    const arrive = go + drive;
     const unloadDone = arrive + Math.min(n, 8) * 0.16 + 0.45;
-    const back = arrive + 3.8;
-    const home = back + 3.2;
+    const back = arrive + stay;
+    const home = back + driveBack;
     let front = DOCK_X;
     let v = 0;
     if (age >= go && age < arrive) {
-      const u = (age - go) / 3.4;
+      const u = (age - go) / drive;
       front = lerp(DOCK_X, BAY_X, ease(u));
-      v = ((BAY_X - DOCK_X) * 6 * u * (1 - u)) / 3.4;
+      v = ((BAY_X - DOCK_X) * 6 * u * (1 - u)) / drive;
     } else if (age >= arrive && age < back) front = BAY_X;
     else if (age >= back && age < home) {
-      const u = (age - back) / 3.2;
+      const u = (age - back) / driveBack;
       front = lerp(BAY_X, DOCK_X, ease(u));
-      v = ((DOCK_X - BAY_X) * 6 * u * (1 - u)) / 3.2;
+      v = ((DOCK_X - BAY_X) * 6 * u * (1 - u)) / driveBack;
     }
     return { n, load, go, arrive, unloadDone, back, home, front, v, accepted: true };
   }
@@ -668,7 +669,7 @@ ${truck()}
 
   /** Moves s toward target along a route with a speed limit and a short ease in and out. */
   const travel = (s, v, target, dt) => {
-    const want = Math.max(-95, Math.min(95, (target - s) * 3.2));
+    const want = Math.max(-130, Math.min(130, (target - s) * 4.5));
     v += (want - v) * (1 - Math.exp(-dt / 0.14));
     s += v * dt;
     if (Math.abs(target - s) < 0.3 && Math.abs(v) < 3) return [target, 0];
@@ -751,7 +752,7 @@ ${truck()}
   function drawGate(gate, t, calm) {
     for (const [id, delay] of GATE_PARTS) {
       const e = !gate.built ? 0 : calm ? 1 : ease((t - gate.since - delay) / 0.9);
-      setAttr(el[id], "transform", e < 1 ? k.translateAlong(P, [0, 0, 40 * (1 - e)]) : null);
+      setAttr(el[id], "transform", e < 1 ? k.translateAlong(P, [0, 0, 20 * (1 - e)]) : null);
       setAttr(el[id], "style", e < 1 ? `opacity:${e.toFixed(3)}` : null);
     }
   }
