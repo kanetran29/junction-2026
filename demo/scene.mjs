@@ -3,7 +3,7 @@
 // are driven from model state and scene time (no wall clock), so Story mode renders the same frames every time.
 import * as k from "./kit/iso-kit.mjs";
 import { glCamera, glLayer } from "./kit/gl.mjs";
-import { euro, countdown, dayTotal, shownNow, clockText, CUTOFF } from "./model.mjs";
+import { euro, countdown, dayTotal, shownNow, clockText, CUTOFF, refusedCard } from "./model.mjs";
 import { ICONS } from "./icons.mjs";
 
 export const W = 1600;
@@ -688,6 +688,12 @@ ${dockFlag()}
   const q = (id) => root.querySelector(`[data-id="${id}"]`);
   const ids = ["agent", "gate-fence", "gate-post", "gate-front", "gate-sign", "stopline", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "zone3", "zone4", "link3", "link4", "letter2", "exhaust", "doorfly", "bursts", "rings", "stampfx", "gateshock", "receipt", "flying", "counter", "chef", "letter", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "dockled", "mphone", "mphonei", "tap", "mail", "rules", "pcrates", "palletsign", "nomilk", "mrack", "mandfly", "dockflag", "dockflagtext"];
   const el = Object.fromEntries(ids.map((id) => [id, q(id)]));
+  // Live's Z4 card folds once the order is decided; a click opens or folds it until the next quote (the ticker has the same events).
+  let listOpen = false;
+  let listQuote;
+  el.zone4.addEventListener("click", () => {
+    if (el.zone4.hasAttribute("data-toggle")) listOpen = !listOpen;
+  });
   const racks = [...root.querySelectorAll(".rack")].sort((a, b) => a.dataset.rack - b.dataset.rack);
   const counterCrates = [...el.counter.querySelectorAll(".ccrate")];
   const truckCrates = [...el.truck.querySelectorAll(".tcrate")];
@@ -1441,8 +1447,10 @@ ${dockFlag()}
     const box3 = drawCard(el.zone3, Z3, card);
     const target = card?.link === "agent" ? at([ax, ay - 1, 34]) : card?.link === "terminal" ? at([PHONE.x + PHONE.w / 2, PHONE.y + PHONE.d, PHONE.z + PHONE.h]) : card?.link === "phone" ? at([MPHONE.x + MPHONE.w / 2, MPHONE.y + 2.3, MPHONE.z + 2.4 + MPHONE.h]) : card?.link === "rack" ? RACK_AT : null;
     drawLink(el.link3, box3 && target && [Math.min(Math.max(target[0], box3[0] + 24), box3[2] - 24), box3[3]], target);
-    const list = story ? state.list : liveList(state);
+    if (!story && state.quote?.at !== listQuote) [listQuote, listOpen] = [state.quote?.at, false];
+    const list = story ? state.list : refusedCard(state, listOpen);
     const box4 = drawCard(el.zone4, Z4, list && { title: list.title, mono: list.mono, lines: list.rows, note: list.note });
+    setAttr(el.zone4, "data-toggle", list?.toggle ? "" : null);
     const shelf = list?.product ? state.shelves.findIndex((x) => x.productId === list.product) : list?.rack;
     const rack = Number.isInteger(shelf) && shelf >= 0 ? at([RACK_X[shelf] + RACK.w / 2, RACK.y + RACK.d, RACK.h + 18]) : null;
     drawLink(el.link4, box4 && rack && [box4[0], box4[3] - 14], rack);
@@ -1515,16 +1523,6 @@ function liveCard(state, t) {
   }
   if (carry === "rejected") return { title: "Refused", tone: "reject", link: "agent", lines: [reasonText(state.door.reasons[0] ?? (ph.status === "rejected" ? "by manager" : ""))] };
   return null;
-}
-
-/** Live mode's Z4 list: the quote's first refusals with their codes, the rest counted. */
-function liveList(state) {
-  const refused = state.quote?.rejections ?? [];
-  if (!refused.length) return null;
-  const rows = refused.slice(0, 3).map((r) => ({ text: `✕ ${r.productId ?? "unknown product"} · ${r.code}`, tone: "reject" }));
-  if (refused.length > 3) rows.push({ text: `+${refused.length - 3} more refused`, tone: "dim" });
-  const rack = state.shelves.findIndex((x) => x.productId && x.productId === String(refused[0].productId));
-  return { rows, rack: rack >= 0 ? rack : undefined };
 }
 
 /** Greedy word wrap to at most width characters per line. */

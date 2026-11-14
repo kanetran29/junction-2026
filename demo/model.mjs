@@ -224,6 +224,25 @@ function rivalEvent(s, ev, d, t) {
   return !(ev.type === "stock.denied" && !s.quietRivals);
 }
 
+/**
+ * Live's Z4 card for the quote's other candidates: muted rows (they are products the door did not offer, not errors on
+ * the order; a refusal of the order itself is the red Z3 card). Once the order is decided it folds to one line that
+ * opens on click (`open`); `toggle` marks a card that folds. At most a title and three rows, so the card stays clear of the
+ * dock flag and the truck. Null when the quote refused nothing.
+ */
+export function refusedCard(state, open = false) {
+  const refused = state.quote?.rejections ?? [];
+  if (!refused.length) return null;
+  const n = refused.length;
+  const what = `${n} ${state.quote.offers?.length ? "other " : ""}${n === 1 ? "candidate" : "candidates"}`;
+  const decided = Boolean(state.door?.stamp);
+  if (decided && !open) return { rows: [{ text: `${what} didn't qualify (reasons)`, tone: "dim" }], toggle: true };
+  const rows = refused.slice(0, 2).map((r) => ({ text: `✕ ${r.productId ?? "unknown product"} · ${r.code}`, tone: "dim" }));
+  if (n > 2) rows.push({ text: `+${n - 2} more not offered`, tone: "dim" });
+  const rack = state.shelves.findIndex((x) => x.productId && x.productId === String(refused[0].productId));
+  return { title: `${what} not offered`, rows, rack: rack >= 0 ? rack : undefined, toggle: decided };
+}
+
 /** The buyer an event belongs to, or null for the door's own events (admin, clock, Story beats). */
 const buyerOf = (ev) => (ev.buyerId && ev.buyerId !== "admin" && !ev.type.startsWith("story.") ? ev.buyerId : null);
 

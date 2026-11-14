@@ -209,3 +209,12 @@ test("story: the closing comparison's dim at 112 s is the same after a seek as a
   const since = sought.compare.since;
   assert.ok(Math.abs(closingFades(stateAt(since + 0.3), since + 0.3).compare - 0.5) < 1e-9, "half way through its 0.6 s fade");
 });
+
+test("story: the candidates refused while quoting are a muted card; only refusals of an order stay red", () => {
+  const lists = STORY.filter((item) => item.ev.type === "story.list" && item.ev.data.rows?.length).map((item) => item.ev.data);
+  const notOffered = lists.find((l) => l.product === "463038");
+  assert.equal(notOffered.title, "20 candidates not offered");
+  assert.ok(notOffered.rows.every((r) => r.tone === "dim"));
+  const red = lists.flatMap((l) => l.rows.filter((r) => r.tone === "reject").map((r) => r.text));
+  assert.deepEqual(red, ["closingTime      Thu 12 Nov 15:00", "Another hotel: ✕ STOCK_TAKEN · 2 left", "✕ 470863 · NEW_ALLERGEN · gluten (AW)"], "the cut-off the agent missed, another hotel's refused order, the refused substitute");
+});

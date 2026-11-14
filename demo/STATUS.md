@@ -273,6 +273,12 @@ Vấn đề tìm thấy:
 - Kiểm `/v1/audit/verify` tối đa một lần mỗi 10 s (thêm một lần cuối đợt), để hàng chục trang Live mở cùng lúc không nhân số lần gọi lên door.
 - Test: 64 pass với Playwright (từng file một), gồm từng trạng thái Try it trong trình duyệt và 40 bếp đặt hàng cùng lúc trong model; `label overlaps: 0`. `dev/fake-gateway.mjs` không đổi.
 
+### 36. Ứng viên bị loại không còn đỏ như lỗi; Try it nhớ cuộc hội thoại
+- Thẻ Z4 trong Live (`refusedCard` trong model.mjs): các sản phẩm khác không được chào là dòng mờ (ink-dim), tiêu đề "N other candidates not offered", 2 dòng đầu + "+K more not offered"; khi đơn đã quyết (AUTO, NEEDS_APPROVAL hay REJECT) thẻ gập thành một dòng "N other candidates didn't qualify (reasons)", bấm để mở hoặc gập lại tới quote sau. Chữ đỏ chỉ còn cho lời từ chối chính đơn hàng (thẻ Z3). Thẻ không cao hơn trước để không đè cờ bến và xe tải.
+- Story cảnh 2: thẻ hộp 10 l thành "20 candidates not offered", dòng mờ, bỏ dòng ghi chú (caption đã nói "20 are past their cut-off"). Các dòng đỏ còn lại là thật: closingTime agent bỏ qua, đơn của khách sạn khác bị từ chối, hàng thay thế thêm gluten. `story.mp4` đã quay trước thay đổi này.
+- Try it là một chuỗi tin nhắn: yêu cầu của chef, câu hỏi của door ("When should it arrive?", "How much?", "Which product?"…; hai nút khi Gemini và Gemma đọc khác nhau), câu trả lời, rồi kết quả. Khi door đang chờ, ô nhập thành "Your answer" với placeholder là câu hỏi; Send gửi `{ visitor, draftId, answer: { text } }`. Door chưa nhận kiểu này (400 hoặc 404) thì gửi lại một câu mới "<yêu cầu>, <câu trả lời>". Nút hai lựa chọn vẫn gửi `answer: { field, value }`. "Start over" xoá chuỗi và draft. Lỗi (429, 503…) hiện dưới chuỗi và trả chữ về ô nhập.
+- Test: 67 pass với Playwright (từng file một), gồm chuỗi tin nhắn, câu trả lời vào đúng draftId, đường dự phòng, Start over, thẻ Z4 mờ và gập; `label overlaps: 0`. `dev/fake-gateway.mjs` không đổi.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

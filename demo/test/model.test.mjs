@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { initialState, liveState, reduce, otherBuyer, plain, euro, countdown, SHELVES } from "../model.mjs";
+import { initialState, liveState, reduce, otherBuyer, refusedCard, plain, euro, countdown, SHELVES } from "../model.mjs";
 
 const B = "hotel-1";
 let seq = 0;
@@ -228,4 +228,24 @@ test("live: an accepted order waits on the pallet until the door's clock reaches
   assert.equal(s.truck.status, "parked");
   s = run([ev("clock.set", { now: "2026-11-16T07:00:00+02:00" }, { buyerId: "admin" })], s);
   assert.deepEqual([s.truck.status, s.truck.crates, s.pallet.crates], ["loading", 1, 0]);
+});
+
+test("live: the quote's other candidates are a muted card, folded to one line once the order is decided", () => {
+  const ev3 = (type, data) => ({ seq: ++seq, ts: "2026-11-13T21:10:00+02:00", type, buyerId: "hotel-a", data });
+  const rejections = Array.from({ length: 29 }, (_, i) => ({ productId: String(460416 + i), code: i % 2 ? "STOCK_LIMITED" : "PRICE_UNAVAILABLE" }));
+  let s = reduce(liveState("hotel-a"), ev3("quote.created", { offers: [{ netCents: 5850 }], rejections }), 1);
+  const open = refusedCard(s);
+  assert.equal(open.title, "29 other candidates not offered");
+  assert.deepEqual(open.rows.map((r) => r.text), ["✕ 460416 · PRICE_UNAVAILABLE", "✕ 460417 · STOCK_LIMITED", "+27 more not offered"]);
+  assert.ok(open.rows.every((r) => r.tone === "dim"), "never error red: these are not errors on the order");
+  assert.equal(open.toggle, false);
+
+  s = reduce(s, ev3("policy.decided", { outcome: "AUTO", reasons: [] }), 2);
+  assert.deepEqual(refusedCard(s), { rows: [{ text: "29 other candidates didn't qualify (reasons)", tone: "dim" }], toggle: true });
+  const unfolded = refusedCard(s, true);
+  assert.deepEqual([unfolded.title, unfolded.rows.length, unfolded.toggle], ["29 other candidates not offered", 3, true]);
+
+  const none = reduce(liveState("hotel-a"), ev3("quote.created", { offers: [], rejections: rejections.slice(0, 1) }), 1);
+  assert.equal(refusedCard(none).title, "1 candidate not offered");
+  assert.equal(refusedCard(liveState("hotel-a")), null);
 });

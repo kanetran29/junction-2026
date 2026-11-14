@@ -38,6 +38,20 @@ const reasonLine = (r, codes) => {
 /** Net and gross of an order as one line. */
 const money = (o) => [Number.isFinite(o?.netCents) ? `Net ${euro(o.netCents)}` : "", Number.isFinite(o?.grossCents) ? `Gross ${euro(o.grossCents)}` : ""].filter(Boolean).join(" · ");
 
+/** The door's question for a field the request left open, in plain words. */
+const QUESTIONS = {
+  deliverBy: "When should it arrive?",
+  quantity: "How much?",
+  needs: "Which product?",
+  category: "Which product?",
+  subtype: "Which product?",
+  claims: "Any requirements, such as lactose-free?",
+  brand: "Which brand?",
+  packLitres: "Which pack size?",
+  fatLevel: "Which fat level?",
+};
+export const questionFor = (field) => QUESTIONS[field] ?? `One more detail: ${field}?`;
+
 /** The line under an answer whose readings were recorded (the example chips are served from recorded readings). */
 export const CACHED_NOTE = "Example: readings recorded from Gemini and Gemma";
 
@@ -71,9 +85,13 @@ function replyView({ status, body, retryAfter }, codes, byManager) {
     const date = q.field === "deliverBy";
     const read = (v) => (date ? dayLabel(v) : String(v));
     const readings = q.readings ?? [];
+    const draftId = body.draft?.id ?? null;
+    if (readings.length < 2) return { kind: "question", tone: "hold", title: questionFor(q.field), lines: [], choices: [], field: q.field, draftId };
     return {
       kind: "question",
       tone: "hold",
+      field: q.field,
+      draftId,
       title: date ? "Which day? The two readers disagree." : `Which ${q.field}? The two readers disagree.`,
       lines: [readings.map((r) => `${/gemma/i.test(r.model) ? "Gemma" : /gemini/i.test(r.model) ? "Gemini" : r.model} read ${read(r.value)}`).join(", ") + ". The door asks, never guesses."],
       choices: readings.map((r) => ({ label: read(r.value), field: q.field, value: r.value })),

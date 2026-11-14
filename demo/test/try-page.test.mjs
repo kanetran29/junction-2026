@@ -87,7 +87,63 @@ test("try panel: 429 counts down with Send off; models busy lights the examples;
   await send();
   assert.equal((await page.textContent("#try-panel .try-cached")).trim(), "Example: readings recorded from Gemini and Gemma");
 
+  assert.equal(await page.inputValue("#try-text"), "", "a sent request leaves the box for the next one");
   reply = { status: 404, body: { error: "TRY_DISABLED" } };
+  await page.fill("#try-text", "20 kg of chicken breast fillet by Monday");
   await page.click("#try-panel .try-send");
   await page.waitForFunction(() => getComputedStyle(document.getElementById("try-panel")).display === "none");
+});
+
+test("try panel: a short thread; the answer goes to the same draft, or as one sentence to a door without answers; Start over", { skip: !pw && "playwright-core not installed (set PLAYWRIGHT_CORE)" }, async (t) => {
+  const child = spawn(process.execPath, [SERVER, "--port", String(PORT + 20)], { stdio: ["ignore", "pipe", "inherit"] });
+  t.after(() => child.kill());
+  await new Promise((resolve) => child.stdout.once("data", resolve));
+  const chromium = pw.chromium ?? pw.default.chromium;
+  const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, headless: true });
+  t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  const posted = [];
+  let takesAnswers = true;
+  const reply = (status, body) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
+  const base = { visitor: "v-beans", buyerId: "visitor-0000beef" };
+  const accepted = { ...base, step: "decided", draft: { id: "d-done" }, order: { orderId: "o1", state: "ACCEPTED", netCents: 31000, grossCents: 35000, reasons: [] } };
+  await page.route("**/v1/try", (route) => {
+    const body = route.request().postDataJSON();
+    posted.push(body);
+    if (body.draftId) return route.fulfill(takesAnswers ? reply(200, accepted) : reply(400, { error: "BAD_REQUEST" }));
+    if (body.text === "200 cans of beans") return route.fulfill(reply(200, { ...base, step: "needs_input", draft: { id: "d-beans" }, question: { field: "deliverBy", readings: [] } }));
+    return route.fulfill(reply(200, accepted));
+  });
+  await page.goto(`http://localhost:${PORT + 20}/?mode=live`);
+  const thread = () => page.$$eval("#try-panel .try-thread > li", (lis) => lis.map((li) => `${li.querySelector(".try-who").textContent}: ${(li.querySelector(".try-said") ?? li.querySelector(".try-title")).textContent}`));
+  const ask = async (text, kind) => {
+    await page.fill("#try-text", text);
+    await page.click("#try-panel .try-send");
+    await page.waitForSelector(`#try-panel .try-thread .try-box[data-kind="${kind}"]`);
+  };
+
+  await ask("200 cans of beans", "question");
+  assert.deepEqual(await thread(), ["You: 200 cans of beans", "Lazydoor: When should it arrive?"]);
+  assert.equal((await page.textContent("#try-panel .try-label")).trim(), "Your answer");
+  assert.equal(await page.getAttribute("#try-text", "placeholder"), "When should it arrive?");
+  await ask("next tuesday", "accepted");
+  assert.deepEqual(posted.at(-1), { visitor: "v-beans", draftId: "d-beans", answer: { text: "next tuesday" } });
+  assert.deepEqual((await thread()).slice(0, 3), ["You: 200 cans of beans", "Lazydoor: When should it arrive?", "You: next tuesday"]);
+  assert.match((await thread())[3], /^Lazydoor: Accepted: 310\.00 € net/);
+  assert.equal((await page.textContent("#try-panel .try-label")).trim(), "Your request, as the chef");
+
+  takesAnswers = false;
+  await ask("200 cans of beans", "question");
+  assert.equal((await thread()).length, 2, "a new request starts a new thread");
+  const before = posted.length;
+  await ask("next tuesday", "accepted");
+  assert.deepEqual(posted.slice(before), [{ visitor: "v-beans", draftId: "d-beans", answer: { text: "next tuesday" } }, { text: "200 cans of beans, next tuesday", visitor: "v-beans" }]);
+  assert.equal((await thread()).length, 4);
+
+  await page.click("#try-panel .try-restart");
+  assert.equal(await page.locator("#try-panel .try-thread > li").count(), 0);
+  assert.equal(await page.isVisible("#try-panel .try-empty"), true);
+  assert.equal(await page.isVisible("#try-panel .try-restart"), false);
+  const width = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+  assert.ok(width[0] <= width[1], `page is ${width[0]} px wide in ${width[1]} px`);
 });

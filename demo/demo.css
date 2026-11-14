@@ -362,6 +362,7 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .zone-line[data-tone="reject"] { fill: #ff8f85; }
 .zone-line[data-tone="auto"] { fill: #7dffb0; }
 .zone-line[data-tone="dim"] { fill: var(--ink-dim); }
+.zone[data-toggle] { cursor: pointer; pointer-events: all; }
 .zone-chip { fill: rgb(95 244 255 / .12); stroke: #5ff4ff; stroke-width: 1.4px; }
 .zone-chip-text { fill: #fff; font: 600 14px var(--sans); text-anchor: middle; }
 .zone-note { fill: var(--ink-dim); font: italic 500 13px var(--sans); }
@@ -531,8 +532,18 @@ body.kiosk .try-panel { display: none; }
 .try-box.phone-card { max-width: 440px; border: 1px solid #2c4650; border-left-width: 1px; border-radius: var(--radius); padding: 0 16px 16px; background: #1b2f38; overflow: hidden; }
 .phone-bar { display: flex; align-items: center; gap: 8px; margin: 0 -16px 14px; padding: 10px 16px; background: var(--hold); color: #231300; font: 700 13px/1.2 var(--sans); }
 .phone-bar .icon { width: 18px; height: 18px; fill: currentColor; }
-.try-back { margin-top: 14px; }
-.try-back[hidden] { display: none; }
+.try-thread { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.try-thread:empty, .try-status:empty { display: none; }
+.try-thread + .try-status { margin-top: 14px; }
+.try-msg { display: grid; gap: 4px; min-width: 0; max-width: min(100%, 560px); }
+.try-msg.from-chef { justify-self: end; justify-items: end; }
+.try-who { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+.try-said { margin: 0; padding: 10px 14px; border-radius: var(--radius); background: rgb(214 92 132 / .14); border: 1px solid rgb(214 92 132 / .4); color: var(--ink); overflow-wrap: anywhere; }
+.try-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 14px; }
+.try-foot:not(:has(> :not([hidden]))) { display: none; }
+.try-restart { background: none; border: 0; padding: 4px 0; font: 600 14px var(--sans); color: var(--brand-soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.try-restart:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.try-restart[hidden], .try-back[hidden] { display: none; }
 
 /* Phones and narrow windows: every multi-column layout above becomes one column; the flow track turns vertical. */
 @media (max-width: 860px) {
