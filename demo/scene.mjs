@@ -74,6 +74,8 @@ const KEEP_CLEAR = [
   boxOf([[PHONE.x, PHONE.y + PHONE.d, PHONE.z], [PHONE.x + PHONE.w, PHONE.y + PHONE.d, PHONE.z], [PHONE.x, PHONE.y + PHONE.d, PHONE.z + PHONE.h], [PHONE.x + PHONE.w, PHONE.y + PHONE.d, PHONE.z + PHONE.h]]),
   boxOf([[CAL.x, WALL_Y, CAL.z], [CAL.x + CAL.w, WALL_Y, CAL.z], [CAL.x, WALL_Y, CAL.z + CAL.h], [CAL.x + CAL.w, WALL_Y, CAL.z + CAL.h]]),
 ];
+/** Right-most screen x the door leaf reaches as it swings open: the door's reason chips start past it. */
+const LEAF_REACH = Math.max(...Array.from({ length: 19 }, (_, i) => (i / 18) * Math.PI * 0.5).flatMap((a) => [4, 86].map((z) => at([HINGE[0] + Math.sin(a) * LEAF_LEN + 2, HINGE[1] + Math.cos(a) * LEAF_LEN, z])[0])));
 /** Local (u, v) on the plane x = const mapped to world (x, y0 + u, z0 − v): marks on faces that look along −x. */
 function faceX(x, y0, z0) {
   const o = at([x, y0, z0]);
@@ -628,11 +630,14 @@ ${truck()}
   };
   const svgNode = (tag, cls) => `<${tag} class="${cls}"/>`;
   const chipMarkup = () => `<g class="chip-g"><rect class="chip-box"/><g class="chip-icon"></g><text class="chip-text"></text></g>`;
-  /** A label chip: rounded box, icon and text at a screen point, sized to its text. */
-  const chip = (node, { x, y, text, iconName, tone, size = 21, anchor = "middle" }) => {
+  /** Width and height of a label chip for its text, icon and font size. */
+  const chipSize = (text, iconName, size = 21) => {
     const perChar = text === text.toUpperCase() && /[A-Z]/.test(text) ? 0.68 : 0.57;
-    const width = Math.round(text.length * size * perChar + (iconName ? size * 1.5 : 0) + 30);
-    const height = Math.round(size * 1.75);
+    return { width: Math.round(text.length * size * perChar + (iconName ? size * 1.5 : 0) + 30), height: Math.round(size * 1.75) };
+  };
+  /** A label chip: rounded box, icon and text at a screen point, sized to its text. Returns its screen box. */
+  const chip = (node, { x, y, text, iconName, tone, size = 21, anchor = "middle" }) => {
+    const { width, height } = chipSize(text, iconName, size);
     const left = Math.max(14, Math.min(W - 14 - width, anchor === "middle" ? x - width / 2 : anchor === "end" ? x - width : x));
     setAttr(node, "data-tone", tone ?? "");
     setAttr(node, "transform", `translate(${f1(left)} ${f1(y - height)})`);
@@ -646,6 +651,39 @@ ${truck()}
     setAttr(label, "y", f1(height / 2 + size * 0.36));
     setAttr(label, "font-size", size);
     setText(label, text);
+    return [left, y - height, left + width, y];
+  };
+
+  /** Screen boxes [x0, y0, x1, y1] that text keeps clear of this frame: the chef, the agent, the truck, the door, and labels placed so far. */
+  const taken = [];
+  const GAP = 6;
+  const rest = new Map();
+  /** A group's screen box at rest (its own transform left out), measured once, moved by (dx, dy). */
+  const bodyBox = (node, dx = 0, dy = 0) => {
+    let b = rest.get(node);
+    if (!b) {
+      const r = node.getBBox();
+      if (!r.width) return null;
+      b = [r.x, r.y, r.x + r.width, r.y + r.height];
+      rest.set(node, b);
+    }
+    return [b[0] + dx, b[1] + dy, b[2] + dx, b[3] + dy];
+  };
+  /** True when box b stays inside the drawing above the caption and keeps GAP from everything taken. */
+  const clear = (b) => b[0] >= 8 && b[1] >= 8 && b[2] <= W - 8 && b[3] <= CARD_BOTTOM && taken.every((o) => b[0] >= o[2] + GAP || b[2] <= o[0] - GAP || b[1] >= o[3] + GAP || b[3] <= o[1] - GAP);
+  /**
+   * Picks a w×h spot [left, top] for a label from candidates, trying the spot it used last frame first so it does not
+   * flicker between two, and reserves it. Returns null when every candidate would cover something: the label then waits.
+   */
+  const place = (key, w, h, candidates) => {
+    const last = live.spot[key];
+    const order = last !== undefined && candidates[last] ? [last, ...candidates.keys()] : [...candidates.keys()];
+    const i = order.find((j) => clear([candidates[j][0], candidates[j][1], candidates[j][0] + w, candidates[j][1] + h]));
+    live.spot[key] = i;
+    if (i === undefined) return null;
+    const [x, y] = candidates[i];
+    taken.push([x, y, x + w, y + h]);
+    return [x, y];
   };
 
   const ROUTE = [[-188, LANE], [-140, LANE], [-106, LANE]];
@@ -665,7 +703,7 @@ ${truck()}
   const RAW_BEND = [(HAND_AT_DOOR[0] + RACK_TOP[0]) / 2, Math.min(HAND_AT_DOOR[1], RACK_TOP[1]) - 150];
   /** Parts of the door in build order, with the delay in seconds before each lowers into place. */
   const GATE_PARTS = [["gate-fence", 0], ["gate-post", 0.45], ["gate-front", 0.9], ["leaf", 1.5], ["gate-sign", 2.1], ["stopline", 2.7]];
-  const live = { s: STATION.home, v: 0, leaf: 0, leafShown: "", warm: 0, red: 0, lampDrawn: -1, boom: 0, today: ["SAT", "14"], happy: false, handKey: null, handAt: null };
+  const live = { s: STATION.home, v: 0, leaf: 0, leafShown: "", warm: 0, red: 0, lampDrawn: -1, boom: 0, today: ["SAT", "14"], happy: false, handKey: null, handAt: null, spot: {} };
 
   /** Moves s toward target along a route with a speed limit and a short ease in and out. */
   const travel = (s, v, target, dt) => {
@@ -722,6 +760,17 @@ ${truck()}
     const posted = drawLetter(state, t, snap, calm, ax, ay, bob);
     setAttr(cardEl, "style", state.agent.carry && !posted ? null : "opacity:0");
 
+    const o = at([0, 0, 0]);
+    const moved = (node, p) => {
+      const q = at(p);
+      return bodyBox(node, q[0] - o[0], q[1] - o[1]);
+    };
+    const agentBox = moved(el.agent, [ax, ay, bob]);
+    const leaf = el.leaf.getBBox();
+    const gateParts = state.gate.built ? [...["gate-fence", "gate-post", "gate-front", "gate-sign"].map((id) => bodyBox(el[id])), leaf.width ? [leaf.x, leaf.y, leaf.x + leaf.width, leaf.y + leaf.height] : null] : [];
+    taken.length = 0;
+    taken.push(...[...KEEP_CLEAR, bodyBox(el.chef), agentBox, moved(el.truck, [truckRun(state.truck, t - state.truck.since).front, TRUCK_Y, 0]), ...gateParts].filter(Boolean));
+
     drawGate(state.gate, t, calm);
     drawRaw(state, t);
     drawRacks(state, t, calm);
@@ -736,15 +785,17 @@ ${truck()}
     } else if (el.scan.firstChild) el.scan.innerHTML = "";
 
     setAttr(beacon, "data-stamp", state.door.scan && !stamp ? (calm || Math.floor(t * 4) % 2 === 0 ? "SCAN" : "SCAN-OFF") : stamp ?? "");
-    drawStamp(stamp, state.door.reasons, state.door.since, state.phone.status, t, calm);
+    const run = truckRun(state.truck, t - state.truck.since);
+    const shippedAt = run.accepted && state.truck.since >= state.door.since ? state.truck.since + run.go : Infinity;
+    drawStamp(stamp, state.door.reasons, state.door.since, state.phone.status, t, calm, shippedAt);
     drawPhone(state.phone, t, calm);
     drawClock(state.now);
+    const typed = drawTyped(state, t, calm);
     drawDoor(state, t, calm);
     drawTruck(state, t, dt, snap, calm);
     flushBursts(t, calm);
-    const typed = drawTyped(state, t, calm);
     drawChef(state, t, typed, calm);
-    drawLabel(state, ax, ay, bob);
+    drawLabel(state, ax, ay, bob, agentBox);
     drawSky(state, dt, snap || calm);
   }
 
@@ -841,7 +892,7 @@ ${truck()}
       const node = chips[i];
       if (status !== "naive" || !text) return setAttr(node, "style", "opacity:0");
       const [cx, cy] = at([RACK_X[i] + RACK.w / 2, RACK.y + RACK.d, RACK.h + 20]);
-      chip(node, { x: cx + 6, y: cy - 4, text, iconName, tone: status, size: 20, anchor: "start" });
+      taken.push(chip(node, { x: cx + 6, y: cy - 4, text, iconName, tone: status, size: 20, anchor: "start" }));
       setAttr(node, "style", `opacity:${(calm ? 1 : clamp01(age / 0.25)).toFixed(3)}`);
     });
   }
@@ -911,16 +962,21 @@ ${truck()}
       if (t >= arrive && t < arrive + 1.4) bursts.push({ x: dx, y: dy - 34, t0: arrive, ok: item.ok });
     });
     if (state.door.stamp === "REJECT" && q && state.door.since >= q.at && t - state.door.since < 1.4) bursts.push({ x: dx, y: dy - 34, t0: state.door.since, ok: false });
-    const [cx, cy] = at([GATE_X + 10, 52, 128]);
-    chips.forEach((node, k) => {
-      const list = items.filter((it) => !it.ok);
-      const item = list[k];
-      if (!item) return setAttr(node, "style", "opacity:0");
-      const arrive = q.at + 0.2 + items.indexOf(item) * 0.45 + 0.6;
-      if (t < arrive && !calm) return setAttr(node, "style", "opacity:0");
+    const tr = state.truck;
+    const shipped = q && tr.status !== "parked" && !tr.naive && tr.since >= q.at;
+    const list = shipped ? [] : items.filter((it) => !it.ok).slice(0, chips.length).map((item) => {
       const text = item.code === "STOCK_LIMITED" ? (item.remaining !== null ? `Only ${item.remaining} left` : "Stock limited") : item.code === "CUTOFF_PASSED" ? "Cut-off passed" : reasonText(item.code);
-      chip(node, { x: cx + 40, y: cy + refused * 44, text, iconName: "cross", tone: "reject", size: 20, anchor: "start" });
-      setAttr(node, "style", `opacity:${(calm ? 1 : clamp01((t - arrive) / 0.25)).toFixed(3)}`);
+      return { item, text, arrive: q.at + 0.2 + items.indexOf(item) * 0.45 + 0.6 };
+    });
+    const front = bodyBox(el["gate-front"]);
+    const shelf = bodyBox(racks[0]);
+    const width = Math.max(0, ...list.map((c) => chipSize(c.text, "cross", 20).width));
+    const spot = list.length && front && shelf ? place("doorchips", width, list.length * 44 - 9, [[Math.max(front[2], LEAF_REACH) + 12, shelf[3] + 8]]) : null;
+    chips.forEach((node, k) => {
+      const c = list[k];
+      if (!c || !spot || (t < c.arrive && !calm)) return setAttr(node, "style", "opacity:0");
+      chip(node, { x: spot[0], y: spot[1] + 35 + refused * 44, text: c.text, iconName: "cross", tone: "reject", size: 20, anchor: "start" });
+      setAttr(node, "style", `opacity:${(calm ? 1 : clamp01((t - c.arrive) / 0.25)).toFixed(3)}`);
       refused += 1;
     });
   }
@@ -973,14 +1029,21 @@ ${truck()}
     if (!words && parked && state.phone.status === "expired") words = ["Approval expired", "clock", "reject"];
     if (!words) return setAttr(el.dockchip, "style", "opacity:0");
     const [px, py] = at([BARRIER.x, BARRIER.post, 0]);
-    chip(el.dockchip, { x: px - 24, y: py + 4, text: words[0], iconName: words[1], tone: words[2], size: 20, anchor: "end" });
+    const { width, height } = chipSize(words[0], words[1], 20);
+    const spot = place("dockchip", width, height, [[px - 24 - width, py + 4 - height], [px - 24 - width, py + 16]]);
+    if (!spot) return setAttr(el.dockchip, "style", "opacity:0");
+    chip(el.dockchip, { x: spot[0], y: spot[1] + height, text: words[0], iconName: words[1], tone: words[2], size: 20, anchor: "start" });
     setAttr(el.dockchip, "style", null);
   }
 
-  /** The door's decision: a shockwave at the gate beacon, and a card in the bottom-right corner where the stamp slams in with its reasons. */
-  function drawStamp(stamp, reasons, since, phoneStatus, t, calm) {
+  /**
+   * The door's decision: a shockwave at the gate beacon, and a card in the bottom-right corner where the stamp slams in
+   * with its reasons. The card fades once the accepted truck leaves the dock (shippedAt), since the truck drives past it.
+   */
+  function drawStamp(stamp, reasons, since, phoneStatus, t, calm, shippedAt) {
     const group = el.stampfx;
-    if (!stamp) {
+    const fade = clamp01(1 - (t - shippedAt) / 0.3);
+    if (!stamp || fade === 0) {
       setAttr(el.gateshock, "style", "opacity:0");
       return setAttr(group, "style", "opacity:0");
     }
@@ -996,7 +1059,7 @@ ${truck()}
       setAttr(ring, "style", u > 0 && u < 1 ? `opacity:${(0.95 * (1 - u)).toFixed(3)}` : "opacity:0");
     });
     setAttr(group, "data-stamp", stamp);
-    setAttr(group, "style", null);
+    setAttr(group, "style", fade < 1 ? `opacity:${fade.toFixed(3)}` : null);
     const badge = group.querySelector(".badge-in");
     const scale = 1 + 0.9 * (1 - backOut(age / 0.26));
     setAttr(badge, "transform", scale !== 1 ? `scale(${scale.toFixed(3)})` : null);
@@ -1011,6 +1074,7 @@ ${truck()}
     const height = 100 + Math.min(3, words.length) * 44;
     setAttr(group.querySelector(".banner-box"), "height", height);
     setAttr(group, "transform", `translate(${W - 16 - 344} ${CARD_BOTTOM - height})`);
+    taken.push([W - 16 - 344, CARD_BOTTOM - height, W - 16, CARD_BOTTOM]);
     const rows = pool(group.querySelector(".stamp-labels"), items.length, chipMarkup);
     rows.forEach((row, i) => {
       const item = items[i];
@@ -1045,7 +1109,7 @@ ${truck()}
     }[ph.status];
     if (!words) return setAttr(el.phonechip, "style", "opacity:0");
     const [px, py] = at([PHONE.x + PHONE.w, PHONE.y + PHONE.d, 0]);
-    chip(el.phonechip, { x: px, y: py + 18, text: words[0], iconName: words[1], tone: words[2], anchor: "end" });
+    taken.push(chip(el.phonechip, { x: px - 8, y: py + 18, text: words[0], iconName: words[1], tone: words[2], anchor: "end" }));
     setAttr(el.phonechip, "style", null);
   }
 
@@ -1116,6 +1180,7 @@ ${truck()}
     setAttr(el.caldate, "data-flip", delivered ? "" : null);
     if (run.accepted && age >= run.unloadDone - 0.2 && age < run.home + 1.5) {
       setAttr(el.receipt, "transform", `translate(40 ${CARD_BOTTOM - 90})`);
+      taken.push([40, CARD_BOTTOM - 90, 256, CARD_BOTTOM - 10]);
       setText(el.receipt.querySelector(".receipt-amount"), state.receipt?.netCents != null ? euro(state.receipt.netCents) : "Delivered");
       setAttr(el.receipt, "style", `opacity:${(calm ? 1 : clamp01((age - run.unloadDone + 0.2) / 0.3)).toFixed(3)}`);
     } else setAttr(el.receipt, "style", "opacity:0");
@@ -1196,8 +1261,9 @@ ${truck()}
     const width = Math.max(...full.map((l) => l.length + 1)) * size * 0.62 + 40;
     const height = full.length * lineH + 26;
     const [tx, ty] = at([PHONE.x + PHONE.w / 2, PHONE.y + PHONE.d, PHONE.z + PHONE.h + 6]);
-    const x = Math.max(14, tx + 50 - width);
+    const x = Math.max(14, tx + 26 - width);
     const y = ty - height - 22;
+    taken.push([x, y, x + width, ty]);
     const rr = 12;
     const tipX = Math.min(Math.max(tx, x + 30), x + width - 30);
     const d = `M${f1(x + rr)} ${f1(y)}H${f1(x + width - rr)}Q${f1(x + width)} ${f1(y)} ${f1(x + width)} ${f1(y + rr)}V${f1(y + height - rr)}Q${f1(x + width)} ${f1(y + height)} ${f1(x + width - rr)} ${f1(y + height)}H${f1(tipX + 12)}L${f1(tx)} ${f1(ty - 4)}L${f1(tipX - 12)} ${f1(y + height)}H${f1(x + rr)}Q${f1(x)} ${f1(y + height)} ${f1(x)} ${f1(y + height - rr)}V${f1(y + rr)}Q${f1(x)} ${f1(y)} ${f1(x + rr)} ${f1(y)}Z`;
@@ -1237,20 +1303,25 @@ ${truck()}
     setAttr(el.phone, "data-typing", typed.typing && ph.status === "idle" ? "" : null);
   }
 
-  /** The agent's card content as a label over its head. */
-  function drawLabel(state, ax, ay, bob) {
+  /** The agent's card content as a label next to it: over its head, else under its feet or beside it, never over the cast, the door or other text. */
+  function drawLabel(state, ax, ay, bob, body) {
     const lines = cardLines(state);
-    if (!lines.length) return setAttr(el.label, "style", "opacity:0");
+    if (!lines.length || !body) return setAttr(el.label, "style", "opacity:0");
     const head = at([ax, ay, 66 + bob]);
     const size = 21;
     const width = Math.max(...lines.map((l) => l.length)) * size * 0.56 + 32;
     const height = lines.length * size * 1.3 + 18;
-    const top = head[1] - height - 8;
-    let left = head[0] - width / 2;
-    for (const [x0, y0, x1, y1] of KEEP_CLEAR) if (top < y1 + 2 && top + height > y0 - 2 && left < x1 + 8 && left + width > x0 - 8) left = x1 + 8;
+    const [hx, above, below, mid] = [head[0], head[1] - height - 8, body[3] + 12, (body[1] + body[3]) / 2 - height / 2];
+    const spot = place("label", width, height, [
+      [hx - width / 2, above], [hx - width / 2, below],
+      [hx - 24, above], [hx + 24 - width, above], [hx - 24, below], [hx + 24 - width, below],
+      [body[2] + 8, mid], [body[0] - 8 - width, mid],
+    ]);
+    if (!spot) return setAttr(el.label, "style", "opacity:0");
+    const [left, top] = spot;
     const box = el.label.querySelector(".label-box");
     box.setAttribute("x", f1(left));
-    box.setAttribute("y", f1(head[1] - height - 8));
+    box.setAttribute("y", f1(top));
     box.setAttribute("width", f1(width));
     box.setAttribute("height", f1(height));
     setAttr(el.label, "data-carry", state.agent.carry);
@@ -1265,7 +1336,7 @@ ${truck()}
     [...txt.children].forEach((span, i) => {
       span.textContent = lines[i];
       span.setAttribute("x", f1(left + width / 2));
-      span.setAttribute("y", f1(head[1] - height - 8 + 9 + size + i * size * 1.3 - 3));
+      span.setAttribute("y", f1(top + 9 + size + i * size * 1.3 - 3));
     });
     setAttr(el.label, "style", null);
   }

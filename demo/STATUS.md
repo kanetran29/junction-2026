@@ -146,6 +146,12 @@ Vấn đề tìm thấy:
 - Các phần cổng giờ hạ xuống từ độ cao 20 (trước 40): với nhịp mới, biển LAZYDOOR đang mờ dần lướt qua logo Valio Aimo ở 0:24,75 và kiểm tra chồng chữ bắt được.
 - Test mới: Story không quá 110 giây, mỗi phụ đề đủ thời gian đọc, phụ đề giới hạn của bếp và luật ký của bếp có mặt, không có "unlimited". Thanh kéo `max` 108,5.
 
+### 17. Chữ không che nhân vật, cổng hay xe; gợi ý xoay ngang trên điện thoại
+- Mỗi khung, cảnh lập danh sách vùng cấm: chef, agent, xe tải (theo vị trí đang chạy), các phần của cổng (rào, cột, khung, biển LAZYDOOR, cánh cửa đang mở), màn hình bếp, lịch, và mọi chữ đã đặt. Nhãn của agent thử lần lượt: trên đầu, dưới chân, lệch trái/phải, hai bên; chỗ nào không chạm gì thì đặt, giữ chỗ cũ nếu còn trống để không nhảy qua lại; không có chỗ nào thì ẩn (lúc xe tải đỗ trước bếp; thẻ hoá đơn góc trái đã có cùng số tiền).
+- Nhãn lý do của cổng ("Cut-off passed", "Only 384 left") chuyển xuống sàn kho, bên phải tầm quét của cánh cửa, không che kệ; ẩn khi đơn đã giao cho xe. Nhãn bến ("Waiting for approval") xuống dưới một hàng khi chỗ cũ bị chiếm. Ô chữ chef gõ và nhãn màn hình bếp lùi trái vài điểm để không chạm mũ chef. Thẻ quyết định góc phải mờ đi khi xe đã nhận hàng rời bến (xe chạy ngang qua góc thẻ).
+- `demo/dev/label-overlap.mjs` thêm khung của chef, agent, xe tải, rào/cột/khung/cánh cổng và biển LAZYDOOR làm vật cứng: chữ không được chạm chúng (vật cứng chạm nhau thì bỏ qua). Lần chạy đầu: 11 cặp; sau khi sửa: `label overlaps: 0` (Story mỗi 0,25 giây, Live phát hết file mẫu).
+- Điện thoại dọc (≤ 640 px): dòng gợi ý "Turn your phone sideways to see the whole scene." với biểu tượng xoay (Phosphor device-rotate). Xoay ngang thì tự ẩn và sân khấu vừa chiều cao màn hình. Đã kiểm 375×812 và 812×375.
+
 ## Còn lại / cần làm sau
 - Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

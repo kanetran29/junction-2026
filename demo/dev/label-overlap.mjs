@@ -8,7 +8,10 @@ const chromium = pw.chromium ?? pw.default.chromium;
 const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, headless: true, args: ["--use-angle=metal", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
 
-/** Runs in the page: the screen boxes of every visible piece of text (and the terminal screen, which must stay clear). */
+/**
+ * Runs in the page: the screen boxes of every visible piece of text (and the terminal screen, which must stay clear),
+ * plus the cast and the door as solids that no text may cover (solids may overlap each other).
+ */
 const collect = () => {
   const scene = document.querySelector(".scene-front");
   const seen = (node) => {
@@ -41,8 +44,20 @@ const collect = () => {
   one("phonechip", ".chip-box", "terminal chip");
   scene.querySelectorAll('[data-id="doorchips"] > .chip-g').forEach((g, i) => add(`door chip ${i}`, g.querySelector(".chip-box")));
   scene.querySelectorAll('[data-id="chips"] > .chip-g').forEach((g, i) => add(`rack chip ${i}`, g.querySelector(".chip-box")));
-  add("LAZYDOOR sign", scene.querySelector(".neon-back"));
   add("logo sign", scene.querySelector('image[href*="valio-aimo-logo"]'));
+  const solid = (id, name) => {
+    const before = items.length;
+    add(name, scene.querySelector(`[data-id="${id}"]`));
+    if (items.length > before) items.at(-1).solid = true;
+  };
+  solid("chef", "chef");
+  solid("agent", "agent");
+  solid("truck", "truck");
+  solid("gate-fence", "gate fence");
+  solid("gate-post", "gate post");
+  solid("gate-front", "gate front");
+  solid("leaf", "gate leaf");
+  solid("gate-sign", "LAZYDOOR sign");
   add("calendar", scene.querySelector(".cal-head")?.parentNode);
   add("terminal screen", scene.querySelector(".phone-screen"));
   const html = (sel, name) => {
@@ -68,13 +83,14 @@ function check({ items, stage }, when) {
     found.set(key, f);
   };
   for (const a of items) {
-    if (a.x < stage.x - 1 || a.y < stage.y - 1 || a.x + a.w > stage.x + stage.w + 1 || a.y + a.h > stage.y + stage.h + 1) note(`${a.name} | outside stage`, 0);
+    if (!a.solid && a.x < stage.x - 1 || a.y < stage.y - 1 || a.x + a.w > stage.x + stage.w + 1 || a.y + a.h > stage.y + stage.h + 1) note(`${a.name} | outside stage`, 0);
   }
   for (let i = 0; i < items.length; i++) {
     for (let j = i + 1; j < items.length; j++) {
       const a = items[i];
       const b = items[j];
-      const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      if (a.solid && b.solid) continue;
+      const w =Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
       const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
       if (w > 2 && h > 2) note([a.name, b.name].sort().join(" | "), w * h);
     }
