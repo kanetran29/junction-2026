@@ -27,4 +27,7 @@ describe('checkSubstitute', () => {
     const bare = product('R', { claims: [], allergens: a([]) });
     expect(checkSubstitute(bare, product('S', { claims: [], allergens: a(['AW']) }))).toEqual({ ok: true, allergensUnknown: true });
   });
+  it('a substitute with no allergen data cannot be compared either: ok but allergensUnknown', () => {
+    expect(checkSubstitute(ref, product('S', { claims: ref.claims, allergens: a([]) }))).toEqual({ ok: true, allergensUnknown: true });
+  });
 });
