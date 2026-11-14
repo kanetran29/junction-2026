@@ -352,7 +352,7 @@ function post(y0, hinge) {
   return base + M("gate", out) + M("rose", slab(k.insetPlan(plan, -0.6), 84, 4, { tone: "mid" }, 3, 0.4));
 }
 
-/** Graphite beam over the gate with its scanner head, glass strip, beacon lamp and the engraved LAZYDOOR sign on two masts. */
+/** Graphite beam over the gate with its scanner head, glass strip, beacon lamp and the two masts that carry the sign. */
 function beam() {
   const out = [M("gate", slab({ x: GATE_X - 10, y: -30, w: 20, d: 82, r: 1.5 }, 100, 10, { tone: "mid" }, 3, 0.8) + dots([[GATE_X - 6, -26, 110], [GATE_X - 6, 48, 110], [GATE_X + 6, -26, 110], [GATE_X + 6, 48, 110]], { size: 1, tone: "hi" }))];
   out.push(M("rose", slab({ x: GATE_X - 10.6, y: -30.6, w: 21.2, d: 83.2, r: 1.8 }, 100, 2.6, { tone: "mid" }, 3, 0.4)));
@@ -362,9 +362,13 @@ function beam() {
   out.push(`<g class="beacon">${cyl(GATE_X, 11, 6, 114, 11, { tone: "hi", className: "beacon-lamp" }, 28)}</g>`);
   out.push(M("dark", cyl(GATE_X, 11, 7, 125, 2.4, { tone: "mid" }, 28)));
   out.push(M("dark", cyl(GATE_X, -22, 1.4, 110, 22, { tone: "mid" }, 10) + cyl(GATE_X, 0, 1.4, 110, 22, { tone: "mid" }, 10)));
-  const [sx, sy] = at([GATE_X, -11, 138]);
-  out.push(`<g class="neon"><rect class="neon-back" x="${f1(sx - 84)}" y="${f1(sy - 24)}" width="168" height="40" rx="9"/><text class="neon-text" x="${f1(sx + 2)}" y="${f1(sy + 3.5)}" text-anchor="middle">LAZYDOOR</text></g>`);
   return out.join("");
+}
+
+/** The LAZYDOOR sign on the beam's masts: pale rose letters engraved on a graphite plate. */
+function sign() {
+  const [sx, sy] = at([GATE_X, -11, 138]);
+  return `<g class="neon"><rect class="neon-back" x="${f1(sx - 84)}" y="${f1(sy - 24)}" width="168" height="40" rx="9"/><text class="neon-text" x="${f1(sx + 2)}" y="${f1(sy + 3.5)}" text-anchor="middle">LAZYDOOR</text></g>`;
 }
 
 /** The kitchen terminal on a pedestal: a glowing screen facing the viewer with an icon per state, and a keypad on its right side where the chef types. */
@@ -546,18 +550,17 @@ export function buildScene(host) {
   const back = `<svg class="iso-svg scene-back" viewBox="0 0 ${W} ${H}" role="img" aria-label="Isometric scene: a hotel chef in his kitchen, the buyer agent robot, Lazydoor's gate and road barrier, Valio Aimo's brick warehouse with racks, the manager's phone, and a delivery truck on the road between the warehouse dock and the kitchen.">${plate()}${backWalls()}</svg>`;
   const front = `<svg class="iso-svg scene-front" viewBox="0 0 ${W} ${H}" aria-hidden="true">
 <defs><filter id="glow" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="7"/></filter></defs>
-<g>${logoSign()}${wallClock()}${LAMPS.map(lamp).join("")}${kitchen()}${[3, 2, 1, 0].map(rack).join("")}${fence(-120, -28)}${post(-28, true)}${phone()}</g>
-<path class="stop-line" d="${k.lineOnTop([GATE_X - 24, -12], [GATE_X - 24, 34], 0.7, P)}"/>
+<g>${logoSign()}${wallClock()}${LAMPS.map(lamp).join("")}${kitchen()}${[3, 2, 1, 0].map(rack).join("")}<g data-id="gate-fence">${fence(-120, -28)}</g><g data-id="gate-post">${post(-28, true)}</g>${phone()}</g>
+<path data-id="stopline" class="stop-line" d="${k.lineOnTop([GATE_X - 24, -12], [GATE_X - 24, 34], 0.7, P)}"/>
 <g data-id="asks" style="opacity:0">${asks()}</g>
 <path data-id="sneak" class="sneak" d="" style="opacity:0"/>
 <g data-id="leaf"></g>
 <g data-id="chef">${chef()}</g>
 <g data-id="agent">${robot("coral", "sun")}${card()}</g>
-<g>${post(36, false)}${beam()}</g>
-<g data-id="naive" class="naive" style="opacity:0">${robot("grey", "grey")}</g>
+<g data-id="gate-front">${post(36, false)}${beam()}</g>
+<g data-id="gate-sign">${sign()}</g>
 <g data-id="trail"></g>
 <g data-id="letter" class="letter" style="opacity:0">${LETTER}</g>
-<g data-id="nletter" class="letter naive-letter" style="opacity:0">${LETTER}</g>
 ${truck()}
 <g data-id="exhaust"></g>
 <g>${barrier()}</g>
@@ -581,7 +584,7 @@ ${truck()}
   const root = host.querySelector(".scene-front");
   const stage = host.closest(".stage") ?? host;
   const q = (id) => root.querySelector(`[data-id="${id}"]`);
-  const ids = ["agent", "naive", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "bubble", "label", "exhaust", "doorfly", "bursts", "doorchips", "dockchip", "rings", "confetti", "stampfx", "gateshock", "chips", "phonechip", "receipt", "flying", "counter", "chef", "letter", "nletter", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "phonei"];
+  const ids = ["agent", "gate-fence", "gate-post", "gate-front", "gate-sign", "stopline", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "bubble", "label", "exhaust", "doorfly", "bursts", "doorchips", "dockchip", "rings", "confetti", "stampfx", "gateshock", "chips", "phonechip", "receipt", "flying", "counter", "chef", "letter", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "phonei"];
   const el = Object.fromEntries(ids.map((id) => [id, q(id)]));
   const racks = [...root.querySelectorAll(".rack")].sort((a, b) => a.dataset.rack - b.dataset.rack);
   const counterCrates = [...el.counter.querySelectorAll(".ccrate")];
@@ -655,7 +658,12 @@ ${truck()}
   };
   const RC = lengths(ROUTE);
   const STATION = { chef: RC[0], home: RC[1], door: RC[2], truck: RC[0] };
-  const NAIVE_AT = [-126, 44];
+  const HAND_AT_DOOR = at([ROUTE[2][0], ROUTE[2][1] + 13, 24]);
+  const RACK_TOP = at([RACK_X[0] + RACK.w / 2, RACK.y + RACK.d, RACK.h + 18]);
+  /** Control point of the raw API arc in Act 1: high over the place where the door will stand. */
+  const RAW_BEND = [(HAND_AT_DOOR[0] + RACK_TOP[0]) / 2, Math.min(HAND_AT_DOOR[1], RACK_TOP[1]) - 150];
+  /** Parts of the door in build order, with the delay in seconds before each lowers into place. */
+  const GATE_PARTS = [["gate-fence", 0], ["gate-post", 0.45], ["gate-front", 0.9], ["leaf", 1.5], ["gate-sign", 2.1], ["stopline", 2.7]];
   const live = { s: STATION.home, v: 0, leaf: 0, leafShown: "", warm: 0, red: 0, lampDrawn: -1, boom: 0, today: ["SAT", "14"], happy: false, handKey: null, handAt: null };
 
   /** Moves s toward target along a route with a speed limit and a short ease in and out. */
@@ -713,7 +721,8 @@ ${truck()}
     const posted = drawLetter(state, t, snap, calm, ax, ay, bob);
     setAttr(cardEl, "style", state.agent.carry && !posted ? null : "opacity:0");
 
-    drawNaive(state.naive, t);
+    drawGate(state.gate, t, calm);
+    drawRaw(state, t);
     drawRacks(state, t, calm);
 
     setAttr(el.asks, "style", state.door.scan ? `stroke-dashoffset:${f1(-t * 24)}` : "opacity:0");
@@ -738,34 +747,23 @@ ${truck()}
     drawSky(state, dt, snap || calm);
   }
 
-  /** The naive robot stands on the kitchen side and asks the raw API around the door: a grey arc over the fence to rack 0. */
-  function drawNaive(naive, t) {
-    if (!naive.step) {
-      setAttr(el.naive, "style", "opacity:0");
-      setAttr(el.sneak, "style", "opacity:0");
-      return;
+  /** The door is not there in Story Act 1; once it is built its parts lower into place one after another. */
+  function drawGate(gate, t, calm) {
+    for (const [id, delay] of GATE_PARTS) {
+      const e = !gate.built ? 0 : calm ? 1 : ease((t - gate.since - delay) / 0.9);
+      setAttr(el[id], "transform", e < 1 ? k.translateAlong(P, [0, 0, 40 * (1 - e)]) : null);
+      setAttr(el[id], "style", e < 1 ? `opacity:${e.toFixed(3)}` : null);
     }
-    const op = naive.step === "gone" ? Math.max(0, 1 - (t - naive.since) / 1) : naive.step === "enter" ? Math.min(1, (t - naive.since) / 0.6) : 1;
-    const walk = naive.step === "enter" ? 1 - easeOut((t - naive.since) / 1.4) : 0;
-    setAttr(el.naive, "transform", k.translateAlong(P, [NAIVE_AT[0] - 50 * walk, NAIVE_AT[1], walk > 0.02 ? Math.abs(Math.sin(t * 13)) * 1.6 : 0]));
-    setAttr(el.naive, "style", `opacity:${op.toFixed(3)}`);
-    if (naive.step === "enter" || naive.step === "grab" || naive.step === "load") {
-      const a = at([NAIVE_AT[0], NAIVE_AT[1], 62]);
-      const b = at([RACK_X[0] + RACK.w / 2, RACK.y + RACK.d, RACK.h + 18]);
-      const c = [(a[0] + b[0]) / 2, Math.min(a[1], b[1]) - 150];
-      const grow = naive.step === "enter" ? clamp01((t - naive.since - 0.8) / 1.2) : 1;
-      setAttr(el.sneak, "d", `M${f1(a[0])} ${f1(a[1])}Q${f1(c[0])} ${f1(c[1])} ${f1(b[0])} ${f1(b[1])}`);
-      setAttr(el.sneak, "style", `opacity:${(op * grow).toFixed(3)};stroke-dashoffset:${f1(-t * 30)}`);
-      const u = naive.step === "enter" ? (t - naive.since - 1.4) / 1.3 : 2;
-      if (u > 0 && u < 1) {
-        const e = ease(u);
-        const q = (i) => (1 - e) * (1 - e) * a[i] + 2 * e * (1 - e) * c[i] + e * e * b[i];
-        placeLetter(el.nletter, q(0), q(1), 1 - 0.3 * e, u > 0.85 ? (1 - u) / 0.15 : 1);
-      } else setAttr(el.nletter, "style", "opacity:0");
-    } else {
-      setAttr(el.sneak, "style", "opacity:0");
-      setAttr(el.nletter, "style", "opacity:0");
-    }
+  }
+
+  /** Act 1, before the door exists: a dashed grey arc from the agent straight to rack 0, the raw supplier API it calls. */
+  function drawRaw(state, t) {
+    const step = state.naive.step;
+    const on = !state.gate.built && state.agent.at === "door" && live.handAt !== null && (step === "enter" || step === "grab" || step === "load");
+    if (!on) return setAttr(el.sneak, "style", "opacity:0");
+    const [a, c, b] = [HAND_AT_DOOR, RAW_BEND, RACK_TOP];
+    setAttr(el.sneak, "d", `M${f1(a[0])} ${f1(a[1])}Q${f1(c[0])} ${f1(c[1])} ${f1(b[0])} ${f1(b[1])}`);
+    setAttr(el.sneak, "style", `opacity:${clamp01((t - live.handAt) / 0.6).toFixed(3)};stroke-dashoffset:${f1(-t * 30)}`);
   }
 
   /** Puts a flying envelope at a screen point with a scale and opacity. */
@@ -776,8 +774,9 @@ ${truck()}
 
   /**
    * The agent posts its request: once it stands at the door, its card flies as an envelope into the door's slot and the
-   * agent waits empty-handed; the quote comes back out of the slot into its hands. Returns true while the card is not in
-   * the agent's hands.
+   * agent waits empty-handed; the quote comes back out of the slot into its hands. Before the door is built (Story Act 1)
+   * the envelope flies straight over to rack 0 instead, the raw API, and nothing comes back. Returns true while the card
+   * is not in the agent's hands.
    */
   function drawLetter(state, t, snap, calm, ax, ay, bob) {
     const ag = state.agent;
@@ -788,8 +787,18 @@ ${truck()}
       setAttr(el.letter, "style", "opacity:0");
       return false;
     }
-    const back = ag.carry === "quote" && state.quote ? Math.max(state.quote.at, live.handAt + 1.2) : Infinity;
     const hand = at([ax, ay + 13, 24 + bob]);
+    if (!state.gate.built) {
+      const u = (t - live.handAt) / 1.3;
+      if (calm || u < 0 || u >= 1) setAttr(el.letter, "style", "opacity:0");
+      else {
+        const e = ease(u);
+        const q = (i) => (1 - e) * (1 - e) * hand[i] + 2 * e * (1 - e) * RAW_BEND[i] + e * e * RACK_TOP[i];
+        placeLetter(el.letter, q(0), q(1), 1 - 0.3 * e, u > 0.85 ? (1 - u) / 0.15 : 1);
+      }
+      return true;
+    }
+    const back = ag.carry === "quote" && state.quote ? Math.max(state.quote.at, live.handAt + 1.2) : Infinity;
     const slot = at(DOOR_SLOT);
     let flight = null;
     if (t - live.handAt < 0.9) flight = { u: (t - live.handAt) / 0.9, from: hand, to: slot };
@@ -819,7 +828,7 @@ ${truck()}
       if (status === "limited") text = shelf.remaining !== null ? `${shelf.remaining} left` : "Limited";
       if (status === "crossed") text = shelf.code === "NEW_ALLERGEN" ? "Allergen" : "Rejected";
       if (shelf.more) text += ` +${shelf.more}`;
-      if (i === 0 && naive.step && naive.step !== "gone" && status === "idle") {
+      if (i === 0 && ["grab", "load", "stuck"].includes(naive.step) && status === "idle") {
         status = naive.step === "stuck" || naive.step === "load" ? "locked" : "naive";
         since = naive.since;
         text = naive.step === "stuck" ? "Closed" : "999999?";

@@ -178,9 +178,7 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .chest-bar { fill: #ffcc33; }
 .visor { fill: #0d1a20; }
 .eye-lit { fill: #6ff7ff; }
-.naive .eye-lit { fill: #8796a0; }
 .antenna { fill: var(--hold); stroke: #fff; stroke-width: 1px; }
-.naive .antenna { fill: #8796a0; }
 .card-face { fill: #fffaf0; }
 .card-line { fill: #8aa3ab; }
 .card-stamp { fill: none; }
@@ -206,7 +204,6 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .letter-body { fill: #fffaf0; stroke: #3a2a1a; stroke-width: 1.2px; }
 .letter-flap { fill: none; stroke: #3a2a1a; stroke-width: 1.2px; stroke-linejoin: round; }
 .letter-seal { fill: var(--brand); }
-.naive-letter .letter-seal { fill: #8796a0; }
 .leaf-seal { fill: #f7e8c8; stroke: #2a1820; stroke-width: 1px; }
 .leaf-seal[data-stamp="AUTO"] { fill: var(--auto); }
 .leaf-seal[data-stamp="NEEDS_APPROVAL"] { fill: var(--hold); }

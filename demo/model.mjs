@@ -9,7 +9,7 @@ const CROSSING = new Set(["NEW_ALLERGEN", "SUBTYPE_MISMATCH", "CLAIM_MISSING", "
 /** Empty shelf slot; productId null means nothing is shown on its tag. */
 const emptyShelf = () => ({ productId: null, status: "idle", remaining: null, code: null, more: 0, since: 0 });
 
-/** The scene before any event: agent docked by the chef, door idle, truck parked. */
+/** The scene before any event: agent docked by the chef, the door standing and idle, truck parked. */
 export function initialState() {
   return {
     seq: 0,
@@ -27,6 +27,7 @@ export function initialState() {
     phone: { status: "idle", orderId: null, expiresAt: null, cents: null, since: 0 },
     truck: { status: "parked", crates: 0, naive: false, since: 0 },
     naive: { step: null, since: 0 },
+    gate: { built: true, since: -60 },
     close: false,
     log: [],
   };
@@ -160,8 +161,14 @@ export function reduce(state, ev, t) {
     case "story.say":
       s.say = d.text ? { who: d.who ?? "chef", text: d.text, since: t } : null;
       break;
+    case "story.gate":
+      s.gate = { built: d.built !== false, since: t };
+      break;
     case "story.naive":
       s.naive = { step: d.step ?? null, since: t };
+      if (d.step === "take") goAgent("chef", "draft");
+      if (d.step === "enter") goAgent("door", "draft");
+      if (d.step === "gone") goAgent("home", null);
       if (d.step === "load") s.truck = { status: "loading", crates: 3, naive: true, since: t };
       if (d.step === "stuck") s.truck = { ...s.truck, status: "stuck", since: t };
       if (d.step === "gone") s.truck = { status: "parked", crates: 0, naive: false, since: t };

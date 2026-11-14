@@ -153,3 +153,20 @@ test("reduce: a quote remembers when it arrived", () => {
   const s = reduce(initialState(), { seq: 1, type: "quote.created", data: QUOTE }, 44.5);
   assert.equal(s.quote.at, 44.5);
 });
+
+test("reduce: the door stands in Live; story.gate takes it away and builds it", () => {
+  assert.equal(initialState().gate.built, true);
+  const gone = reduce(initialState(), { type: "story.gate", data: { built: false } }, 0);
+  assert.equal(gone.gate.built, false);
+  const built = reduce(gone, { type: "story.gate", data: { built: true } }, 29);
+  assert.deepEqual(built.gate, { built: true, since: 29 });
+});
+
+test("reduce: the naive steps move the one agent: take at the chef, enter at the door place, gone home empty-handed", () => {
+  let s = reduce(initialState(), { type: "story.naive", data: { step: "take" } }, 9);
+  assert.deepEqual([s.agent.at, s.agent.carry], ["chef", "draft"]);
+  s = reduce(s, { type: "story.naive", data: { step: "enter" } }, 11);
+  assert.deepEqual([s.agent.at, s.agent.carry, s.agent.since], ["door", "draft", 11]);
+  s = reduce(s, { type: "story.naive", data: { step: "gone" } }, 27);
+  assert.deepEqual([s.agent.at, s.agent.carry], ["home", null]);
+});

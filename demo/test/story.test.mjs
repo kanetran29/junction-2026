@@ -59,3 +59,16 @@ test("story: gateway events carry the schema envelope only", () => {
     assert.equal(typeof ev.data, "object");
   }
 });
+
+test("story: Act 1 has no door, the door is built after the naive run, the same agent walks in Act 2", () => {
+  const gone = firstAt((ev) => ev.type === "story.naive" && ev.data.step === "gone");
+  const built = firstAt((ev) => ev.type === "story.gate" && ev.data.built === true);
+  const draft = firstAt((ev) => ev.type === "draft.created");
+  assert.equal(stateAt(1).gate.built, false);
+  assert.equal(stateAt(20).gate.built, false);
+  assert.ok(gone < built && built < draft);
+  assert.equal(stateAt(built + 0.01).gate.built, true);
+  assert.equal(stateAt(DURATION).gate.built, true);
+  const caption = STORY.find((item) => item.at >= built - 1 && item.ev.type === "story.caption");
+  assert.match(caption.ev.data.text, /built a door/);
+});

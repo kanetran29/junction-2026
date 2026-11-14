@@ -6,15 +6,14 @@ Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 
 Mở http://localhost:8790/ (dev server đang chạy, phục vụ thẳng thư mục `demo/`), bấm Play hoặc kéo thanh thời gian. Chưa quay video mới: `demo/story.mp4` vẫn là bản cũ, sẽ quay lại sau khi Kane duyệt.
 
-Cần xem (6 sửa theo nhận xét của Kane về 77db1ef; tổng quan: [ảnh](shots/after-overview.png)):
-1. Chef: quay mặt thẳng về người xem, hai vai ngang nhau, hai tay gắn đối xứng vào thân ở mọi tư thế (đứng, gõ phím, nhún vai, giơ ngón cái) ([ảnh](shots/after-chef-poses.png)).
-2. Xe tải: bỏ hẳn chữ VALIO AIMO trên xe ([giao hàng](shots/after-delivery.png)).
-3. Thanh chắn bến: mỗi chuyến xe chỉ mở một lần (mở trước khi xe chạy, đóng khi xe đã về đỗ), không mở khi hàng bị từ chối hay hết hạn. Trong Story: mở 62,7 s, đóng 73,7 s; mở 80,9 s, đóng 92,0 s.
-4. Agent: 0:36 đến 0:38 đi tới trước cổng, thả phong thư vào khe thư trên cánh cổng, đứng chờ ngoài cổng tay không; báo giá đi ra từ khe về tay agent ([ảnh](shots/after-letter.png)). Agent ngây thơ (0:12): cũng đi tới trước cổng, nhưng phong thư bay vòng qua cổng theo đường nét đứt xám tới kệ (đây là ý "bỏ qua cổng" của cảnh này) ([ảnh](shots/after-naive-letter.png)).
-5. Màu Lazydoor: bỏ hồng neon. Cổng màu graphite, cánh cổng màu đỏ garnet trầm, viền hồng đậm (#b8456b) ở nắp hàng rào, cổ trụ và dầm; biển LAZYDOOR chữ hồng nhạt khắc trên tấm graphite, không phát sáng. Giao diện dùng cùng tông: chữ "Lazydoor", nút đang chọn, vạch dừng, tia quét ([cổng](shots/after-gate.png)).
-6. Chữ nhỏ hơn một bậc: phụ đề 2,25% chiều rộng (43 px ở 1080p), nhãn và thẻ 20 đến 22 đơn vị (24 đến 26 px), khung sự kiện và đồng hồ 1,3%, số đếm ngược 2,75%; thẻ quyết định và hoá đơn thu nhỏ theo.
+Cần xem (kịch bản dựng lại thành hai hồi, một agent; ảnh: [các hồi](shots/after-acts.png)):
+1. Hồi 1 (0:00 đến 0:28): chưa có Lazydoor trong cảnh (không hàng rào, cổng, biển, máy quét, vạch dừng). Chef gõ yêu cầu; agent tới lấy đơn ở chef (0:10), đi tới ranh giới kho, gửi phong thư thẳng tới kệ theo đường cong xám (API thô của Valio, 0:13); kệ trả "999999?" (0:15); thùng 10 l novobox bị cổng bến từ chối "Cut-off Thu 12 Nov 15:00" (0:20); xe trống, quầy bếp trống, chef nhún vai; agent về chỗ.
+2. Chuyển cảnh (0:28 đến 0:32): phụ đề "So we built a door in front of the warehouse."; cổng được lắp từng phần, hạ xuống đúng chỗ: hàng rào, trụ sau, trụ trước và dầm có máy quét, cánh cổng, biển LAZYDOOR, vạch dừng.
+3. Hồi 2 (từ 0:32): cùng một robot (không còn robot thứ hai) đi tới cổng mới, thả phong thư vào khe, đứng chờ ngoài; cổng kiểm tra luật; phần còn lại giữ nguyên: duyệt, đơn được nhận, xe chở tới bếp, tấn công chia nhỏ, chất thay thế có gây dị ứng, phê duyệt hết hạn.
+4. Live: cổng có sẵn từ đầu, không có cảnh lắp.
+5. Sáu sửa của vòng trước vẫn giữ (chef cân đối, xe không chữ, thanh chắn mở một lần mỗi chuyến: 1:03,7 đến 1:14,7 và 1:21,9 đến 1:33,0; màu hồng đậm tiết chế; chữ nhỏ hơn một bậc).
 
-Kiểm tra: `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 giây, Live phát hết file mẫu); 31 test pass.
+Kiểm tra: `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 giây, Live phát hết file mẫu); 34 test pass. Kịch bản dài 124 giây.
 
 ## Nhật ký
 
@@ -133,6 +132,11 @@ Vấn đề tìm thấy:
 - Phong thư: khe thư (viền vàng) trên cánh cổng; agent tới trước cổng thì thẻ trên tay bay thành phong thư vào khe, agent đứng chờ tay không; báo giá đi ra khỏi khe về tay agent (chờ ít nhất 1,2 giây sau khi thả thư). Agent ngây thơ: phong thư bay theo đường cong xám vòng qua cổng tới kệ.
 - Màu: theo design-taste-frontend, một màu nhấn duy nhất, độ bão hoà thấp hơn 80%, không phát sáng neon: hồng đậm `--brand #d65c84` (chữ trên nền tối, tương phản 5,0:1), `--brand-strong #b8456b` (nền nút có chữ trắng, 5,1:1), `--brand-soft #eba3ba` (đường mảnh, chữ biển). Không dùng xanh lá, vàng hay đỏ vì đó là màu tín hiệu AUTO / chờ duyệt / REJECT, không dùng xanh dương vì trùng Valio Aimo.
 - Cỡ chữ: giữa bản trước khi phóng to (nhãn 14 đến 19, phụ đề 2,15%) và bản 77db1ef (nhãn 23 đến 26, phụ đề 2,5%).
+
+### 15. Kịch bản hai hồi, một agent (theo yêu cầu của Kane)
+- Model: thêm `gate: { built, since }`. Live mặc định có cổng; Story dùng tín hiệu `story.gate` để bỏ cổng ở đầu và dựng cổng sau hồi 1. Các bước `story.naive` giờ điều khiển chính agent: `take` (tới chef lấy đơn), `enter` (tới ranh giới kho), `gone` (về chỗ, tay không). Test mới cho cả ba điều này và cho thứ tự kịch bản (bỏ cổng, chạy hồi 1, dựng cổng, rồi mới tới đơn qua cổng).
+- Cảnh: bỏ robot xám thứ hai. Khi chưa có cổng, phong thư của agent bay theo đường cong tới kệ 0 (API thô) thay vì vào khe. Các phần của cổng nằm trong nhóm riêng, hạ xuống và hiện dần theo thứ tự, mỗi phần 0,9 giây.
+- Phụ đề hồi 1 và chuyển cảnh viết lại cho khớp: "The agent orders straight from Valio's raw API. Nothing checks the order.", "The agent learns it after the fact, at the dock.", "So we built a door in front of the warehouse.", "The same agent tries again, through the door. Every decision is a published rule.". Các mốc hồi 2 lùi 1 giây.
 
 ## Còn lại / cần làm sau
 - Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).
