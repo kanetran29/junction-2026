@@ -13,6 +13,7 @@ import { ValioRateLimited } from '../valio/client';
 import { lineNet } from '../domain/money';
 import { eur, productName, qty, renderReceipt } from '../receipt/render';
 import { db } from '../db';
+import { peppolFilename, peppolXml } from '../peppol/export';
 
 /** Escapes a value for HTML text and double-quoted attributes; every interpolated value goes through it. */
 export function escapeHtml(s: unknown): string {
@@ -164,6 +165,11 @@ export function uiRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }>
   ui.get('/approve/:token', async (c) => {
     const r = await renderApprovePage(c.env, c.req.param('token'), fetchFn);
     return c.html(r.html, r.status);
+  });
+
+  ui.get('/approve/:token/peppol', async (c) => {
+    const { orderId, xml } = await peppolXml(c.env, { token: c.req.param('token') });
+    return c.body(xml, 200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': `attachment; filename="${peppolFilename(orderId)}"` });
   });
 
   for (const [verb, act] of [['approve', (e: Env, t: string, role: 'approver' | 'agent') => approve(e, t, { callerRole: role }, fetchFn)], ['reject', (e: Env, t: string, role: 'approver' | 'agent') => reject(e, t, { callerRole: role })]] as const) {

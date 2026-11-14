@@ -63,11 +63,14 @@ export function keylessDemo(env: Env, header: string | undefined): boolean {
 /**
  * Structural auth for `/v1/*`: resolves the caller from the bearer key before any validation (no key or an unknown one is
  * 401) and keeps it in the request context for `requireBuyer`; the public `exempt` paths skip it, and the `demoOpen` paths
- * skip it for a keyless request on a demo door (their handler then reads every buyer, read-only).
+ * skip it for a keyless request on a demo door (their handler then reads every buyer, read-only). A path matching
+ * `visitorPath` also skips it, but only for a request that sends `X-Visitor-Token` and no Authorization header; its handler
+ * then resolves the visitor's own sandbox and nothing else.
  */
-export function authenticate(exempt: string[], demoOpen: string[]): MiddlewareHandler<{ Bindings: Env }> {
+export function authenticate(exempt: string[], demoOpen: string[], visitorPath?: RegExp): MiddlewareHandler<{ Bindings: Env }> {
   return async (c, next) => {
-    const open = exempt.includes(c.req.path) || (demoOpen.includes(c.req.path) && keylessDemo(c.env, c.req.header('Authorization')));
+    const visitor = visitorPath?.test(c.req.path) === true && c.req.header('X-Visitor-Token') !== undefined && c.req.header('Authorization') === undefined;
+    const open = exempt.includes(c.req.path) || visitor || (demoOpen.includes(c.req.path) && keylessDemo(c.env, c.req.header('Authorization')));
     if (!open) {
       const who = await identify(c.env, c.req.header('Authorization'));
       if (!who) throw new HttpError(401, 'UNAUTHORIZED', 'a valid Bearer API key is required');

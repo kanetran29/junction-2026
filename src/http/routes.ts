@@ -1,4 +1,4 @@
-import { OpenAPIHono, createRoute, type z } from '@hono/zod-openapi';
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import type { MiddlewareHandler } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
@@ -13,6 +13,7 @@ import { logEvent, verifyChain } from '../events/log';
 import { InterpretError, confirmDraft, interpret } from '../interpret/gemini';
 import { OrderError, createBasket, getOrder, placeOrder } from '../orders/store';
 import { QuoteError, createQuote, getQuote, type QuoteInput } from '../quote/store';
+import { peppolFilename, peppolXml, visitorBuyer } from '../peppol/export';
 import { productName } from '../receipt/render';
 import { ValioRateLimited } from '../valio/client';
 import { uiRoutes, receiptText } from '../ui/approve';
@@ -33,6 +34,9 @@ export const AUDIT_PER_MINUTE = 30;
 
 /** The only `/v1` routes that need no key: the published rules and reason codes, the audit check (it shows only hashes) and Try it, voice included (demo door only). */
 const PUBLIC_PATHS = ['/v1/rules', '/v1/reason-codes', '/v1/audit/verify', '/v1/try', '/v1/try/decision', '/v1/try/voice'];
+
+/** The Peppol export path, the only `/v1` route a Try it visitor token (`X-Visitor-Token`) opens without a key. */
+const PEPPOL_PATH = /^\/v1\/orders\/[^/]+\/peppol$/;
 
 /** One documented JSON reply: its description and the zod schema of the body. */
 const json = <T extends z.ZodType>(schema: T, description: string) => ({ description, content: { 'application/json': { schema } } });
@@ -73,6 +77,14 @@ const orderRoute = createRoute({
 });
 const getOrderRoute = createRoute({ method: 'get', path: '/v1/orders/{id}', summary: "Read the buyer's own order", request: { params: S.IdParam }, security: SECURITY, responses: ok(S.Order) });
 const receiptRoute = createRoute({ method: 'get', path: '/v1/orders/{id}/receipt', summary: "The order's plain-text receipt", request: { params: S.IdParam }, security: SECURITY, responses: ok(S.Receipt) });
+const peppolRoute = createRoute({
+  method: 'get',
+  path: '/v1/orders/{id}/peppol',
+  summary: "Feature `peppol` (off by default): an ACCEPTED order as a Peppol BIS Order 3.0 (UBL 2.1) XML download. Export only: Valio Aimo has no Peppol access point here, nothing is sent. A buyer key reads its own order; a Try it visitor sends `X-Visitor-Token` instead of a key for an order of their own sandbox. Another buyer's order is 404, an order that is not ACCEPTED is 409 ORDER_NOT_ACCEPTED, the feature off is 404 NOT_FOUND",
+  request: { params: S.IdParam },
+  security: SECURITY,
+  responses: { ...ok(S.ErrorBody), 200: { description: 'UBL 2.1 Order XML, `Content-Disposition: attachment; filename="lazydoor-order-<id>.xml"`', content: { 'application/xml': { schema: z.string() } } } },
+});
 const resolveRoute = createRoute({ method: 'post', path: '/v1/resolve', summary: 'Resolve a product id, sales-unit GTIN, brand or name from the catalogue; never corrects input, no Valio call', request: body(S.ResolveBody), security: SECURITY, responses: ok(S.ResolveReply) });
 const familiesRoute = createRoute({ method: 'get', path: '/v1/families', summary: 'The catalogue map by category, or with terms the families that mention them, with evidence (no products, no Valio call)', request: { query: S.FamiliesQuery }, security: SECURITY, responses: ok(S.FamiliesReply) });
 const rulesRoute = createRoute({ method: 'get', path: '/v1/rules', summary: 'The published decision register: who decides what, and the constants behind it', responses: { 200: json(S.RulesReply, 'OK') } });
@@ -165,7 +177,7 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   // the clip route has its own 1 MB limit; the 4 KB one above is not applied to it
   const voiceBodyLimit = bodyLimit({ maxSize: VOICE_MAX_BYTES, onError: (c) => c.json({ error: 'PAYLOAD_TOO_LARGE', detail: 'at most 1 MB' }, 413) });
   app.use('/v1/try/voice', demoOnly, voiceOn, voiceCors, voiceBodyLimit);
-  app.use('/v1/*', authenticate(PUBLIC_PATHS, ['/v1/events', '/v1/events/stream']));
+  app.use('/v1/*', authenticate(PUBLIC_PATHS, ['/v1/events', '/v1/events/stream'], PEPPOL_PATH));
 
   app.notFound((c) => c.json({ error: 'NOT_FOUND', detail: 'no such route' }, 404));
 
@@ -272,6 +284,15 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
     if (text === null) throw new HttpError(404, 'ORDER_NOT_FOUND', 'no such order');
     const jws = (await getOrder(c.env, buyerId, id))?.jws;
     return c.json({ text, ...(jws ? { jws } : {}) }, 200);
+  });
+
+  /** The Peppol XML of an accepted order: the caller's own by key, or a Try it visitor's own sandbox order by `X-Visitor-Token`. */
+  app.openapi(peppolRoute, async (c) => {
+    const orderId = c.req.valid('param').id;
+    const visitor = c.req.header('X-Visitor-Token');
+    const buyerId = c.req.header('Authorization') === undefined && visitor !== undefined ? await visitorBuyer(c.env, visitor) : (await requireBuyer(c)).buyerId;
+    const { xml } = await peppolXml(c.env, { orderId, buyerId });
+    return c.body(xml, 200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': `attachment; filename="${peppolFilename(orderId)}"` }) as never;
   });
 
   /** Resolves an id, GTIN, brand or name from the catalogue; never corrects input. */
