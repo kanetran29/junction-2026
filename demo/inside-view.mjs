@@ -3,6 +3,7 @@
 // three guardrail clusters, a bento of live tiles, display numerals with the agent-run video, logo groups, a closing split.
 import { HERO, FLOW, FLOW_NOTE, FLOW_STILL, GUARDRAILS, GUARD_STILL, BUILT_WITH, PRODUCTION, CHECKS, COMMANDS, DOOR_URL, REPO_URL, runCheck } from "./inside.mjs";
 import { ICONS } from "./icons.mjs";
+import { AC_ID, acChip, acNote, labelAcChips, fillAcceptance, openCase } from "./acceptance-view.mjs";
 
 /** An element with a class and text. */
 function el(tag, cls = "", text = "") {
@@ -44,7 +45,7 @@ function still({ src, alt, caption }, cls = "", eager = false) {
 /** Small chips, one per value. */
 function chips(values, cls) {
   const span = el("span", "chips");
-  for (const v of values) span.append(el("span", `chip ${cls}`, v));
+  for (const v of values) span.append(AC_ID.test(v) ? acChip(v, `chip ${cls}`) : el("span", `chip ${cls}`, v));
   return span;
 }
 
@@ -101,7 +102,7 @@ function guardrails() {
     cluster.append(el("h3", "", c.heading), list);
     grid.append(cluster);
   }
-  return section("guardrails", "Guardrails, with evidence", still(GUARD_STILL, "guard-still"), grid);
+  return section("guardrails", "Guardrails, with evidence", still(GUARD_STILL, "guard-still"), acNote(), grid);
 }
 
 /** The four live tiles and the copyable commands; returns the section and a function that fills the tiles. */
@@ -242,15 +243,21 @@ function production(go) {
 
 /**
  * Builds every section into `root` and fills the live tiles from the door at `base`; `go(mode, anchor)` switches tabs
- * for the hero's two actions. Resolves once proof.json and the live checks have answered.
+ * for the hero's two actions. A #ac-AC05 hash opens that acceptance case. Resolves once proof.json, the live checks and
+ * acceptance.json have answered.
  */
 export async function mountInside(root, base, go, proofUrl = "proof.json") {
   const live = checks(base);
   const proofSlot = section("proof", "Proof", el("p", "muted", "Loading the proof numbers."));
-  root.replaceChildren(hero(go), flow(), guardrails(), live.s, proofSlot, builtWith(), production(go));
+  const acSlot = section("acceptance", "Acceptance cases", el("p", "muted", "Loading the acceptance cases."));
+  root.replaceChildren(hero(go), flow(), guardrails(), live.s, proofSlot, acSlot, builtWith(), production(go));
+  labelAcChips(root);
+  const smooth = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const acLoad = fillAcceptance(acSlot).then((ok) => ok && openCase(root, location.hash, false));
+  window.addEventListener("hashchange", () => openCase(root, location.hash, smooth()));
   const proofLoad = fetch(proofUrl)
     .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
     .then((data) => proofSlot.replaceWith(proof(data)))
     .catch(() => proofSlot.replaceChildren(el("h2", "", "Proof"), el("p", "muted", "The proof numbers could not be loaded.")));
-  await Promise.all([proofLoad, live.run()]);
+  await Promise.all([proofLoad, live.run(), acLoad]);
 }

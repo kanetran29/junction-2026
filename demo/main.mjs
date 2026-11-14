@@ -10,6 +10,7 @@ import { STRENGTHS, PAGE_ONLY, GROUPS, COMPARE_NOTE, CONNECT_LINE } from "./comp
 import { ICONS } from "./icons.mjs";
 import { mountInside } from "./inside-view.mjs";
 import { mountDeck } from "./deck-view.mjs";
+import { AC_ID, acChip, acNote, labelAcChips } from "./acceptance-view.mjs";
 import { runCheck, CHECKS } from "./inside.mjs";
 import { mountTry } from "./try-view.mjs";
 
@@ -48,7 +49,7 @@ function el(tag, cls, text = "") {
   return node;
 }
 
-/** Fills the Story's closing comparison (eight rows, ✕ without the door, ✓ with Lazydoor) and the Compare page's table. */
+/** Fills the Story's closing comparison (eight rows, ✕ without the door, ✓ with Lazydoor) and the Compare page's table, whose AC chips link to their case. */
 function buildCompare() {
   $("compare-rows").replaceChildren(...STRENGTHS.map((row) => {
     const li = el("li");
@@ -71,13 +72,15 @@ function buildCompare() {
       const line = el("p");
       line.append(glyph("check"), el("span", "", row.with));
       const tags = el("span", "chips");
-      for (const e of row.evidence) tags.append(el("span", "chip proof", e));
+      for (const e of row.evidence) tags.append(AC_ID.test(e) ? acChip(e) : el("span", "chip proof", e));
       withDoor.append(line, tags);
       pair.append(el("h3", "", row.topic), without, withDoor);
       group.append(pair);
     }
     return group;
   }));
+  document.querySelector("#compare-page .pairs-legend").before(acNote());
+  labelAcChips($("compare-page"));
 }
 
 /** A Phosphor glyph (check or cross) from icons.mjs, inline. */

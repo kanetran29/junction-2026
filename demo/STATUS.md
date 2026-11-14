@@ -297,6 +297,13 @@ Vấn đề tìm thấy:
 - 375 px: thanh tab 5 nút vừa khít (nút hẹp hơn dưới 480 px). `dev/fake-gateway.mjs` biết thêm kiểu `.webp`, `.png`, `.pdf` (server 8790 cần khởi động lại mới trả đúng kiểu; không khởi động lại vẫn chạy).
 - Test: 70 pass với Playwright; `label overlaps: 0`.
 
+### 40. Mã AC có nghĩa (Kane: "mã AC là gì cần show ra")
+- Nhánh này đã merge `main` (a1ee7c4, không xung đột) để có `research/acceptance/cases.json` 63 case và `proof.json` 63/63; Try it giờ ưu tiên câu hỏi `question.text` của door (164c84e).
+- `node demo/dev/acceptance.mjs [last-run.json]` viết `demo/acceptance.json`: mỗi case id, tiêu đề, rubric, các lệnh gọi API, số check (333 check tất cả); thêm passed, total, version, date từ `~/junction-2026/.data/acceptance-last-run.json` khi file đó có (chưa có: "not yet measured"). Không chép input hay dữ liệu sản phẩm.
+- Mọi chip AC (Inside guardrails, Compare) là link `?mode=inside#ac-AC05` có title và aria-label "AC05: <tiêu đề case>"; trước chip đầu tiên của mỗi trang có dòng "AC = acceptance case: an automated end-to-end check run on the deployed door. 63/63 pass." (số từ proof.json, chỉ khi confirmed).
+- Inside có mục "Acceptance cases" sau Proof: 5 nhóm theo rubric đầu tiên của case (End-to-end demo 3, The user's need 11, Controls 25, Exceptions 17, Openness 7), mỗi nhóm là disclosure đóng sẵn; mỗi case có id, tiêu đề, chip lệnh gọi, số check, dấu pass khi đã đo. `#ac-AC05` mở đúng nhóm, tô sáng case và cuộn tới. Link nguồn research/acceptance/cases.json trên GitHub.
+- Test: 73 pass với Playwright (đồng bộ acceptance.json với cases.json, dấu pass theo run, chip có title và link, 63 case, anchor mở đúng nhóm, 375 px); `label overlaps: 0`.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).
