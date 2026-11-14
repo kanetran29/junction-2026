@@ -55,27 +55,30 @@ export const GUARDRAILS = [
 ];
 export const GUARD_STILL = { src: "assets/stills/nomilk.webp", alt: "Without the door: Monday morning, the kitchen calendar is stamped NO MILK.", caption: "Without the door, the agent ordered boxes past their cut-off. Monday had no milk." };
 
-/** What each part of the stack does, in three groups; `logo` names a Simple Icons file in assets/logos. */
+/**
+ * What each part of the stack does, in three groups. `marks` are its logos in assets/logos (see NOTICE.md): `icon` is a
+ * Simple Icons file the page tints to its text colour, `image` an official logo shown exactly as its owner serves it.
+ */
 export const BUILT_WITH = [
   {
     group: "Data",
     parts: [
-      { name: "Aiven for PostgreSQL", logo: "postgresql", line: "Every write: one transaction per order under an advisory lock, and the hash-chained event log." },
-      { name: "Cloudflare D1", logo: "cloudflare", line: "The read-only catalogue of 17,546 products and the recorded Valio replies." },
+      { name: "Aiven for PostgreSQL", marks: [{ image: "aiven-logo-white.svg" }], line: "Every write: one transaction per order under an advisory lock, and the hash-chained event log." },
+      { name: "Cloudflare D1", marks: [{ icon: "cloudflare" }], line: "The read-only catalogue of 17,546 products and the recorded Valio replies." },
     ],
   },
   {
     group: "Models",
     parts: [
-      { name: "Gemini 3.8 Flash", logo: "googlegemini", line: "Drafts the typed request and runs the reference agent." },
-      { name: "Gemma 4 31B", logo: null, line: "Reads every request a second time, on its own." },
+      { name: "Gemini 3.8 Flash", marks: [{ icon: "googlegemini" }], line: "Drafts the typed request and runs the reference agent." },
+      { name: "Gemma 4 31B", marks: [{ image: "gemma-mark-dark.svg" }], line: "Reads every request a second time, on its own." },
     ],
   },
   {
     group: "Runtime and interfaces",
     parts: [
-      { name: "Cloudflare Workers and Hyperdrive", logo: "cloudflare", line: "Run the door and pool its connections to Postgres." },
-      { name: "OpenAPI and MCP", logo: null, line: "One schema for an HTTP API and an MCP server with 9 tools." },
+      { name: "Cloudflare Workers and Hyperdrive", marks: [{ icon: "cloudflare" }], line: "Run the door and pool its connections to Postgres." },
+      { name: "OpenAPI and MCP", marks: [{ icon: "openapiinitiative" }, { icon: "modelcontextprotocol" }], line: "One schema for an HTTP API and an MCP server with 9 tools." },
     ],
   },
 ];

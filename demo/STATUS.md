@@ -279,6 +279,13 @@ Vấn đề tìm thấy:
 - Try it là một chuỗi tin nhắn: yêu cầu của chef, câu hỏi của door ("When should it arrive?", "How much?", "Which product?"…; hai nút khi Gemini và Gemma đọc khác nhau), câu trả lời, rồi kết quả. Khi door đang chờ, ô nhập thành "Your answer" với placeholder là câu hỏi; Send gửi `{ visitor, draftId, answer: { text } }`. Door chưa nhận kiểu này (400 hoặc 404) thì gửi lại một câu mới "<yêu cầu>, <câu trả lời>". Nút hai lựa chọn vẫn gửi `answer: { field, value }`. "Start over" xoá chuỗi và draft. Lỗi (429, 503…) hiện dưới chuỗi và trả chữ về ô nhập.
 - Test: 67 pass với Playwright (từng file một), gồm chuỗi tin nhắn, câu trả lời vào đúng draftId, đường dự phòng, Start over, thẻ Z4 mờ và gập; `label overlaps: 0`. `dev/fake-gateway.mjs` không đổi.
 
+### 37. Logo chính thức trong Built with và slide kiến trúc (Kane: "Lấy logo")
+- Aiven: logo trắng (cua + chữ "aiven") mà aiven.io tự phục vụ (`/remix-assets/logo-aiven-white-DtXKUo9P.svg`; trang press của Aiven dẫn tới brand guidelines). Gemma: dấu Gemma bản sáng cho nền tối mà trang Gemma của Google DeepMind phục vụ (deepmind.google/models/gemma). Ảnh PNG trên ai.google.dev là hình minh hoạ có lưới dựng hình, không phải logo, nên không dùng. Cả hai hiện nguyên bản dưới dạng ảnh, không tô lại màu.
+- OpenAPI Initiative và Model Context Protocol từ Simple Icons 16.0.0 (CC0), hai dấu cạnh nhau cho dòng "OpenAPI and MCP". Logo PostgreSQL bỏ: hàng Aiven chỉ dùng logo Aiven (cua + chữ đã đủ rõ, thêm voi thì rối).
+- `demo/assets/logos/NOTICE.md`: từng file, nguồn, ngày tải, "trademark of its owner, used to show the technology this project uses".
+- Built with: logo nằm trên tên mỗi dòng (một dấu, hai dấu hay logo ngang đều thẳng hàng). Deck slide 7: Aiven, Gemini + Gemma, OpenAPI + MCP ở ô agent; render lại `pitch/out/deck.pdf` và `slides/07.png`.
+- Test: 67 pass với Playwright; `label overlaps: 0`; 375 px không cuộn ngang.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

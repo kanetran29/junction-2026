@@ -72,11 +72,17 @@ footer { position: absolute; left: 96px; right: 96px; bottom: 36px; display: fle
 .box { position: absolute; border: 1px solid var(--line); border-radius: var(--radius); background: rgb(6 34 42 / .85); padding: 20px 26px; display: grid; align-content: center; gap: 6px; }
 .box b { font: 700 32px/1.15 var(--sans); }
 .box span { font: 400 28px/1.25 var(--sans); color: var(--ink-dim); }
-.agent { left: 0; top: 170px; width: 300px; height: 160px; }
-.door { left: 420px; top: 10px; width: 484px; height: 480px; border: 2px solid var(--brand); justify-items: start; gap: 10px; padding: 36px; }
+.agent { left: 0; top: 140px; width: 300px; height: 220px; }
+.agent .marks { justify-content: flex-start; margin-bottom: 10px; }
+.agent .logo { width: 40px; height: 40px; }
+.door { left: 400px; top: 10px; width: 440px; height: 480px; border: 2px solid var(--brand); justify-items: start; gap: 10px; padding: 36px; }
 .door b { font-size: 52px; letter-spacing: -.02em; }
-.deps { position: absolute; left: 1080px; right: 0; top: 0; display: grid; gap: 20px; }
-.deps .box { position: relative; height: 110px; grid-template-columns: 52px 1fr; align-items: center; column-gap: 22px; padding: 0 24px; }
+.deps { position: absolute; left: 960px; right: 0; top: 0; display: grid; gap: 20px; }
+.deps .box { position: relative; height: 110px; grid-template-columns: 120px 1fr; align-items: center; column-gap: 24px; padding: 0 24px; }
+.marks { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.deps .logo { width: 44px; height: 44px; }
+.mark { display: block; width: 44px; height: 44px; }
+.mark.wide { width: 120px; height: auto; }
 .deps .box > div { display: grid; gap: 2px; }
 .deps i { width: 52px; height: 52px; }
 .logo { width: 52px; height: 52px; fill: var(--ink); }

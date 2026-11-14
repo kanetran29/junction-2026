@@ -34,6 +34,9 @@ const shot = (src, alt, cls = "") => `<figure class="shot ${cls}"><img src="${sr
 const logo = (name) => readFileSync(join(ROOT, "demo/assets/logos", `${name}.svg`), "utf8").replace(/<title>.*?<\/title>/, "").replace("<svg ", '<svg class="logo" aria-hidden="true" ');
 
 const STILL = "../demo/assets/stills";
+
+/** An official logo (Aiven, Gemma) from demo/assets/logos, shown unmodified as an image; see its NOTICE.md. */
+const mark = (file, cls = "mark") => `<img class="${cls}" src="../demo/assets/logos/${file}" alt="">`;
 const h1 = (id) => `<h1>${esc(slide[id].heading)}</h1>`;
 
 /** Each slide's own layout, keyed by its id in pitch.json. */
@@ -64,17 +67,17 @@ const LAYOUTS = {
   built: () => `
     ${h1("built")}
     <div class="arch">
-      <div class="box agent"><b>Any agent</b><span>HTTP API or MCP</span></div>
+      <div class="box agent"><span class="marks">${logo("openapiinitiative")}${logo("modelcontextprotocol")}</span><b>Any agent</b><span>HTTP API or MCP</span></div>
       <div class="box door">${logo("cloudflare")}<b>Lazydoor</b><span>Cloudflare Workers</span><span>Rules, quotes, receipts</span></div>
       <div class="deps">
         <div class="box"><i></i><div><b>Valio API</b><span>Availability and price</span></div></div>
-        <div class="box">${logo("googlegemini")}<div><b>Gemini 3.8 Flash, Gemma 4 31B</b><span>A draft, then a second reading</span></div></div>
-        <div class="box">${logo("cloudflare")}<div><b>Cloudflare D1</b><span>Catalogue of 17,546 products</span></div></div>
-        <div class="box">${logo("postgresql")}<div><b>Aiven for PostgreSQL</b><span>Every write, via Hyperdrive</span></div></div>
+        <div class="box"><span class="marks">${logo("googlegemini")}${mark("gemma-mark-dark.svg")}</span><div><b>Gemini 3.8 Flash, Gemma 4 31B</b><span>A draft, then a second reading</span></div></div>
+        <div class="box"><span class="marks">${logo("cloudflare")}</span><div><b>Cloudflare D1</b><span>Catalogue of 17,546 products</span></div></div>
+        <div class="box"><span class="marks">${mark("aiven-logo-white.svg", "mark wide")}</span><div><b>Aiven for PostgreSQL</b><span>Every write, via Hyperdrive</span></div></div>
       </div>
       <svg class="wires" viewBox="0 0 1728 500" aria-hidden="true">
         <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0L10 5L0 10z"/></marker></defs>
-        <path d="M300 250H416" marker-end="url(#tip)"/>${[55, 185, 315, 445].map((y) => `<path d="M904 ${y}H1076" marker-end="url(#tip)"/>`).join("")}
+        <path d="M300 250H396" marker-end="url(#tip)"/>${[55, 185, 315, 445].map((y) => `<path d="M840 ${y}H956" marker-end="url(#tip)"/>`).join("")}
       </svg>
     </div>
     ${points(slide.built.bullets, "grid2")}`,

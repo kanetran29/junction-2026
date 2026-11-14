@@ -1,2 +1,3 @@
-postgresql.svg, cloudflare.svg and googlegemini.svg come from Simple Icons 13.21.0 (https://simpleicons.org,
-npm package simple-icons), released under CC0 1.0. The brand marks themselves belong to their owners.
+cloudflare.svg and googlegemini.svg come from Simple Icons 13.21.0, openapiinitiative.svg and modelcontextprotocol.svg
+from Simple Icons 16.0.0 (https://simpleicons.org, npm package simple-icons), released under CC0 1.0. The brand marks
+themselves belong to their owners; see NOTICE.md.
