@@ -29,7 +29,7 @@ The door has two stores. The Valio catalog (17,546 products, their GTINs, catego
 What Aiven does for Lazydoor:
 
 - **The stock ledger commits in one transaction.** Placing or approving an order runs one transaction under a transaction-scoped advisory lock (`pg_advisory_xact_lock`). It books the order, re-checks the buyer's day total and inserts the order's lines only if each one still fits Valio's limit less the lines already accepted. Either all of it happens or none of it does. A test races 20 orders of 4 units for a 6-unit product against Postgres: exactly one is accepted, the rest get `STOCK_TAKEN`.
-- **The audit log.** Every step appends an event with a strictly increasing sequence number. A second advisory lock orders the inserts, so a reader polling `seq > since` (the SSE stream, the demo page, a judge) never skips an event that commits late.
+- **The audit log is hash-chained.** Every step appends an event with a strictly increasing sequence number and `hash = sha256(prevHash + canonical JSON of the event)`. A second advisory lock is held from reading the previous hash to the commit, so the chain stays linear under concurrent writes and a reader polling `seq > since` (the SSE stream, the demo page, a judge) never skips an event that commits late or sees a hash change.
 - **No row-write quota.** D1's free tier stops at 100,000 row writes a day, and loading the catalog used that up. Aiven bills by plan, not per row, so the demo keeps writing.
 
 ## Gemma reads every request a second time
@@ -41,6 +41,33 @@ Gemini drafts the order from the buyer's sentence. **Gemma 4** (`gemma-4-31b-it`
 - **No answer from Gemma** within 20 s, or Gemma over its quota: the draft stands as Gemini read it, marked `unavailable`. A Gemma outage never stops ordering.
 
 The `draft.created` event carries the result (`crossCheck`), so the demo page shows when the two readers agree.
+
+## Check it yourself
+
+The door signs what it says and chains what it did, so you can check it without trusting it. Everything below works with
+`curl` and Node, no key needed.
+
+```bash
+D=https://lazydoor.lazydoor.workers.dev
+curl -s $D/.well-known/agent-gateway.json   # discovery: API, MCP, rules, events, audit, keys, approval model, demo
+curl -s $D/.well-known/jwks.json            # the door's Ed25519 public key (kid = RFC 7638 thumbprint)
+curl -s $D/v1/audit/verify                  # the whole event chain recomputed, and the result signed
+node scripts/verify-audit.mjs $D            # recompute the chain yourself and check the signed head against the JWKS
+```
+
+- **Hash-chained events.** Each event in `/v1/events` carries `prevHash` and `hash` = sha256 of `prevHash` followed by the
+  RFC 8785 canonical JSON of the event without those two fields; the first event after a reset links to 64 zeros. The exact
+  rule is in [docs/events.md](docs/events.md#hash-chain). `GET /v1/audit/verify` recomputes the chain, names the first bad
+  seq if any, and signs `{ count, firstSeq, headSeq, headHash, valid, checkedAt }` with the door key. On the demo door,
+  `POST /admin/tamper` (admin key) changes one event behind the door's back, and verify then names its seq.
+- **Signed quotes.** Every quote offer carries `jws`, a compact EdDSA JWS over the quote, offer and buyer, the delivery date,
+  every line (product, sales units, unit price, line net), the totals, currency, `validUntil` (the quote expiry: the earliest
+  of 30 minutes and the Valio cut-off), `iat` and `aud: "lazydoor:quote"`. An agent can verify it against the JWKS before
+  ordering (the reference agent does and logs `quote signature verified`) and send it back as `quoteJws`: the door places the
+  order only when the signature verifies and every field equals the offer as quoted, else `QUOTE_SIGNATURE_INVALID`.
+- **Signed receipts.** Once an order is final (accepted, rejected or expired), the order reply, `GET /v1/orders/{id}` and the
+  receipt carry `jws` over the order id, buyer, state, lines, totals, who approved it and when it was decided
+  (`aud: "lazydoor:receipt"`). A held order gets its receipt when the approver decides.
 
 ## Quick start
 
@@ -56,7 +83,12 @@ Create `.dev.vars` (gitignored) with these names. Put your own values in. Never 
 VALIO_API_KEY=
 ADMIN_KEY=
 GEMINI_API_KEY=
+DOOR_SIGNING_JWK=
 ```
+
+`DOOR_SIGNING_JWK` is the door's private Ed25519 key as one line of JWK JSON. `node scripts/door-key.mjs <file>` writes a new
+one to a file (mode 600) and prints only its `kid`; paste the file's line after `DOOR_SIGNING_JWK=`. A deployed door gets its
+own key with `wrangler secret put DOOR_SIGNING_JWK < <file>`. Tests generate a fresh key per run.
 
 `GEMINI_API_KEY` is optional, but `pnpm categories:build` calls Gemini and needs it. Without it, free-text interpretation is unavailable and the cases that need a real model report `BLOCKED_ON_GEMINI`. Everything else works.
 
@@ -98,12 +130,15 @@ The scenarios use the demo-only admin routes (reset, clock, replay), so they wor
 | MCP (streamable HTTP) | `/mcp`, with 9 tools: `interpret_request`, `confirm_draft`, `search_products`, `get_quote`, `quote_basket`, `place_order`, `get_order`, `resolve_product`, `list_families` |
 | Decision register | `GET /v1/rules` (public) |
 | Reason codes | `GET /v1/reason-codes` (public); also [docs/reason-codes.md](docs/reason-codes.md) |
-| Events | `GET /v1/events` (polling) and `GET /v1/events/stream` (Server-Sent Events); schema in [docs/events.md](docs/events.md) |
+| Events | `GET /v1/events` (polling) and `GET /v1/events/stream` (Server-Sent Events), hash-chained; schema in [docs/events.md](docs/events.md) |
+| Audit | `GET /v1/audit/verify` (public): the recomputed chain, signed |
+| Signing key | `GET /.well-known/jwks.json` (public): verifies quote offers, receipts and audit results |
+| Discovery | `GET /.well-known/agent-gateway.json` (public): where everything above is, the approval model, the demo and the code |
 | Approver | `GET /approver/{approverKey}` (inbox), `GET /approve/{token}` (phone page), `POST /approve/{token}` and `POST /reject/{token}` |
 | Receipt | `GET /v1/orders/{id}/receipt` (plain text, buyer key); `GET /receipt/{orderId}` (plain text, no key: the order id is the capability URL, so share it only with whoever may see the receipt) |
 | Health | `GET /health` |
 
-The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/search`, `/v1/quotes`, `/v1/baskets`, `/v1/orders`, `/v1/resolve`, and `GET /v1/families`, `/v1/quotes/{id}` and `/v1/orders/{id}`. Every `/v1` route except `/v1/rules` and `/v1/reason-codes` needs `Authorization: Bearer <key>`, and so does `/mcp`. The one exception is the event log on a demo door: with `DEMO_MODE=1`, `GET /v1/events` and `/v1/events/stream` also answer a request with no key at all, read-only and for every buyer, so the public demo page can watch the door (a wrong key is still 401). `/health` and `/openapi.json` are open. HTTP and MCP share one schema.
+The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/search`, `/v1/quotes`, `/v1/baskets`, `/v1/orders`, `/v1/resolve`, and `GET /v1/families`, `/v1/quotes/{id}` and `/v1/orders/{id}`. Every `/v1` route except `/v1/rules`, `/v1/reason-codes` and `/v1/audit/verify` needs `Authorization: Bearer <key>`, and so does `/mcp`. The one exception is the event log on a demo door: with `DEMO_MODE=1`, `GET /v1/events` and `/v1/events/stream` also answer a request with no key at all, read-only and for every buyer, so the public demo page can watch the door (a wrong key is still 401). `/health` and `/openapi.json` are open. HTTP and MCP share one schema.
 
 **Demo page.** The animated demo (story and Live mode) is served by the same Worker at [`/demo/`](https://lazydoor.lazydoor.workers.dev/demo/), as Workers static assets. `scripts/build-demo.mjs` copies only the files the page loads into `dist/assets/demo/` (wrangler runs it before every deploy, `pnpm test` before every run); `demo/dev/`, `demo/test/`, `demo/shots/`, the notes and `story.mp4` stay unpublished. Live mode reads `/v1/events` from the page's own origin.
 
@@ -111,7 +146,7 @@ The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/searc
 
 **Judge key.** The operator mints a read-everything key with `POST /admin/judge-key` (admin key, `DEMO_MODE=1`); it returns `{ key }` once. The key acts as buyer `hotel-b` (it can place orders as `hotel-b`) and reads every buyer's events. It survives `/admin/reset`; agent and approver keys do not.
 
-**Deploying.** The remote D1 catalog is filled once with `pnpm migrate:remote`, `pnpm index:load:remote`, `pnpm replies:load:remote` and `pnpm categories:load:remote` (the local `dev:load` equivalents run against `--local`). The write store is a Hyperdrive config (caching disabled, so every read sees the last write) in front of the Aiven service; its id goes in `wrangler.jsonc`, and `POST /admin/reset` creates the tables.
+**Deploying.** The remote D1 catalog is filled once with `pnpm migrate:remote`, `pnpm index:load:remote`, `pnpm replies:load:remote` and `pnpm categories:load:remote` (the local `dev:load` equivalents run against `--local`). The write store is a Hyperdrive config (caching disabled, so every read sees the last write) in front of the Aiven service; its id goes in `wrangler.jsonc`, and `POST /admin/reset` creates the tables. A schema change is always `ADD COLUMN IF NOT EXISTS`, so apply `SCHEMA` (`src/db.ts`) to the database before deploying the code that reads the new columns (the running code ignores them), then reset the demo. The door's signing key is the Worker secret `DOOR_SIGNING_JWK` (`node scripts/door-key.mjs <file>`, then `wrangler secret put DOOR_SIGNING_JWK < <file>`); without it the door refuses quotes and orders before anything is booked.
 
 The agent never receives the approval link. `place_order` returns only the approval status and the approver's name. The link goes to the approver inbox.
 
@@ -155,6 +190,7 @@ For this to run in production, Valio needs to provide:
 | AP2 (Agent Payments Protocol) | The signed buyer mandate plays the role of its mandate. It is a bearer JWS with no key binding, and says so. |
 | UCP (Universal Commerce Protocol) | Not implemented. The catalogue, quote and order shapes are plain typed JSON, but there is no UCP endpoint. |
 | Peppol Order Response | The mapping is by design, not an emitted document. ACCEPTED = `AP`, REJECTED = `RE`, a SHORTFALL or substitute line = `CA`. |
+| JOSE (RFC 7515, 7517, 7638, 8037) and JCS (RFC 8785) | Quote offers, receipts and the audit head are compact EdDSA JWS; the key is a JWK Set with an RFC 7638 thumbprint `kid`; signed claims and the event chain use RFC 8785 canonical JSON. |
 
 ## Reason codes
 

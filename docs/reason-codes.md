@@ -45,3 +45,4 @@ The same table is served live at `GET /v1/reason-codes`.
 | `SUBTYPE_UNVERIFIED` | The product type could not be confirmed against a reviewed subtype. | `requires_buyer_review` | no |
 | `NOT_SELECTED` | The basket offered options for this need but none was chosen. | `requires_buyer_review` | no |
 | `BRAND_NOT_CARRIED` | Valio does not carry the requested brand. | `requires_buyer_input` | no |
+| `QUOTE_SIGNATURE_INVALID` | The quote signature sent with the order does not verify against the door's key or does not match the offer as quoted. | `requires_buyer_input` | no |

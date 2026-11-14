@@ -18,9 +18,10 @@ describe('events', () => {
     const s2 = await logEvent(e, { type: 'valio.called', buyerId: 'b1', quoteId: 'q1', orderId: 'o1', data: { endpoint: 'price', ids: ['1'], replay: false } });
     expect(s2).toBeGreaterThan(s1);
     const out = await listEvents(e, { since: 0 });
+    const hash = expect.stringMatching(/^[0-9a-f]{64}$/);
     expect(out).toEqual([
-      { seq: s1, ts: '2026-11-13T21:10:00+02:00', type: 'draft.created', buyerId: 'b1', draftId: 'd1', data: { text: 'milk' } },
-      { seq: s2, ts: '2026-11-13T21:10:00+02:00', type: 'valio.called', buyerId: 'b1', quoteId: 'q1', orderId: 'o1', data: { endpoint: 'price', ids: ['1'], replay: false } },
+      { seq: s1, ts: '2026-11-13T21:10:00+02:00', type: 'draft.created', buyerId: 'b1', draftId: 'd1', data: { text: 'milk' }, prevHash: '0'.repeat(64), hash },
+      { seq: s2, ts: '2026-11-13T21:10:00+02:00', type: 'valio.called', buyerId: 'b1', quoteId: 'q1', orderId: 'o1', data: { endpoint: 'price', ids: ['1'], replay: false }, prevHash: out[0].hash, hash },
     ]);
   });
 

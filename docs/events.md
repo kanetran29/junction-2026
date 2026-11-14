@@ -28,6 +28,8 @@ interface Event {
   quoteId?: string;
   orderId?: string;
   data: object;         // per type, below
+  prevHash: string;     // the hash of the event before this one; 64 zeros for the first event after a reset
+  hash: string;         // see "Hash chain" below
 }
 ```
 
@@ -48,3 +50,28 @@ interface Event {
 | `clock.set` | `{ now }` |
 
 `approval.requested` never carries the approval link or token: those reach only the approver inbox.
+
+## Hash chain
+
+Every event is chained to the one before it, in commit order, so changing, removing or reordering a stored event shows.
+
+- `hash = hex(sha256(UTF-8 bytes of prevHash + canonicalJson(event)))`, where `+` is plain string concatenation of the 64 hex
+  characters of `prevHash` and the canonical JSON.
+- `event` is the event exactly as `/v1/events` serves it **without** `prevHash` and `hash`: `seq`, `ts`, `type`, `buyerId`,
+  `draftId`, `quoteId` and `orderId` when present (absent ids are left out, never `null`), and `data`.
+- `canonicalJson` follows RFC 8785 (JCS): object keys sorted by UTF-16 code units at every depth, arrays in order, no whitespace,
+  strings and numbers written as ECMAScript `JSON.stringify` writes them.
+- The first event's `prevHash` is the genesis, 64 zeros. **`/admin/reset` (demo doors only) wipes the log, so the chain starts
+  again from genesis**; seqs keep increasing across resets.
+- Inserts hold one Postgres advisory lock until they commit; the next seq and the previous hash are read under it, so seqs
+  commit in order, the chain is linear, and a reader polling `seq > since` never sees a hash that later changes.
+
+`GET /v1/audit/verify` (public, no key) recomputes the whole chain and answers
+`{ count, firstSeq, headSeq, headHash, valid, firstBadSeq?, checkedAt, jws }`. `firstBadSeq` is the first event whose `prevHash`
+is not the stored hash before it or whose `hash` does not recompute; a removed event shows at the event after it. `jws` is the
+door's compact EdDSA JWS over every other field plus `aud: "lazydoor:audit"`; verify it with `/.well-known/jwks.json`. Keep a
+signed head to notice later that events were cut from the end, which a chain alone cannot show.
+
+Check it from outside with `node scripts/verify-audit.mjs <door URL>` (Node only, no dependencies). The demo route
+`POST /admin/tamper` (admin key, `DEMO_MODE=1`) adds `"tampered": true` to one event's `data` without touching its hash, so
+verify names that seq.

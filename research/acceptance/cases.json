@@ -1275,6 +1275,87 @@
           "expect": [["state", "=", "REJECTED"], ["decision.reasons[*].code", "contains", "MANDATE_EXPIRED"]]
         }
       ]
+    },
+    {
+      "id": "AC50",
+      "tier": 1,
+      "title": "Every quote offer is signed by the door and verifies with the published JWKS",
+      "rubric": ["controls 20", "openness 15"],
+      "given": {
+        "draft": {"category": "10400", "claims": ["FREE_FROM_LACTOSE"], "deliverBy": "2026-11-16", "quantity": {"value": 20, "unit": "l"}}
+      },
+      "steps": [
+        {"call": "quote", "input": {}, "expect": [["offers[0].jws", "matches", "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"]]},
+        {"call": "verify_offer_jws", "input": {"offer": 0}, "expect": [["verified", "=", true], ["claimsMatchOffer", "=", true], ["claims.currency", "=", "EUR"]]},
+        {"call": "http_get", "input": {"path": "/.well-known/jwks.json"}, "expect": [["keys", "count=", 1], ["keys[0].alg", "=", "EdDSA"], ["keys[0].crv", "=", "Ed25519"], ["keys[0].d", "=", null]]}
+      ]
+    },
+    {
+      "id": "AC51",
+      "tier": 1,
+      "title": "An order carrying a quote signature with a changed price is refused and places nothing; the real one is accepted",
+      "rubric": ["controls 20", "exceptions 15"],
+      "given": {
+        "draft": {"category": "10400", "claims": ["FREE_FROM_LACTOSE"], "deliverBy": "2026-11-16", "quantity": {"value": 20, "unit": "l"}}
+      },
+      "steps": [
+        {"call": "quote", "input": {}, "expect": []},
+        {"call": "place_order_with_jws", "input": {"offer": 0, "tamper": "price"}, "expect": [["httpStatus", "=", 422], ["error", "=", "QUOTE_SIGNATURE_INVALID"], ["ordersForKey", "=", 0]]},
+        {"call": "place_order_with_jws", "input": {"offer": 0}, "expect": [["state", "=", "ACCEPTED"], ["ordersForKey", "=", 1]]}
+      ]
+    },
+    {
+      "id": "AC52",
+      "tier": 1,
+      "title": "A held order has no signed receipt until the approver decides; then it is signed with the approver's name",
+      "rubric": ["controls 20", "e2e 30"],
+      "given": {
+        "draft": {"category": "10400", "claims": ["FREE_FROM_LACTOSE"], "deliverBy": "2026-11-16", "quantity": {"value": 1000, "unit": "l"}}
+      },
+      "steps": [
+        {"call": "quote", "input": {}, "expect": []},
+        {"call": "place_order", "input": {"offer": 0}, "expect": [["state", "=", "HELD"], ["jws", "=", null]]},
+        {"call": "approve", "input": {}, "expect": [["state", "=", "ACCEPTED"]]},
+        {"call": "verify_receipt_jws", "input": {}, "expect": [["verified", "=", true], ["sameOnReceipt", "=", true], ["claims.state", "=", "ACCEPTED"], ["claims.approvedBy", "=", "Kitchen manager"], ["claims.aud", "=", "lazydoor:receipt"]]}
+      ]
+    },
+    {
+      "id": "AC53",
+      "tier": 1,
+      "title": "The event log is hash-chained from genesis and the door signs the verified head",
+      "rubric": ["openness 15", "controls 20"],
+      "given": {
+        "draft": {"category": "10400", "claims": ["FREE_FROM_LACTOSE"], "deliverBy": "2026-11-16", "quantity": {"value": 20, "unit": "l"}}
+      },
+      "steps": [
+        {"call": "quote_and_place", "input": {"offer": 0}, "expect": [["state", "=", "ACCEPTED"]]},
+        {"call": "audit_verify", "input": {}, "expect": [["valid", "=", true], ["count", ">=", 6], ["headHash", "matches", "^[0-9a-f]{64}$"], ["signatureVerified", "=", true]]},
+        {"call": "all_events", "input": {}, "expect": [["events[0].type", "=", "clock.set"], ["events[0].prevHash", "=", "0000000000000000000000000000000000000000000000000000000000000000"]]}
+      ]
+    },
+    {
+      "id": "AC54",
+      "tier": 1,
+      "title": "A changed event is found and named by seq; a reset starts a fresh, valid chain",
+      "rubric": ["openness 15"],
+      "given": {
+        "draft": {"category": "10400", "claims": ["FREE_FROM_LACTOSE"], "deliverBy": "2026-11-16", "quantity": {"value": 20, "unit": "l"}}
+      },
+      "steps": [
+        {"call": "quote", "input": {}, "expect": []},
+        {"call": "tamper_and_verify", "input": {}, "expect": [["verify.valid", "=", false], ["namesTheSeq", "=", true], ["verify.signatureVerified", "=", true]]},
+        {"call": "reset_and_verify", "input": {}, "expect": [["valid", "=", true], ["count", "=", 1], ["firstPrevHash", "=", "0000000000000000000000000000000000000000000000000000000000000000"]]}
+      ]
+    },
+    {
+      "id": "AC55",
+      "tier": 1,
+      "title": "A discovery document tells any agent where the API, MCP, rules, events, audit, keys and demo are",
+      "rubric": ["openness 15"],
+      "steps": [
+        {"call": "http_get", "input": {"path": "/.well-known/agent-gateway.json"}, "expect": [["name", "=", "Lazydoor"], ["mcp.transport", "=", "streamable-http"], ["openapi", "matches", "/openapi\\.json$"], ["jwks", "matches", "/\\.well-known/jwks\\.json$"], ["audit.verify", "matches", "/v1/audit/verify$"], ["approval.agentCanApprove", "=", false], ["demo", "matches", "/demo/$"], ["repository", "=", "https://github.com/kanetran29/junction-2026"]]},
+        {"call": "http_get", "input": {"path": "/openapi.json"}, "expect": [["info.description", "contains", "/.well-known/agent-gateway.json"]]}
+      ]
     }
   ],
   "decisions": {
@@ -1286,6 +1367,7 @@
     "Step `approve` gets the approval token from the approver inbox (approver key from the seeded mandate), never from the place_order reply.",
     "New steps: approve_as_agent (calls approve with the agent key), quote_basket, place_basket ({offers:[i,...]} picks offer i of need i; null skips a need), resolve, list_families, set_replay_variant, place_order_without_key, place_order_same_key_other_body.",
     "`as` on a step sets the buyer whose agent key is used (default hotel-a). `given.priorAccepted` seeds accepted order lines before the steps.",
+    "Signing and audit steps (AC50-AC55): verify_offer_jws ({offer:i}) and verify_receipt_jws check a door JWS with only /.well-known/jwks.json; place_order_with_jws ({offer:i, tamper?:\"price\"}) sends the offer JWS back, optionally with a changed price; audit_verify checks /v1/audit/verify and its signed head; all_events reads every buyer's events with the admin key; tamper_and_verify calls /admin/tamper then verify; reset_and_verify resets with the case state and verifies the fresh chain.",
     "A case whose steps call `interpret` needs a live model: when GET /health reports models.gemini = false, the runner marks it BLOCKED_ON_GEMINI instead of running it."
   ]
 }

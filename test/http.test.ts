@@ -148,7 +148,7 @@ describe('structural auth and error shapes', () => {
 
   it('answers 409 while the same Idempotency-Key is still being processed', async () => {
     const keys = await reset();
-    const hash = await sha256Hex(JSON.stringify(['qx', 'ox', null, null, null]));
+    const hash = await sha256Hex(JSON.stringify(['qx', 'ox', null, null, null, null]));
     await db(e).prepare("INSERT INTO orders(id, buyer_id, quote_id, idempotency_key, request_hash, state, body, created_at) VALUES ('ord_busy','hotel-a','qx','busy',?,'PLACING','{}','2026-11-13T21:10:00+02:00')").bind(hash).run();
     const r = await call('/v1/orders', { key: keys.agentKeys['hotel-a'], headers: { 'Idempotency-Key': 'busy' }, body: { quoteId: 'qx', offerId: 'ox' } });
     expect(r.status).toBe(409);

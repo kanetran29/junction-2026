@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
 
@@ -8,11 +9,13 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig(async () => {
   const migrations = await readD1Migrations('./migrations');
+  // a fresh door signing key per test run, so no key is ever stored for tests
+  const doorKey = JSON.stringify(generateKeyPairSync('ed25519').privateKey.export({ format: 'jwk' }));
   return {
     plugins: [
       cloudflareTest({
         wrangler: { configPath: './wrangler.jsonc' },
-        miniflare: { bindings: { TEST_MIGRATIONS: migrations } },
+        miniflare: { bindings: { TEST_MIGRATIONS: migrations, DOOR_SIGNING_JWK: doorKey } },
       }),
     ],
     test: {

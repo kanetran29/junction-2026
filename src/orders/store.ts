@@ -9,8 +9,9 @@ import { MandateError, loadMandate } from '../mandate/jws';
 import { orderable } from '../offers/orderable';
 import { decide, type Decision, type Reason, type Unmet } from '../policy/decide';
 import type { Offer, OfferLine, Quote } from '../quote/build';
-import { createQuote, getQuote } from '../quote/store';
-import { newId, sha256Hex } from '../util';
+import { createQuote, getQuote, offerClaims } from '../quote/store';
+import { AUD, doorKey, signJws, verifyJws } from '../sign/door';
+import { canonicalJson, newId, sha256Hex } from '../util';
 import { ValioError, fetchOffers, type Offers } from '../valio/client';
 import { db } from '../db';
 
@@ -27,7 +28,10 @@ export interface Order {
   deliveryDate: string | null;
 }
 
-/** The order as every reply shows it: state, why, the decision, who must approve and the order itself. Never a token or URL. */
+/**
+ * The order as every reply shows it: state, why, the decision, who must approve and the order itself, and once the order is
+ * final (ACCEPTED, REJECTED or EXPIRED) the door's JWS over its receipt claims. Never a token or URL.
+ */
 export interface OrderView {
   orderId: string;
   state: OrderState;
@@ -35,14 +39,15 @@ export interface OrderView {
   decision: Decision;
   approval: { status: 'pending' | 'none'; approver: string };
   order: Order;
+  jws?: string;
 }
 
 export type PlaceReply = OrderView & { available?: number; retryable?: boolean; resolution?: 'requote' };
 
-export type PlaceRequest = { buyerId: string; idempotencyKey?: string; agentReason?: string } & (
-  | { quoteId: string; offerId: string }
-  | { basketId: string; selections: { quoteId: string; offerId: string }[] }
-);
+/** One chosen offer; `quoteJws`, when sent, must be that offer's JWS as the door signed it. */
+type Selection = { quoteId: string; offerId: string; quoteJws?: string };
+
+export type PlaceRequest = { buyerId: string; idempotencyKey?: string; agentReason?: string } & (Selection | { basketId: string; selections: Selection[] });
 
 export interface ApproveReply {
   orderId: string;
@@ -83,6 +88,7 @@ interface Row {
   mandate_version: number | null;
   lines_hash: string | null;
   reply: string | null;
+  decided_at: string | null;
 }
 
 /** One product on one delivery day: how many sales units the order needs and Valio's limit read at commit (null = Valio's stock is unknown). */
@@ -126,6 +132,36 @@ function basketGross(lines: OfferLine[]): number {
   return grossCents(byRate);
 }
 
+/** The states after which an order never changes again; only these carry a signed receipt. */
+const FINAL: OrderState[] = ['ACCEPTED', 'REJECTED', 'EXPIRED'];
+
+/**
+ * What a final order's JWS binds: the order, buyer and state, every line (product, sales units, unit price, line net,
+ * delivery date), the totals and currency, who approved it (the mandate's approver when a human approval accepted it: only
+ * an order that was HELD keeps its approval token, the commit clears it on every other; else null), when it was decided
+ * (door time) and the receipt audience.
+ */
+function receiptClaims(r: Row, v: OrderView) {
+  return {
+    orderId: r.id,
+    buyerId: r.buyer_id,
+    state: r.state,
+    lines: v.order.lines.map((l) => ({ productId: l.productId, salesUnits: l.salesUnits, unitPriceCents: l.netCentsPerSalesUnit, netCents: lineNet(l), deliveryDate: l.deliveryDate })),
+    netCents: r.net_cents,
+    grossCents: r.gross_cents,
+    currency: 'EUR',
+    approvedBy: r.state === 'ACCEPTED' && r.approval_token !== null ? r.approver : null,
+    decidedAt: r.decided_at,
+    aud: AUD.receipt,
+  };
+}
+
+/** The reply view of a row plus, once the order is final and its decision time is recorded, the door's receipt JWS. */
+async function signedView(env: Env, r: Row): Promise<OrderView> {
+  const v = view(r);
+  return FINAL.includes(r.state) && r.decided_at ? { ...v, jws: await signJws(env, receiptClaims(r, v)) } : v;
+}
+
 /** Shapes a stored row as the reply every endpoint shows (the row's `decision` column is the decision shown). */
 function view(r: Row): OrderView {
   const body = JSON.parse(r.body) as { lines: OfferLine[]; unmet: Unmet[] };
@@ -147,7 +183,7 @@ async function rowById(env: Env, id: string): Promise<Row | null> {
 /** The buyer's own order as a reply view, or null when it does not exist, is another buyer's or is still being placed. */
 export async function getOrder(env: Env, buyerId: string, id: string): Promise<OrderView | null> {
   const r = await db(env).prepare("SELECT * FROM orders WHERE id = ? AND buyer_id = ? AND state <> 'PLACING'").bind(id, buyerId).first<Row>();
-  return r ? view(r) : null;
+  return r ? signedView(env, r) : null;
 }
 
 /** SQL: true when no checked product has less free stock than the order needs; `n` numbers the parameter holding the checks JSON. */
@@ -280,7 +316,7 @@ async function finalize(env: Env, row: Row): Promise<{ reply: PlaceReply; decisi
   } else if (row.state === 'REJECTED' && row.reason === 'OVER_DAY_HARD' && decision.outcome !== 'REJECT') {
     decision = { outcome: 'REJECT', reasons: [...decision.reasons, { code: 'OVER_DAY_HARD', detail: 'the day total crossed the hard limit while this order was placed' }] };
   }
-  const reply: PlaceReply = { ...view({ ...row, decision: JSON.stringify(decision) }), ...extra };
+  const reply: PlaceReply = { ...(await signedView(env, { ...row, decision: JSON.stringify(decision) })), ...extra };
   await db(env).prepare('UPDATE orders SET decision = ?, reply = ? WHERE id = ?').bind(JSON.stringify(decision), JSON.stringify(reply), row.id).run();
   return { reply, decision, shorts };
 }
@@ -289,17 +325,24 @@ async function finalize(env: Env, row: Row): Promise<{ reply: PlaceReply; decisi
  * Finds the quotes and offers a request chose and the needs of a basket it left out. Single: the quote must be the buyer's
  * (404) and hold the offer (400). Basket: the basket must be the buyer's (404), at least one selection is needed and each
  * must come from the basket, once (400); a need with no selection becomes an unmet entry carrying that quote's first
- * rejection code, or NOT_SELECTED when it had offers.
+ * rejection code, or NOT_SELECTED when it had offers. A selection that carries `quoteJws` is refused 422
+ * QUOTE_SIGNATURE_INVALID unless the door's signature verifies and its claims equal `offerClaims` of the stored offer.
  */
 async function resolvePicks(env: Env, req: PlaceRequest): Promise<{ picks: { quote: Quote; offer: Offer }[]; unmet: Unmet[] }> {
-  const pick = async (buyerId: string, quoteId: string, offerId: string) => {
+  const pick = async (buyerId: string, { quoteId, offerId, quoteJws }: Selection) => {
     const quote = await getQuote(env, buyerId, quoteId);
     if (!quote) throw new OrderError(404, 'QUOTE_NOT_FOUND', `no quote ${quoteId}`);
     const offer = quote.offers.find((o) => o.offerId === offerId);
     if (!offer) throw new OrderError(400, 'OFFER_NOT_IN_QUOTE', `quote ${quoteId} has no offer ${offerId}`);
+    if (quoteJws !== undefined) {
+      const claims = await verifyJws(env, quoteJws, AUD.quote);
+      if (!claims || canonicalJson(claims) !== canonicalJson(offerClaims(quote, offer))) {
+        throw new OrderError(422, 'QUOTE_SIGNATURE_INVALID', `the quoteJws is not the door's signature over offer ${offerId} of quote ${quoteId} as stored`);
+      }
+    }
     return { quote, offer };
   };
-  if ('quoteId' in req) return { picks: [await pick(req.buyerId, req.quoteId, req.offerId)], unmet: [] };
+  if ('quoteId' in req) return { picks: [await pick(req.buyerId, req)], unmet: [] };
 
   const basket = await db(env).prepare('SELECT body FROM baskets WHERE id = ? AND buyer_id = ?').bind(req.basketId, req.buyerId).first<{ body: string }>();
   if (!basket) throw new OrderError(404, 'BASKET_NOT_FOUND', `no basket ${req.basketId}`);
@@ -309,7 +352,7 @@ async function resolvePicks(env: Env, req: PlaceRequest): Promise<{ picks: { quo
     throw new OrderError(400, 'BAD_SELECTION', 'select at least one offer, each from a different quote of the basket');
   }
   const picks = [];
-  for (const s of req.selections) picks.push(await pick(req.buyerId, s.quoteId, s.offerId));
+  for (const s of req.selections) picks.push(await pick(req.buyerId, s));
   const unmet: Unmet[] = [];
   for (const id of quoteIds.filter((q) => !chosen.includes(q))) {
     const quote = (await getQuote(env, req.buyerId, id))!;
@@ -334,12 +377,15 @@ async function dayTotals(env: Env, buyerId: string, date: string): Promise<{ com
  * transaction (under the global write lock, `src/db.ts`) that books the order and, only when the order is ACCEPTED and every finite line still fits Valio's limit less the
  * accepted lines, inserts its lines into the ledger, otherwise rejects it STOCK_TAKEN. The day total is re-checked inside
  * that batch, so concurrent orders cannot jointly pass the daily auto limit. A quote or a held order reserves nothing.
- * A HELD order gets an approval token that only `approverInbox` reveals; no reply carries it.
+ * A HELD order gets an approval token that only `approverInbox` reveals; no reply carries it. Without a usable signing key
+ * nothing is booked.
  */
 export async function placeOrder(env: Env, req: PlaceRequest, fetchFn: typeof fetch = fetch): Promise<PlaceReply> {
   const key = req.idempotencyKey;
   if (!key) throw new OrderError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'an Idempotency-Key is required');
-  const sel = 'quoteId' in req ? [req.quoteId, req.offerId, null] : [null, null, req.selections.map((s) => [s.quoteId, s.offerId])];
+  // the reply of a final order is signed after the ledger commit, so a missing key must stop the order before it is booked
+  await doorKey(env);
+  const sel = 'quoteId' in req ? [req.quoteId, req.offerId, req.quoteJws ?? null, null] : [null, null, null, req.selections.map((s) => [s.quoteId, s.offerId, s.quoteJws ?? null])];
   const hash = await sha256Hex(JSON.stringify([...sel, 'basketId' in req ? req.basketId : null, req.agentReason ?? null]));
   const id = newId('ord');
   const at = await now(env);
@@ -418,7 +464,7 @@ async function commitOrder(env: Env, id: string, req: PlaceRequest, at: Date, fe
     ),
     s.prepare(`${INSERT_LINES} WHERE (SELECT state FROM orders WHERE id = ?1) = 'ACCEPTED' AND ${noShortLine(4)}`).bind(id, req.buyerId, linesJson, checksJson),
     s.prepare("UPDATE orders SET state = 'REJECTED', reason = 'STOCK_TAKEN' WHERE id = ?1 AND state = 'ACCEPTED' AND NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = ?1)").bind(id),
-    s.prepare("UPDATE orders SET approval_token = NULL, expires_at = NULL WHERE id = ? AND state <> 'HELD'").bind(id),
+    s.prepare("UPDATE orders SET approval_token = NULL, expires_at = NULL, decided_at = ? WHERE id = ? AND state <> 'HELD'").bind(helsinkiIso(at), id),
   ]);
 
   const row = (await rowById(env, id))!;
@@ -438,9 +484,9 @@ async function byToken(env: Env, token: string): Promise<Row> {
   return r;
 }
 
-/** Ends a HELD order as EXPIRED with a reason; 409 when another request resolved it first. */
-async function expireOrder(env: Env, row: Row, reason: ReasonCode, extra: { available?: number } = {}): Promise<ApproveReply> {
-  const res = await db(env).prepare("UPDATE orders SET state = 'EXPIRED', reason = ? WHERE id = ? AND state = 'HELD'").bind(reason, row.id).run();
+/** Ends a HELD order as EXPIRED with a reason at door time `at`; 409 when another request resolved it first. */
+async function expireOrder(env: Env, row: Row, at: Date, reason: ReasonCode, extra: { available?: number } = {}): Promise<ApproveReply> {
+  const res = await db(env).prepare("UPDATE orders SET state = 'EXPIRED', reason = ?, decided_at = ? WHERE id = ? AND state = 'HELD'").bind(reason, helsinkiIso(at), row.id).run();
   if (!res.meta.changes) throw new OrderError(409, 'TOKEN_USED', 'this approval was already resolved');
   await logEvent(env, { buyerId: row.buyer_id, orderId: row.id, type: 'approval.expired', data: {} });
   return { orderId: row.id, state: 'EXPIRED', reason, ...extra };
@@ -458,14 +504,14 @@ export async function approve(env: Env, token: string, opts: { callerRole: 'appr
   if (row.state !== 'HELD') throw new OrderError(409, 'TOKEN_USED', 'this approval was already resolved');
   const at = await now(env);
   const { lines } = JSON.parse(row.body) as { lines: OfferLine[] };
-  if (at.getTime() >= Date.parse(row.expires_at!)) return expireOrder(env, row, 'APPROVAL_EXPIRED');
+  if (at.getTime() >= Date.parse(row.expires_at!)) return expireOrder(env, row, at, 'APPROVAL_EXPIRED');
 
   const ref: Ref = { buyerId: row.buyer_id, orderId: row.id, ...(row.quote_id ? { quoteId: row.quote_id } : {}) };
   const { limits, failure, offers } = await readLimits(env, lines, at, ref, fetchFn);
-  if (failure === 'NOT_ORDERABLE') return expireOrder(env, row, 'STOCK_TAKEN', { available: 0 });
-  if (failure) return expireOrder(env, row, failure === 'CUTOFF_PASSED' ? 'APPROVAL_EXPIRED' : failure);
+  if (failure === 'NOT_ORDERABLE') return expireOrder(env, row, at, 'STOCK_TAKEN', { available: 0 });
+  if (failure) return expireOrder(env, row, at, failure === 'CUTOFF_PASSED' ? 'APPROVAL_EXPIRED' : failure);
   const moved = lines.some((l) => halfUp((offers.price.get(l.productId)!.catalogPrice!.value as number) * 100) !== l.netCentsPerSalesUnit);
-  if (moved) return expireOrder(env, row, 'PRICE_CHANGED');
+  if (moved) return expireOrder(env, row, at, 'PRICE_CHANGED');
 
   let version: number;
   try {
@@ -481,9 +527,9 @@ export async function approve(env: Env, token: string, opts: { callerRole: 'appr
   const linesJson = JSON.stringify(lines.map((l) => ({ productId: l.productId, deliveryDate: l.deliveryDate, salesUnits: l.salesUnits })));
   const s = db(env);
   const res = await s.batch([
-    s.prepare(`UPDATE orders SET state = 'ACCEPTED', reason = NULL WHERE id = ?1 AND state = 'HELD' AND ${noShortLine(2)}`).bind(row.id, checksJson),
+    s.prepare(`UPDATE orders SET state = 'ACCEPTED', reason = NULL, decided_at = ?3 WHERE id = ?1 AND state = 'HELD' AND ${noShortLine(2)}`).bind(row.id, checksJson, helsinkiIso(at)),
     s.prepare(`${INSERT_LINES} WHERE (SELECT state FROM orders WHERE id = ?1) = 'ACCEPTED' AND NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = ?1)`).bind(row.id, row.buyer_id, linesJson),
-    s.prepare("UPDATE orders SET state = 'EXPIRED', reason = 'STOCK_TAKEN' WHERE id = ? AND state = 'HELD'").bind(row.id),
+    s.prepare("UPDATE orders SET state = 'EXPIRED', reason = 'STOCK_TAKEN', decided_at = ? WHERE id = ? AND state = 'HELD'").bind(helsinkiIso(at), row.id),
   ]);
   if (res[0].meta.changes) {
     await logEvent(env, { ...ref, type: 'approval.approved', data: {} });
@@ -501,7 +547,7 @@ export async function approve(env: Env, token: string, opts: { callerRole: 'appr
 export async function reject(env: Env, token: string, opts: { callerRole: 'approver' | 'agent' }): Promise<ApproveReply> {
   if (opts?.callerRole !== 'approver') throw new OrderError(403, 'AGENT_CANNOT_APPROVE', 'only the approver can reject an order');
   const row = await byToken(env, token);
-  const res = await db(env).prepare("UPDATE orders SET state = 'REJECTED' WHERE id = ? AND state = 'HELD'").bind(row.id).run();
+  const res = await db(env).prepare("UPDATE orders SET state = 'REJECTED', decided_at = ? WHERE id = ? AND state = 'HELD'").bind(helsinkiIso(await now(env)), row.id).run();
   if (!res.meta.changes) throw new OrderError(409, 'TOKEN_USED', 'this approval was already resolved');
   await logEvent(env, { buyerId: row.buyer_id, orderId: row.id, ...(row.quote_id ? { quoteId: row.quote_id } : {}), type: 'approval.rejected', data: {} });
   return { orderId: row.id, state: 'REJECTED' };

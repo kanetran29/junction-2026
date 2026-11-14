@@ -14,6 +14,8 @@ export interface Bindings {
   VALIO_API_KEY: string;
   ADMIN_KEY: string;
   GEMINI_API_KEY?: string;
+  /** The door's private Ed25519 JWK (JSON); signs quote offers, receipts and the audit head. Public half at `/.well-known/jwks.json`. */
+  DOOR_SIGNING_JWK: string;
 }
 
 declare global {

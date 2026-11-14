@@ -1,6 +1,7 @@
 import { QUOTE_TTL_MS, RANKED_BY } from '../quote/build';
 import { REJECTION_PRECEDENCE, defaultMandate } from './constants';
 import { REASONS } from './reasons';
+import { AUD } from '../sign/door';
 
 export interface Decision {
   id: string;
@@ -40,6 +41,8 @@ export function decisionRegister(): Decision[] {
       constants: { perOrder: mandate.perOrder, perDay: mandate.perDay, reliabilityFloor: mandate.reliabilityFloor, reliabilityUnknown: mandate.reliabilityUnknown, noNewAllergen: mandate.noNewAllergen },
     },
     { id: 'approval', rule: 'A held order is accepted only when the named human approver approves it through their own link.', owner: 'approver', model: false, constants: {} },
+    seller('signatures', "The door signs every quote offer and every final order (accepted, rejected or expired) with its Ed25519 key, published at /.well-known/jwks.json. An order may send the offer's JWS back as quoteJws; it is placed only when the signature verifies and every bound field equals the offer as quoted, otherwise it is refused with QUOTE_SIGNATURE_INVALID.", { alg: 'EdDSA', audiences: AUD }),
+    seller('auditChain', 'Every event is hash-chained in commit order: hash = sha256(prevHash + canonical JSON of the event), starting from 64 zeros after a reset. /v1/audit/verify recomputes the whole chain and signs the result.', { hash: 'sha256', canonicalJson: 'RFC 8785 (JCS)', genesis: '0'.repeat(64) }),
   ];
 }
 

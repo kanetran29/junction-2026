@@ -49,6 +49,7 @@ export const REASONS = {
   SUBTYPE_UNVERIFIED: r('The product type could not be confirmed against a reviewed subtype.', 'requires_buyer_review'),
   NOT_SELECTED: r('The basket offered options for this need but none was chosen.', 'requires_buyer_review'),
   BRAND_NOT_CARRIED: r('Valio does not carry the requested brand.', 'requires_buyer_input'),
+  QUOTE_SIGNATURE_INVALID: r("The quote signature sent with the order does not verify against the door's key or does not match the offer as quoted.", 'requires_buyer_input'),
 } as const satisfies Record<string, ReasonInfo>;
 
 export type ReasonCode = keyof typeof REASONS;

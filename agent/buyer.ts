@@ -89,6 +89,43 @@ async function connectMcp(gatewayUrl: string, apiKey: string, fetchFn: typeof fe
   };
 }
 
+/** Decodes unpadded base64url to bytes. */
+const fromB64u = (s: string) => new Uint8Array(Buffer.from(s, 'base64url'));
+
+/**
+ * Checks an offer's JWS as any outside client can: the key its `kid` names in the door's JWKS, `alg: EdDSA`, the signature,
+ * then that the claims are for quotes (`aud`) and say exactly what the quote showed the agent: this quote and offer, the
+ * delivery date, every line (product, sales units, unit price, line net), both totals and the validity. Returns the kid, or
+ * null when anything fails. (The JWKS comes from the same door, so this proves the reply is the door's own signed statement;
+ * pin the kid to also rule out a door that is not the one you trust.)
+ */
+export async function verifyOfferJws(jws: string, set: { keys: JsonWebKey[] }, quote: Json, offer: Json): Promise<string | null> {
+  try {
+    const [h, p, s] = jws.split('.');
+    const dec = new TextDecoder();
+    const header = JSON.parse(dec.decode(fromB64u(h)));
+    const jwk = set.keys.find((k) => (k as { kid?: string }).kid === header.kid);
+    if (header.alg !== 'EdDSA' || !jwk) return null;
+    const key = await crypto.subtle.importKey('jwk', { kty: jwk.kty, crv: jwk.crv, x: jwk.x }, { name: 'Ed25519' }, false, ['verify']);
+    if (!(await crypto.subtle.verify('Ed25519', key, fromB64u(s), new TextEncoder().encode(`${h}.${p}`)))) return null;
+    const c = JSON.parse(dec.decode(fromB64u(p)));
+    const lines = (offer.lines ?? []).map((l: Json) => [l.productId, l.salesUnits, l.netCentsPerSalesUnit, Math.floor(l.netCentsPerSalesUnit * l.salesUnits + 0.5)]);
+    const signedLines = (c.lines ?? []).map((l: Json) => [l.productId, l.salesUnits, l.unitPriceCents, l.netCents]);
+    const same =
+      c.aud === 'lazydoor:quote' &&
+      c.quoteId === quote.id &&
+      c.offerId === offer.offerId &&
+      c.deliveryDate === offer.deliveryDate &&
+      JSON.stringify(signedLines) === JSON.stringify(lines) &&
+      c.netCents === offer.netCents &&
+      c.grossCents === offer.grossCents &&
+      c.validUntil === quote.expiresAt;
+    return same ? header.kid : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The gateway's order reply cut to what the model and the trace need; the approval link never appears (it is not in the reply, and is dropped if it ever were). */
 function compactOrder(r: Json): Json {
   return {
@@ -133,9 +170,20 @@ export async function runBuyer(opts: BuyerOptions): Promise<Trace> {
   const fetchFn = opts.fetchFn ?? fetch;
   const log = opts.log ?? ((l: string) => console.log(l));
   const profile = opts.buyerProfile;
-  const mcp = await connectMcp(opts.gatewayUrl.replace(/\/$/, ''), opts.apiKey, fetchFn);
+  const gatewayUrl = opts.gatewayUrl.replace(/\/$/, '');
+  const mcp = await connectMcp(gatewayUrl, opts.apiKey, fetchFn);
   const trace: Trace = { steps: [], answer: '' };
   let lastDraft: Json;
+  const quotes = new Map<string, Json>();
+  let doorKeys: Promise<{ keys: JsonWebKey[] }> | undefined;
+  /** The door's published signing keys, fetched once per run (a failed fetch is forgotten, so the next order tries again). */
+  const jwks = () =>
+    (doorKeys ??= fetchFn(`${gatewayUrl}/.well-known/jwks.json`)
+      .then((r) => r.json() as Promise<{ keys: JsonWebKey[] }>)
+      .catch((err) => {
+        doorKeys = undefined;
+        throw err;
+      }));
 
   /** Waits (bounded) for a human to decide a HELD order by re-reading it; the agent has no way to approve. */
   const waitForApprover = async (held: Json): Promise<Json> => {
@@ -149,12 +197,21 @@ export async function runBuyer(opts: BuyerOptions): Promise<Trace> {
     return current;
   };
 
-  /** Runs one tool call with the agent's own adjustments: profile fill on confirm, a recommendation on quotes, an idempotency key and the wait on orders; a VALIO_RATE_LIMITED reply of at most 60 s is waited out and the same call retried once. */
+  /** Runs one tool call with the agent's own adjustments: profile fill on confirm, a recommendation on quotes, the quote signature check, an idempotency key and the wait on orders; a VALIO_RATE_LIMITED reply of at most 60 s is waited out and the same call retried once. */
   const execute = async (name: string, rawArgs: Json): Promise<Json> => {
     let args = rawArgs ?? {};
     if (name === 'confirm_draft') args = { ...args, fill: { ...fillUnclear(lastDraft ?? { unclear: [] }, profile), ...(args.fill ?? {}) } };
     if (name === 'place_order') {
       args = { ...args, idempotencyKey: args.idempotencyKey ?? randomUUID() };
+      const quote = quotes.get(args.quoteId);
+      const offer = quote?.offers?.find((o: Json) => o.offerId === args.offerId);
+      const kid = offer?.jws ? await verifyOfferJws(offer.jws, await jwks().catch(() => ({ keys: [] })), quote, offer) : null;
+      if (!kid) {
+        log('    QUOTE_SIGNATURE_INVALID: this offer has no door signature that matches the quote; not ordering');
+        return { error: 'QUOTE_SIGNATURE_INVALID', detail: 'order only an offer from a quote you got in this run whose signature verifies against the door JWKS; nothing was placed' };
+      }
+      log(`    quote signature verified (kid ${kid})`);
+      args = { ...args, quoteJws: offer.jws };
       log(`    reason sent: ${args.agentReason ?? '(none)'}`);
     }
     log(`> ${name} ${JSON.stringify(args)}`);
@@ -166,6 +223,7 @@ export async function runBuyer(opts: BuyerOptions): Promise<Trace> {
     }
     if (name === 'interpret_request' && reply.draft) lastDraft = reply.draft;
     if (name === 'get_quote' && reply.offers) {
+      quotes.set(reply.id, reply);
       const pick = chooseWithinMandate(reply.offers as (PlanOffer & Json)[], profile);
       const compact = compactQuote(reply, pick?.offerId);
       for (const o of compact.offers) log(`    offer ${o.offerId}: ${o.products.join(' + ')} ${o.filled} filled, short ${o.shortfall}, ${(o.netCents / 100).toFixed(2)} EUR net${o.changes?.length ? `, changes ${o.changes.join(',')}` : ''}${o.offerId === pick?.offerId ? '  <- recommended' : ''}`);

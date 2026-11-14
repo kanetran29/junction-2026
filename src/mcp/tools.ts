@@ -51,7 +51,7 @@ const tools: Tool[] = [
   },
   {
     name: 'get_quote',
-    description: 'Quote a need (a stored draftId, a draft, or a bare need): ranked offers, rejections with reason codes, one Valio call per endpoint.',
+    description: "Quote a need (a stored draftId, a draft, or a bare need): ranked offers, rejections with reason codes, one Valio call per endpoint. Every offer carries the door's signed jws (verify with /.well-known/jwks.json).",
     input: S.QuoteBody,
     output: S.Quote,
     run: (a, { env, buyerId, fetchFn }) => createQuote(env, buyerId, a as QuoteInput, fetchFn),
@@ -65,7 +65,7 @@ const tools: Tool[] = [
   },
   {
     name: 'place_order',
-    description: 'Place one offer, or one offer per basket need; needs an idempotencyKey. A REJECTED order is returned with isError.',
+    description: "Place one offer, or one offer per basket need; needs an idempotencyKey. Send the offer's jws as quoteJws to have the door check it (a mismatch is QUOTE_SIGNATURE_INVALID). A final order carries a signed jws receipt. A REJECTED order is returned with isError.",
     input: PlaceOrderInput,
     output: S.Order,
     run: (a, { env, buyerId, fetchFn }) => placeOrder(env, { ...a, buyerId }, fetchFn),

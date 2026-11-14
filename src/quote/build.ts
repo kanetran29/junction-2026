@@ -59,6 +59,8 @@ export interface Offer {
   carbonLabel: 'product-group average';
   estimate: boolean;
   changes: ReasonCode[];
+  /** The door's compact JWS over `offerClaims` (set when the quote is stored; see src/quote/store.ts). */
+  jws?: string;
 }
 
 export interface Rejection {

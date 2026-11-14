@@ -22,15 +22,32 @@ export const SearchReply = z.object({ products: z.array(SearchProduct), valioCal
 
 /** A quote request names a stored draft, a draft to confirm and use, or a bare need. */
 export const QuoteBody = z.union([z.object({ draftId: z.string().min(1) }), z.object({ draft: Draft }), Draft]).openapi('QuoteBody');
-export const Quote = z.looseObject({ id: z.string(), buyerId: z.string(), expiresAt: z.string(), offers: z.array(z.looseObject({ offerId: z.string(), netCents: z.number(), lines: z.array(z.looseObject({ productId: z.string(), stockNote: z.string().optional() })).optional() })), rejections: z.array(z.looseObject({ productId: z.string(), code: z.string() })) }).openapi('Quote');
+export const Quote = z
+  .looseObject({
+    id: z.string(),
+    buyerId: z.string(),
+    expiresAt: z.string(),
+    offers: z.array(
+      z.looseObject({
+        offerId: z.string(),
+        netCents: z.number(),
+        lines: z.array(z.looseObject({ productId: z.string(), stockNote: z.string().optional() })).optional(),
+        jws: z.string().openapi({ description: 'The door\'s compact EdDSA JWS over this offer (quoteId, offerId, buyerId, deliveryDate, lines, netCents, grossCents, currency, validUntil, iat, aud "lazydoor:quote"); verify with /.well-known/jwks.json and send it back as quoteJws' }),
+      }),
+    ),
+    rejections: z.array(z.looseObject({ productId: z.string(), code: z.string() })),
+  })
+  .openapi('Quote');
 
 export const BasketBody = z.object({ needs: z.array(Draft).min(1).max(20) }).openapi('BasketBody');
 export const BasketReply = z.object({ basketId: z.string(), quotes: z.array(Quote), expiresAt: z.string() }).openapi('BasketReply');
 
+/** The offer's JWS sent back with an order; the door then checks its signature and that it matches the stored offer. */
+const QuoteJws = z.string().min(1).max(8192).optional().openapi({ description: "Optional: the offer's jws from the quote; when sent, a signature or field mismatch is 422 QUOTE_SIGNATURE_INVALID" });
 /** One offer of one quote; a basket order lists one per need. */
-const Selection = z.object({ quoteId: z.string().min(1), offerId: z.string().min(1) });
+const Selection = z.object({ quoteId: z.string().min(1), offerId: z.string().min(1), quoteJws: QuoteJws });
 export const OrderBody = z.union([
-  z.object({ quoteId: z.string().min(1), offerId: z.string().min(1), agentReason: z.string().max(500).optional() }),
+  z.object({ quoteId: z.string().min(1), offerId: z.string().min(1), quoteJws: QuoteJws, agentReason: z.string().max(500).optional() }),
   z.object({ basketId: z.string().min(1), selections: z.array(Selection).min(1), agentReason: z.string().max(500).optional() }),
 ]).openapi('OrderBody');
 export const Order = z.looseObject({
@@ -43,9 +60,10 @@ export const Order = z.looseObject({
   available: z.number().optional(),
   retryable: z.boolean().optional(),
   resolution: z.string().optional(),
+  jws: z.string().optional().openapi({ description: 'Once the order is final: the door\'s compact EdDSA JWS over orderId, buyerId, state, lines, netCents, grossCents, currency, approvedBy, decidedAt and aud "lazydoor:receipt"' }),
 }).openapi('Order');
 
-export const Receipt = z.object({ text: z.string() }).openapi('Receipt');
+export const Receipt = z.object({ text: z.string(), jws: z.string().optional().openapi({ description: 'The same signed receipt as the order reply carries, once the order is final' }) }).openapi('Receipt');
 export const Health = z
   .object({ ok: z.boolean(), now: z.string(), replay: z.boolean(), models: z.object({ gemini: z.boolean() }), store: z.enum(['aiven-postgres', 'postgres']).openapi({ description: 'Where orders, the ledger, approvals and events live' }) })
   .openapi('Health');
@@ -78,6 +96,30 @@ export const RulesReply = z.object({ decisions: z.array(z.object({ id: z.string(
 export const ReasonCodesReply = z.object({ codes: z.array(z.object({ code: z.string(), text: z.string(), resolution: z.string(), retryable: z.boolean() })) }).openapi('ReasonCodesReply');
 
 export const EventsQuery = z.object({ since: z.coerce.number().int().min(0).optional(), buyer: z.string().optional() });
-export const Event = z.looseObject({ seq: z.number(), ts: z.string(), type: z.string(), buyerId: z.string(), data: z.record(z.string(), z.unknown()) }).openapi('Event');
+export const Event = z
+  .looseObject({
+    seq: z.number(),
+    ts: z.string(),
+    type: z.string(),
+    buyerId: z.string(),
+    data: z.record(z.string(), z.unknown()),
+    prevHash: z.string().openapi({ description: 'The hash of the event before this one; 64 zeros for the first event after a reset' }),
+    hash: z.string().openapi({ description: 'Hex sha256 of prevHash followed by the canonical JSON of this event without prevHash and hash (docs/events.md)' }),
+  })
+  .openapi('Event');
 export const EventsReply = z.object({ events: z.array(Event), next: z.number() }).openapi('EventsReply');
 export const EventStream = z.string().openapi({ description: 'Server-Sent Events: `id: <seq>`, `event: <type>`, `data: <Event as JSON>`' });
+
+/** `GET /v1/audit/verify`: the recomputed chain and the door's signature over exactly that result. */
+export const AuditVerifyReply = z
+  .object({
+    count: z.number(),
+    firstSeq: z.number().nullable(),
+    headSeq: z.number().nullable(),
+    headHash: z.string(),
+    valid: z.boolean(),
+    firstBadSeq: z.number().optional().openapi({ description: 'The first event whose link or hash does not recompute; present only when valid is false' }),
+    checkedAt: z.string(),
+    jws: z.string().openapi({ description: 'Compact EdDSA JWS over every other field plus aud "lazydoor:audit"; verify with /.well-known/jwks.json' }),
+  })
+  .openapi('AuditVerifyReply');

@@ -25,7 +25,8 @@ export interface Db {
 
 /**
  * The tables the door writes (orders, ledger, approvals, events, mandates, keys, clock and replay settings). Idempotent, so
- * `/admin/reset` and the test setup run it every time. Times stay ISO text with `+02:00`, as in the D1 schema before.
+ * `/admin/reset` and the test setup run it every time; columns added later come as `ADD COLUMN IF NOT EXISTS`, so a database
+ * created before them gains them on the next reset. Times stay ISO text with `+02:00`, as in the D1 schema before.
  */
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -55,6 +56,8 @@ CREATE TABLE IF NOT EXISTS events (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, order_id TEXT, buyer_id TEXT, draft_id TEXT, quote_id TEXT,
   kind TEXT NOT NULL, body TEXT NOT NULL, at TEXT NOT NULL
 );
+ALTER TABLE events ADD COLUMN IF NOT EXISTS prev_hash TEXT, ADD COLUMN IF NOT EXISTS hash TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS decided_at TEXT;
 CREATE INDEX IF NOT EXISTS idx_events_order ON events(order_id);
 CREATE INDEX IF NOT EXISTS idx_events_buyer ON events(buyer_id, id);
 CREATE TABLE IF NOT EXISTS rate_limits (key_hash TEXT NOT NULL, minute INTEGER NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (key_hash, minute));
@@ -99,23 +102,26 @@ async function exec(q: postgres.Sql | postgres.TransactionSql, s: Stmt): Promise
   return { results: [...rows], meta: { changes: rows.count } };
 }
 
+/** A statement with its (Postgres-numbered) text and bound arguments, run on the client or inside an open transaction. */
+function statement(q: postgres.Sql | postgres.TransactionSql, text: string, args: unknown[] = []): Stmt {
+  return {
+    text,
+    args,
+    bind: (...a: unknown[]) => statement(q, text, a),
+    first: async <T>() => ((await exec(q, statement(q, text, args))).results[0] as T | undefined) ?? null,
+    all: async <T>() => ({ results: (await exec(q, statement(q, text, args))).results as T[] }),
+    run: () => exec(q, statement(q, text, args)),
+  };
+}
+
 /**
  * The write store for a request. `batch` runs its statements in one transaction after taking the global write lock, which
  * gives Postgres the single-writer behaviour the D1 code was written for (no two ledger commits interleave).
  */
 export function db(env: Env): Db {
   const sql = client(env);
-  /** A statement with its (Postgres-numbered) text and bound arguments. */
-  const stmt = (text: string, args: unknown[] = []): Stmt => ({
-    text,
-    args,
-    bind: (...a: unknown[]) => stmt(text, a),
-    first: async <T>() => ((await exec(sql, stmt(text, args))).results[0] as T | undefined) ?? null,
-    all: async <T>() => ({ results: (await exec(sql, stmt(text, args))).results as T[] }),
-    run: () => exec(sql, stmt(text, args)),
-  });
   return {
-    prepare: (q) => stmt(toPg(q)),
+    prepare: (q) => statement(sql, toPg(q)),
     // ponytail: one global lock, as D1 serialised every write; per (product, day) locks if commits ever queue
     batch: (stmts) =>
       sql.begin(async (tx) => {
@@ -125,6 +131,15 @@ export function db(env: Env): Db {
         return out;
       }) as Promise<Result[]>,
   };
+}
+
+/**
+ * Runs `fn` in one Postgres transaction, so code can read, compute and write between statements (the event chain hashes in
+ * JS between reading the previous hash and inserting). Statements prepared on the handle run inside it; it commits when
+ * `fn` resolves and rolls back when it throws. Takes no lock of its own.
+ */
+export function transaction<T>(env: Env, fn: (s: Pick<Db, 'prepare'>) => Promise<T>): Promise<T> {
+  return client(env).begin((tx) => fn({ prepare: (q) => statement(tx, toPg(q)) })) as Promise<T>;
 }
 
 /** Creates the write tables when missing (safe to repeat). */

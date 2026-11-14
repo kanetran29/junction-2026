@@ -7,7 +7,7 @@ import { searchProducts } from '../catalog/search';
 import { helsinkiIso, now, replayOn } from '../clock';
 import type { Env } from '../env';
 import { decisionRegister, reasonCodes } from '../domain/rules';
-import { logEvent } from '../events/log';
+import { logEvent, verifyChain } from '../events/log';
 import { InterpretError, confirmDraft, interpret } from '../interpret/gemini';
 import { OrderError, createBasket, getOrder, placeOrder } from '../orders/store';
 import { QuoteError, createQuote, getQuote, type QuoteInput } from '../quote/store';
@@ -19,11 +19,15 @@ import { HttpError, authenticate, rateLimit, requireBuyer } from './auth';
 import { readEvents, streamEvents } from './events';
 import * as S from './schemas';
 import { storeKind } from '../db';
+import { AUD, jwks, signJws } from '../sign/door';
+import { VERSION, discovery } from './discovery';
 
 export const INTERPRET_PER_MINUTE = 20;
+/** `/v1/audit/verify` recomputes the whole chain, so anonymous callers get at most this many a minute per client address. */
+export const AUDIT_PER_MINUTE = 30;
 
-/** The only `/v1` routes that need no key: the published rules and reason codes. */
-const PUBLIC_PATHS = ['/v1/rules', '/v1/reason-codes'];
+/** The only `/v1` routes that need no key: the published rules and reason codes, and the audit check (it shows only hashes). */
+const PUBLIC_PATHS = ['/v1/rules', '/v1/reason-codes', '/v1/audit/verify'];
 
 /** One documented JSON reply: its description and the zod schema of the body. */
 const json = <T extends z.ZodType>(schema: T, description: string) => ({ description, content: { 'application/json': { schema } } });
@@ -77,6 +81,7 @@ const streamRoute = createRoute({
   security: SECURITY,
   responses: { 200: { description: 'text/event-stream', content: { 'text/event-stream': { schema: S.EventStream } } }, 401: json(S.ErrorBody, 'Missing or unknown API key'), 403: json(S.ErrorBody, "Another buyer's events") },
 });
+const auditRoute = createRoute({ method: 'get', path: '/v1/audit/verify', summary: 'Recompute the hash chain of the whole event log and sign the result (head hash, first bad seq if any) with the door key; public, it shows only hashes; 30 a minute per client address', responses: { 200: json(S.AuditVerifyReply, 'OK'), 429: json(S.ErrorBody, 'Rate limited') } });
 const healthRoute = createRoute({ method: 'get', path: '/health', summary: 'Liveness, the gateway clock, replay mode, whether a Gemini key is configured and the write store', responses: { 200: json(S.Health, 'OK') } });
 
 /**
@@ -194,12 +199,14 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
     return c.json(o as never, 200);
   });
 
-  /** The plain-text receipt of the caller's own order. */
+  /** The plain-text receipt of the caller's own order, with the signed receipt once the order is final. */
   app.openapi(receiptRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
-    const text = await receiptText(c.env, c.req.valid('param').id, buyerId);
+    const id = c.req.valid('param').id;
+    const text = await receiptText(c.env, id, buyerId);
     if (text === null) throw new HttpError(404, 'ORDER_NOT_FOUND', 'no such order');
-    return c.json({ text }, 200);
+    const jws = (await getOrder(c.env, buyerId, id))?.jws;
+    return c.json({ text, ...(jws ? { jws } : {}) }, 200);
   });
 
   /** Resolves an id, GTIN, brand or name from the catalogue; never corrects input. */
@@ -223,8 +230,26 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   app.openapi(eventsRoute, async (c) => c.json(await readEvents(c), 200));
   /** Streams the event log as Server-Sent Events. */
   app.openapi(streamRoute, (c) => streamEvents(c) as never);
+  /** Recomputes the event chain and signs the result, stamped with the door clock; rate limited per client address. */
+  app.openapi(auditRoute, async (c) => {
+    await rateLimit(c.env, `Bearer audit:${c.req.header('CF-Connecting-IP') ?? 'unknown'}`, AUDIT_PER_MINUTE);
+    const result = { ...(await verifyChain(c.env)), checkedAt: helsinkiIso(await now(c.env)) };
+    return c.json({ ...result, jws: await signJws(c.env, { ...result, aud: AUD.audit }) }, 200);
+  });
+  /** The door's public signing key (JWK Set): verifies quote offers, receipts and audit results. */
+  app.get('/.well-known/jwks.json', async (c) => c.json(await jwks(c.env), 200, { 'Cache-Control': 'public, max-age=300' }));
 
-  app.doc('/openapi.json', { openapi: '3.0.3', info: { title: 'Lazydoor', version: '0.1.0', description: 'Lazy at the order, strict at the border.' } });
+  /** What any agent fetches first: where the API, MCP, rules, events, audit, keys and demo are. */
+  app.get('/.well-known/agent-gateway.json', (c) => c.json(discovery(new URL(c.req.url).origin)));
+
+  app.doc('/openapi.json', (c) => {
+    const discoveryUrl = `${new URL(c.req.url).origin}/.well-known/agent-gateway.json`;
+    return {
+      openapi: '3.0.3',
+      info: { title: 'Lazydoor', version: VERSION, description: 'Lazy at the order, strict at the border. Discovery document (MCP, events, audit, signing keys, approval model): /.well-known/agent-gateway.json' },
+      externalDocs: { url: discoveryUrl, description: 'Discovery document' },
+    };
+  });
 
   app.route('/', adminRoutes());
   app.route('/', uiRoutes(fetchFn));

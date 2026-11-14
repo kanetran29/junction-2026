@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { helsinkiIso, normaliseClock, now, setClock } from '../clock';
 import { DEFAULT_MANDATE_EXP } from '../domain/constants';
 import type { Env } from '../env';
-import { logEvent } from '../events/log';
+import { EVENT_LOCK, logEvent } from '../events/log';
 import { seedMandate } from '../mandate/jws';
 import { newId, sha256Hex } from '../util';
 import { HttpError, identify } from './auth';
@@ -51,8 +51,8 @@ async function insertPriorOrder(env: Env, buyerId: string, netCents: number, lin
 }
 
 /**
- * Demo-only admin routes (the acceptance runner and the demo operator): reset, clock, replay variant and the order and
- * ledger counters. Every route needs `DEMO_MODE=1` (else 404, as if absent) and the admin key (else 401). `saveMandate`
+ * Demo-only admin routes (the acceptance runner and the demo operator): reset, clock, replay variant, the audit tamper demo
+ * and the order and ledger counters. Every route needs `DEMO_MODE=1` (else 404, as if absent) and the admin key (else 401). `saveMandate`
  * and `seedMandate` are reachable only from here and from scripts, never from a buyer route.
  */
 export function adminRoutes(): Hono<{ Bindings: Env }> {
@@ -85,7 +85,8 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
     }
     await ensureSchema(env);
     const s = db(env);
-    await s.batch(['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'mandates', 'buyer_keys'].map((t) => s.prepare(`DELETE FROM ${t}`)).concat(s.prepare("DELETE FROM api_keys WHERE role <> 'judge'")));
+    // the event lock too, so an event being appended right now cannot land on top of the wiped chain
+    await s.batch([s.prepare(`SELECT pg_advisory_xact_lock(${EVENT_LOCK})`), ...['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'mandates', 'buyer_keys'].map((t) => s.prepare(`DELETE FROM ${t}`)), s.prepare("DELETE FROM api_keys WHERE role <> 'judge'")]);
     await setClock(env, b.clock ?? null);
     await setSetting(env, 'replay', b.replay ? '1' : null);
     await setSetting(env, 'recording', b.replay ?? null);
@@ -117,6 +118,22 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
     }
     await logEvent(env, { buyerId: 'admin', type: 'clock.set', data: { now: helsinkiIso(await now(env)) } });
     return c.json({ agentKeys, approverKeys });
+  });
+
+  /**
+   * Demo of the audit chain: rewrites one event's data (the given `seq`, else the latest event) by adding `"tampered": true`,
+   * leaving its stored hashes alone, so `/v1/audit/verify` answers `valid: false` with that seq. `/admin/reset` starts a
+   * fresh chain. An unknown seq is 404.
+   */
+  admin.post('/admin/tamper', async (c) => {
+    const parsed = z.object({ seq: z.number().int().positive().optional() }).safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) throw parsed.error;
+    const row = await db(c.env)
+      .prepare(`UPDATE events SET body = (body::jsonb || '{"tampered": true}'::jsonb)::text WHERE id = COALESCE(?1::bigint, (SELECT MAX(id) FROM events)) RETURNING id`)
+      .bind(parsed.data.seq ?? null)
+      .first<{ id: number }>();
+    if (!row) throw new HttpError(404, 'EVENT_NOT_FOUND', 'no such event');
+    return c.json({ tampered: row.id });
   });
 
   /**

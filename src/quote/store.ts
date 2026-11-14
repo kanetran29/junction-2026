@@ -7,8 +7,10 @@ import { orderable } from '../offers/orderable';
 import type { ReasonCode } from '../domain/reasons';
 import { ValioError, fetchOffers, type Offers } from '../valio/client';
 import { newId } from '../util';
-import { buildQuote, type Draft, type Quote } from './build';
+import { buildQuote, type Draft, type Offer, type Quote } from './build';
 import { db } from '../db';
+import { lineNet } from '../domain/money';
+import { AUD, doorKey, signJws } from '../sign/door';
 
 /** A quote request that cannot be answered: Valio failed (UPSTREAM_ERROR) or the named draft is missing or not confirmed. */
 export class QuoteError extends Error {
@@ -43,6 +45,27 @@ export const draftSchema = z
 
 /** What a quote request names: a stored draft, a draft to confirm and use, or a product list. */
 export type QuoteInput = { draftId: string } | { draft: unknown } | { products: string[]; quantity: unknown; deliverBy: string };
+
+/**
+ * What an offer's JWS binds: the quote, offer and buyer, the delivery date, every line (product, sales units, unit price and
+ * line net in cents), the totals and currency, how long the offer holds (the quote expiry: the earliest of 30 minutes, the
+ * Valio cut-off and the price validity), when it was issued (the quote's door time, seconds) and the quote audience.
+ */
+export function offerClaims(q: Quote, o: Offer) {
+  return {
+    quoteId: q.id,
+    offerId: o.offerId,
+    buyerId: q.buyerId,
+    deliveryDate: o.deliveryDate,
+    lines: o.lines.map((l) => ({ productId: l.productId, salesUnits: l.salesUnits, unitPriceCents: l.netCentsPerSalesUnit, netCents: lineNet(l) })),
+    netCents: o.netCents,
+    grossCents: o.grossCents,
+    currency: 'EUR',
+    validUntil: q.expiresAt,
+    iat: Math.floor(Date.parse(q.createdAt) / 1000),
+    aud: AUD.quote,
+  };
+}
 
 /** Stores a quote (one row per quote, body is the JSON). */
 export async function saveQuote(env: Env, q: Quote): Promise<void> {
@@ -110,10 +133,13 @@ async function brandsNotCarried(env: Env, d: Draft): Promise<string[]> {
 
 /**
  * Quotes a need for a buyer: validates it (zod) and stores a posted draft as confirmed, searches the catalogue, asks
- * Valio once per endpoint about that shortlist only, takes accepted order lines off limited stock, builds and saves the
- * quote and appends `search.done`, two `valio.called` and `quote.created` events. A failing Valio call is UPSTREAM_ERROR.
+ * Valio once per endpoint about that shortlist only, takes accepted order lines off limited stock, builds the quote, signs
+ * every offer with the door key (`offerClaims`), saves it and appends `search.done`, two `valio.called` and `quote.created`
+ * events. A failing Valio call is UPSTREAM_ERROR; a missing signing key fails first, before anything is logged.
  */
 export async function createQuote(env: Env, buyerId: string, input: QuoteInput, fetchFn: typeof fetch = fetch): Promise<Quote> {
+  // no signing key means no signed offers: fail before any event is logged or Valio is called
+  await doorKey(env);
   const at = await now(env);
   let draftId: string;
   let draft: Draft;
@@ -156,6 +182,7 @@ export async function createQuote(env: Env, buyerId: string, input: QuoteInput, 
     acceptedUnits: await acceptedUnits(env, products, offers, at, draft.deliverBy),
     brandsNotCarried: await brandsNotCarried(env, draft),
   });
+  for (const o of q.offers) o.jws = await signJws(env, offerClaims(q, o));
   await saveQuote(env, q);
   await logEvent(env, {
     ...ref,

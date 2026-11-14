@@ -207,7 +207,7 @@ describe('stuck idempotency keys', () => {
   it('a PLACING row is 409 while fresh and is swept after 60 s so the retry proceeds', async () => {
     const q = await quote('hotel-a', 'QA', 20);
     await db(e).prepare("INSERT INTO orders(id, buyer_id, quote_id, idempotency_key, request_hash, state, body, created_at) VALUES ('dead','hotel-a',?, 'stale', ?, 'PLACING', '{}', '2026-11-13T21:10:00+02:00')")
-      .bind(q.id, await sha256Hex(JSON.stringify([q.id, 'o1', null, null, null])))
+      .bind(q.id, await sha256Hex(JSON.stringify([q.id, 'o1', null, null, null, null])))
       .run();
     await setClock(e, '2026-11-13T19:10:30Z');
     expect(await errOf(place('hotel-a', q.id, rows, { idempotencyKey: 'stale' }))).toMatchObject({ status: 409 });

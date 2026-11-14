@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, webcrypto } from 'node:crypto';
 import { join } from 'node:path';
 import { match } from './matcher';
 
@@ -20,6 +20,8 @@ type Ctx = {
   basket: Record<string, Json>;
   tokens: Record<string, string>;
   mcpSession?: string;
+  /** The reset body this case started from, for a step that resets again. */
+  resetBody: Json;
 };
 type Handler = (ctx: Ctx, step: Step, buyer: string, given: Json) => Promise<Json>;
 
@@ -97,6 +99,36 @@ async function fetchToken(ctx: Ctx, buyer: string, orderId: string): Promise<voi
   const inbox = await http(`/approver/${ctx.approverKeys[buyer]}`, { headers: { Accept: 'application/json' } });
   const hit = (inbox.pending ?? []).find((p: Json) => p.orderId === orderId);
   if (hit) ctx.tokens[orderId] = hit.token;
+}
+
+/**
+ * Verifies a compact EdDSA JWS from the door with only its published JWKS (as any client would) and returns its claims, or
+ * null when the key, algorithm or signature does not check out.
+ */
+async function verifyDoorJws(jws: string | undefined): Promise<Json | null> {
+  if (typeof jws !== 'string') return null;
+  const [h, p, s] = jws.split('.');
+  const header = JSON.parse(Buffer.from(h, 'base64url').toString('utf8'));
+  const jwk = (await http('/.well-known/jwks.json')).keys?.find((k: Json) => k.kid === header.kid);
+  if (header.alg !== 'EdDSA' || !jwk) return null;
+  const key = await webcrypto.subtle.importKey('jwk', { kty: jwk.kty, crv: jwk.crv, x: jwk.x }, { name: 'Ed25519' }, false, ['verify']);
+  return (await webcrypto.subtle.verify('Ed25519', key, Buffer.from(s, 'base64url'), Buffer.from(`${h}.${p}`))) ? JSON.parse(Buffer.from(p, 'base64url').toString('utf8')) : null;
+}
+
+/** A copy of a JWS whose claims were edited (the first line's price and the net doubled), keeping the door's header and signature. */
+function tamperedPrice(jws: string): string {
+  const [h, p, s] = jws.split('.');
+  const claims = JSON.parse(Buffer.from(p, 'base64url').toString('utf8'));
+  claims.netCents = Math.floor(claims.netCents / 2);
+  return `${h}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.${s}`;
+}
+
+/** The door's audit check plus whether its signed head verifies with the JWKS and says exactly what the reply says. */
+async function auditVerify(): Promise<Json> {
+  const { jws, httpStatus, ...result } = await http('/v1/audit/verify');
+  const claims = await verifyDoorJws(jws);
+  const same = claims !== null && JSON.stringify(Object.keys(claims).filter((k) => k !== 'aud').sort().map((k) => [k, claims[k]])) === JSON.stringify(Object.keys(result).sort().map((k) => [k, result[k]]));
+  return { ...result, httpStatus, signatureVerified: same && claims.aud === 'lazydoor:audit' };
 }
 
 /** Counts rows of an admin list endpoint (`{ count }`). */
@@ -201,16 +233,48 @@ const handlers: Record<string, Handler> = {
   set_clock: (_ctx, step) => admin('/admin/clock', { clock: step.input.clock }),
   set_replay_variant: (_ctx, step) => admin('/admin/replay', { variant: step.input }),
   http_get: (ctx, step, buyer) => http(step.input.path, { key: ctx.agentKeys[buyer] }),
+  verify_offer_jws: async (ctx, step, buyer) => {
+    const q = ctx.lastQuote[buyer];
+    const o = q?.offers?.[step.input.offer];
+    const claims = await verifyDoorJws(o?.jws);
+    return { verified: claims !== null, claimsMatchOffer: claims?.quoteId === q?.id && claims?.offerId === o?.offerId && claims?.netCents === o?.netCents && claims?.aud === 'lazydoor:quote', claims };
+  },
+  place_order_with_jws: async (ctx, step, buyer) => {
+    const q = ctx.lastQuote[buyer];
+    const o = q?.offers?.[step.input.offer];
+    const quoteJws = step.input.tamper === 'price' ? tamperedPrice(o?.jws) : o?.jws;
+    const key = randomUUID();
+    const reply = await agent(ctx, buyer, '/v1/orders', { quoteId: q?.id, offerId: o?.offerId, quoteJws }, { 'Idempotency-Key': key });
+    await remember(ctx, buyer, reply);
+    return { ...reply, ordersForKey: await adminCount(`/admin/orders?idempotencyKey=${key}`) };
+  },
+  verify_receipt_jws: async (ctx, _step, buyer) => {
+    const order = await agent(ctx, buyer, `/v1/orders/${ctx.lastOrderId[buyer]}`);
+    const receipt = await agent(ctx, buyer, `/v1/orders/${ctx.lastOrderId[buyer]}/receipt`);
+    const claims = await verifyDoorJws(order.jws);
+    return { verified: claims !== null, sameOnReceipt: receipt.jws === order.jws, claims };
+  },
+  audit_verify: () => auditVerify(),
+  all_events: () => http('/v1/events?since=0', { key: ADMIN_KEY }),
+  tamper_and_verify: async () => {
+    const t = await admin('/admin/tamper', {});
+    const v = await auditVerify();
+    return { tampered: t.tampered, verify: v, namesTheSeq: v.firstBadSeq === t.tampered };
+  },
+  reset_and_verify: async (ctx) => {
+    const r = await admin('/admin/reset', ctx.resetBody);
+    ctx.agentKeys = r.agentKeys;
+    ctx.approverKeys = r.approverKeys;
+    const events = (await http('/v1/events?since=0', { key: ADMIN_KEY })).events ?? [];
+    return { ...(await auditVerify()), firstPrevHash: events[0]?.prevHash };
+  },
   mcp_list_tools: (ctx, _step, buyer) => mcpTools(ctx, buyer),
 };
 
-/** Resets gateway state for a case from `defaults` plus the case `given`; returns the minted keys. */
-async function reset(defaults: Json, given: Json) {
+/** The reset body for a case: `defaults` plus the case `given`, only the fields `/admin/reset` reads. */
+function resetBody(defaults: Json, given: Json): Json {
   const g = { mandate: defaults.mandate, clock: defaults.clock, replay: defaults.replay, ...given };
-  const body = Object.fromEntries(
-    ['clock', 'replay', 'replayVariant', 'mandate', 'mandateTampered', 'mandateExp', 'priorAcceptedNetCents', 'priorAccepted'].map((k) => [k, g[k]]),
-  );
-  return admin('/admin/reset', body);
+  return Object.fromEntries(['clock', 'replay', 'replayVariant', 'mandate', 'mandateTampered', 'mandateExp', 'priorAcceptedNetCents', 'priorAccepted'].map((k) => [k, g[k]]));
 }
 
 /**
@@ -227,9 +291,10 @@ async function runCase(c: Case, defaults: Json): Promise<{ status: 'PASS' | 'FAI
   if (c.steps.some((s) => s.call === 'interpret') && health.models?.gemini === false) return { status: 'BLOCKED_ON_GEMINI' };
   let at = 'reset';
   try {
-    const r = await reset(defaults, c.given ?? {});
+    const body = resetBody(defaults, c.given ?? {});
+    const r = await admin('/admin/reset', body);
     if (!r.agentKeys) return { status: 'FAIL', detail: `reset failed: HTTP ${r.httpStatus}` };
-    const ctx: Ctx = { agentKeys: r.agentKeys, approverKeys: r.approverKeys, given: c.given ?? {}, defaultBuyer: defaults.buyer, lastQuote: {}, lastOrderId: {}, basket: {}, tokens: {} };
+    const ctx: Ctx = { agentKeys: r.agentKeys, approverKeys: r.approverKeys, given: c.given ?? {}, defaultBuyer: defaults.buyer, lastQuote: {}, lastOrderId: {}, basket: {}, tokens: {}, resetBody: body };
     for (const [i, step] of c.steps.entries()) {
       at = `step ${i + 1} ${step.call}`;
       const handler = handlers[step.call];
