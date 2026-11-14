@@ -59,6 +59,7 @@ test("inside page: renders every section, loads proof.json, shows each live chec
   const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
   await page.goto(`http://localhost:${PORT}/?mode=inside`);
   await page.waitForFunction(() => document.querySelector('.inside-section[data-section="proof"][data-loaded]') && ![...document.querySelectorAll(".tile")].some((t) => t.dataset.state === "loading"));
+  await page.waitForFunction(() => [...document.querySelectorAll(".stack-group .mark-img")].every((img) => img.complete), null, { timeout: 5000 }).catch(() => {});
   const out = await page.evaluate(() => ({
     sections: [...document.querySelectorAll("#inside-page .inside-section")].map((s) => s.dataset.section),
     h1: document.querySelector("#inside-page h1")?.textContent,
@@ -70,7 +71,8 @@ test("inside page: renders every section, loads proof.json, shows each live chec
     numerals: document.querySelectorAll(".numeral").length,
     poster: document.querySelector("video.agent-run")?.getAttribute("poster"),
     pitch: document.querySelectorAll(".pitch-link").length,
-    logos: document.querySelectorAll(".stack-group .logo:not(.logo-none)").length,
+    marks: [...document.querySelectorAll(".stack-group li")].map((li) => [...li.querySelectorAll(".marks > *")].map((m) => m.getAttribute("src") ?? m.style.getPropertyValue("--logo").match(/logos\/(.+)\.svg/)?.[1])),
+    marksLoaded: [...document.querySelectorAll(".stack-group .mark-img")].every((img) => img.complete && img.naturalWidth > 0),
     scroll: document.documentElement.scrollWidth,
     client: document.documentElement.clientWidth,
   }));
@@ -82,6 +84,7 @@ test("inside page: renders every section, loads proof.json, shows each live chec
   assert.deepEqual(out.tiles, ["audit:pending", "jwks:pending", "rules:pending", "discovery:pending"], "the dev server has none of the door's routes: each tile says it is coming");
   assert.equal(out.poster, "assets/proof/agent-run-poster.webp");
   assert.equal(out.pitch, 0, "no pitch link until proof.json has its URL");
-  assert.equal(out.logos, 4);
+  assert.deepEqual(out.marks, [["assets/logos/aiven-logo-white.svg"], ["cloudflare"], ["googlegemini"], ["assets/logos/gemma-mark-dark.svg"], ["cloudflare"], ["openapiinitiative", "modelcontextprotocol"]]);
+  assert.ok(out.marksLoaded, "the official logos load");
   assert.ok(out.scroll <= out.client, `page is ${out.scroll} px wide in a ${out.client} px viewport`);
 });

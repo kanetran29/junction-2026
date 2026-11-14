@@ -189,7 +189,10 @@ function proof(data) {
   return s;
 }
 
-/** Built with: three groups, each part one line with its logo (Simple Icons, CC0) when there is one. */
+/**
+ * Built with: three groups, each part its logos above its name and one line. Simple Icons marks (CC0) take the text
+ * colour; official logos (Aiven, Gemma) are images, unmodified. The name says the same, so the logos are decorative.
+ */
 function builtWith() {
   const groups = el("div", "stack-groups");
   for (const g of BUILT_WITH) {
@@ -197,12 +200,22 @@ function builtWith() {
     const ul = el("ul");
     for (const part of g.parts) {
       const li = el("li");
-      const mark = el("span", part.logo ? "logo" : "logo logo-none");
-      if (part.logo) mark.style.setProperty("--logo", `url("assets/logos/${part.logo}.svg")`);
-      mark.setAttribute("aria-hidden", "true");
+      const marks = el("span", "marks");
+      marks.setAttribute("aria-hidden", "true");
+      for (const m of part.marks) {
+        if (m.image) {
+          const img = el("img", "mark-img");
+          Object.assign(img, { src: `assets/logos/${m.image}`, alt: "", decoding: "async" });
+          marks.append(img);
+        } else {
+          const mark = el("span", "logo");
+          mark.style.setProperty("--logo", `url("assets/logos/${m.icon}.svg")`);
+          marks.append(mark);
+        }
+      }
       const words = el("div");
       words.append(el("b", "", part.name), el("span", "", part.line));
-      li.append(mark, words);
+      li.append(marks, words);
       ul.append(li);
     }
     box.append(el("h3", "", g.group), ul);

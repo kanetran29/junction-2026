@@ -466,11 +466,12 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .stack-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; }
 .stack-group h3 { font-size: 14px; font-weight: 600; color: var(--ink-dim); margin-bottom: 16px; }
 .stack-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; }
-.stack-group li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 14px; align-items: start; }
+.stack-group li { display: grid; gap: 10px; }
+.marks { display: flex; align-items: center; gap: 12px; height: 26px; }
+.mark-img { display: block; height: 24px; width: auto; }
 .stack-group b { display: block; color: #fff; font-size: 16px; }
-.stack-group span:not(.logo) { font-size: 14px; color: var(--ink-dim); line-height: 1.45; }
-.logo { width: 28px; height: 28px; background: var(--ink); -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; margin-top: 2px; }
-.logo-none { visibility: hidden; }
+.stack-group div > span { font-size: 14px; color: var(--ink-dim); line-height: 1.45; }
+.logo { flex: none; width: 24px; height: 24px; background: var(--ink); -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; }
 .is-production { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: 48px; align-items: center; }
 .closing-sentence { font-size: 19px; color: var(--ink); margin: 0 0 22px; max-width: 40ch; }
 .closing-links { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
