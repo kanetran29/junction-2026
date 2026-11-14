@@ -59,6 +59,11 @@ export async function streamEvents(c: Ctx): Promise<Response> {
         ctl.close();
       } catch {
         // a database error or a departed client ends the stream; the client reconnects with Last-Event-ID
+        try {
+          ctl.close();
+        } catch {
+          // already closed by the departed client
+        }
       }
     },
     cancel() {

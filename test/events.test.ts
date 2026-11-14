@@ -31,5 +31,6 @@ describe('events', () => {
     expect((await listEvents(e, { since: a })).map((x) => x.buyerId)).toEqual(['b2', 'b1']);
     expect((await listEvents(e, { since: 0, buyerId: 'b1' })).map((x) => x.buyerId)).toEqual(['b1', 'b1']);
     expect(await listEvents(e, { since: 0, limit: 1 })).toHaveLength(1);
+    expect(await listEvents(e, { since: 2 ** 31 })).toEqual([]);
   });
 });

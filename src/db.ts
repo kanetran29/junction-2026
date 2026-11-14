@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS quotes (id TEXT PRIMARY KEY, buyer_id TEXT NOT NULL, 
 CREATE TABLE IF NOT EXISTS baskets (id TEXT PRIMARY KEY, buyer_id TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY, buyer_id TEXT NOT NULL, quote_id TEXT, basket_id TEXT, idempotency_key TEXT, request_hash TEXT,
-  state TEXT NOT NULL, net_cents INTEGER NOT NULL DEFAULT 0, gross_cents INTEGER NOT NULL DEFAULT 0, delivery_date TEXT,
+  state TEXT NOT NULL, net_cents BIGINT NOT NULL DEFAULT 0, gross_cents BIGINT NOT NULL DEFAULT 0, delivery_date TEXT,
   body TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT, reason TEXT, decision TEXT, agent_reason TEXT,
   mandate_version INTEGER, approver TEXT, lines_hash TEXT, approval_token TEXT, reply TEXT
 );

@@ -38,6 +38,13 @@ describe('db (Postgres write store)', () => {
     expect(up).toEqual({ results: [{ value: '2' }], meta: { changes: 1 } });
   });
 
+  it('keeps order totals above 2^31 cents (unknown stock lets a quote cover any quantity)', async () => {
+    const s = db(e);
+    await s.prepare("INSERT INTO orders(id, buyer_id, state, net_cents, gross_cents, body, created_at) VALUES ('big', 'b', 'REJECTED', ?, ?, '{}', 'x')").bind(3_000_000_000, 3_000_000_000).run();
+    expect(await s.prepare("SELECT net_cents, SUM(gross_cents) AS g FROM orders WHERE id = 'big' GROUP BY net_cents").first()).toEqual({ net_cents: 3_000_000_000, g: 3_000_000_000 });
+    await s.prepare("DELETE FROM orders WHERE id = 'big'").run();
+  });
+
   it('names the store: plain Postgres here, aiven-postgres where aiven_extras is offered', async () => {
     expect(await storeKind(e)).toBe('postgres');
   });

@@ -48,7 +48,7 @@ export async function logEvent(env: Env, e: NewEvent): Promise<number> {
 /** Events with seq greater than `since` (optionally one buyer's), oldest first, at most `limit` (default 500). */
 export async function listEvents(env: Env, q: { since: number; buyerId?: string; limit?: number }): Promise<Event[]> {
   const { results } = await db(env).prepare(
-    'SELECT id, at, kind, buyer_id, draft_id, quote_id, order_id, body FROM events WHERE id > ?1 AND (?2::text IS NULL OR buyer_id = ?2) ORDER BY id LIMIT ?3',
+    'SELECT id, at, kind, buyer_id, draft_id, quote_id, order_id, body FROM events WHERE id > ?1::bigint AND (?2::text IS NULL OR buyer_id = ?2) ORDER BY id LIMIT ?3',
   )
     .bind(q.since, q.buyerId ?? null, q.limit ?? 500)
     .all<Record<string, string | number | null>>();
