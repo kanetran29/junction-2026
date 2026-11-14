@@ -170,3 +170,16 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 15. CORS chỉ cho `GET /v1/events*` (origin *, header Bearer, không nhận key qua query string).
 16. Hoãn: `reliability.tri` của quote theo sàn mặc định 0.9 (policy vẫn dùng sàn trong mandate); quét cả bảng ở resolve/families (đủ cho demo);
     guard secret có thể bỏ sót biến tên kiểu `exportADMIN_KEY` (không tồn tại).
+
+### B12. Ba sửa theo câu trả lời của Valio trên Discord (Tommi, Thứ Bảy 09:35 / 09:40)
+- **429**: Valio trả 429 → chặn 30 s (hoặc theo `Retry-After`, kẹp trong 1–300 s), trong lúc chặn không gọi Valio; door trả **503
+  `VALIO_RATE_LIMITED`** kèm header `Retry-After`; không báo giá / không đặt hàng khi không có giá mới. Agent tham chiếu chờ (≤ 60 s) rồi
+  thử lại đúng một lần. Trạng thái chặn để trong bộ nhớ từng isolate (D1 đang hết hạn mức ghi). Commit `0d6b9ba`, `9206da1`.
+- **≥ 999999 = "không biết tồn kho"**, không phải "vô hạn" (vẫn cho đặt mọi số lượng như logic của Valio). Nhãn hiện trên dòng báo giá
+  và trang duyệt: "Stock unknown: Valio does not stock this product". `/v1/rules`, README, spec/plan đã đổi chữ. Commit `7d07d42`.
+- **README**: hạn mức và người duyệt là luật của chính khách hàng (trong mandate họ ký), Valio không đặt; "chỉ quản lý được đặt hàng"
+  không còn đủ khi agent đặt thay; người duyệt khi vượt hạn mức khớp với điều Valio nói là cần lúc này. Commit `84c8ccf`.
+- Review Opus: đạt, một lỗi quan trọng (Retry-After không có trần) đã sửa, re-review sạch.
+- Kiểm chứng local: vitest **315/315**, nghiệm thu **49/49** (2 lần), scenarios **11/11**. Đã push `9206da1` và **deploy** (phiên bản
+  `a9222b44`): `/health`, `/v1/reason-codes`, `/v1/rules` trên URL thật trả nội dung mới. Kiểm thử có ghi trên URL thật vẫn chờ hạn mức D1
+  reset lúc 00:00 UTC (mục đầu file).
