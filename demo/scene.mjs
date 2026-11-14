@@ -1,4 +1,4 @@
-// The isometric scene, art direction "Petrol night, signal colours": Valio Aimo petrol as the night, Lazydoor magenta,
+// The isometric scene, art direction "Petrol night, signal colours": Valio Aimo petrol as the night, a graphite Lazydoor gate with one deep-rose accent,
 // warm amber light. Static parts are built once from the anatomy kit; moving parts, effects and every word on screen
 // are driven from model state and scene time (no wall clock), so Story mode renders the same frames every time.
 import * as k from "./kit/iso-kit.mjs";
@@ -30,8 +30,12 @@ const TRUCK_Y = 60;
 const T_LEN = 140;
 const DOCK_X = 160;
 const BAY_X = -296;
-const BARRIER = { x: 136, post: ROAD.y + ROAD.d + 5, z: 24, len: 56 };
+export const BARRIER = { x: 136, post: ROAD.y + ROAD.d + 5, z: 24, len: 56 };
 const DOOR_POINT = [GATE_X + 8, 10, 46];
+/** The letter slot in the closed door leaf, on its kitchen face. */
+const DOOR_SLOT = [GATE_X - 1.8, 11, 42.5];
+/** A small envelope drawn around its centre: body, flap and seal. */
+const LETTER = `<rect class="letter-body" x="-12" y="-8" width="24" height="16" rx="1.6"/><path class="letter-flap" d="M-12 -8L0 1.5L12 -8"/><circle class="letter-seal" cx="0" cy="1.5" r="2.8"/>`;
 const LAMP_Z = 88;
 const LAMPS = RACK_X.map((x) => x + RACK.w / 2);
 const WINDOWS = [[-46, 22], [104, 22], [134, 22], [272, 22]];
@@ -180,24 +184,46 @@ function calendar() {
   return `${M("cream", slab(plate, CAL.z, CAL.h, { tone: "hi", crease: "lo" }, 2, 0.4))}<g transform="${face(CAL.x, WALL_Y + 2.1, CAL.z + CAL.h)}"><rect class="cal-head" x="0" y="0" width="${CAL.w}" height="15" rx="1"/><circle class="cal-ring" cx="8" cy="0" r="1.8"/><circle class="cal-ring" cx="${CAL.w - 8}" cy="0" r="1.8"/><text data-id="calday" class="cal-day" x="${CAL.w / 2}" y="12" font-size="12" text-anchor="middle">SAT</text><text data-id="caldate" class="cal-date" x="${CAL.w / 2}" y="40" font-size="24" text-anchor="middle">14</text></g>`;
 }
 
-/** The chef: shoes, trousers, lemon jacket with buttons, apron with pocket, neckerchief, face, toque with pleats; arms down or a thumbs-up. */
+/** The chef's frame: u runs left to right across the screen (level shoulders), f points at the viewer. */
+const CHEF_U = [2 / Math.sqrt(5), 1 / Math.sqrt(5)];
+const CHEF_F = [-1 / Math.sqrt(5), 2 / Math.sqrt(5)];
+/** World point at (u, f) from the chef's centre at height z. */
+const chefAt = (u, f, z = 0) => [CHEF[0] + u * CHEF_U[0] + f * CHEF_F[0], CHEF[1] + u * CHEF_U[1] + f * CHEF_F[1], z];
+/** A rounded box in the chef's frame: plan {x: u, y: f, w, d, r} turned to face the viewer, extruded from z by h. */
+const chefBox = (plan, z, h, style, steps = 2, bevel = 0.6) => S(k.extrude(k.ringOf(plan, steps).map(([u, f]) => chefAt(u, f).slice(0, 2)), z, h, P, { convex: true, bevel }), style);
+/** A flat bar in plan from world point a to b (an arm reaching out), width w, from z up by h. */
+const bar = (a, b, w, z, h, style) => {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const [nx, ny] = [(-(b[1] - a[1]) / len) * (w / 2), ((b[0] - a[0]) / len) * (w / 2)];
+  const ring = [[a[0] - nx, a[1] - ny], [b[0] - nx, b[1] - ny], [b[0] + nx, b[1] + ny], [a[0] + nx, a[1] + ny]];
+  return S(k.extrude(ring, z, h, P, { convex: true, bevel: 0.4 }), style);
+};
+
+/**
+ * The chef, turned square to the viewer so both shoulders sit level: shoes, trousers, lemon jacket with buttons, apron with pocket,
+ * neckerchief, face, toque with pleats; arms down at both sides, one reaching to the keypad, both out in a shrug, or a thumbs-up.
+ */
 function chef() {
   const [x, y] = CHEF;
   const out = [`<path class="iso-halo" d="${k.haloOf({ x: x - 13, y: y - 11, w: 26, d: 22, r: 10 }, 0, 0.1, P)}" style="filter:blur(4px)"/>`];
-  out.push(M("dark", slab({ x: x - 9, y: y - 3, w: 7, d: 11, r: 2 }, 0, 3, { tone: "mid" }, 2) + slab({ x: x + 2, y: y - 3, w: 7, d: 11, r: 2 }, 0, 3, { tone: "mid" }, 2) + cyl(x, y, 8, 3, 16, { tone: "mid" }, 28)));
-  out.push(`<g class="arms-down arm-left">${M("sun", slab({ x: x - 16, y: y - 4, w: 5, d: 8, r: 2 }, 26, 20, { tone: "hi" }, 2))}${skin(x - 13.5, y, 24, 2.6)}</g>`);
-  out.push(`<g class="arm-type" style="opacity:0">${M("sun", slab({ x: x - 26, y: y + 2, w: 15, d: 6, r: 2 }, 43, 5, { tone: "hi" }, 2))}<g class="typing-hand">${skin(x - 26, y + 6, 50.5, 2.8)}</g></g>`);
+  out.push(M("dark", chefBox({ x: -9, y: -3, w: 7, d: 11, r: 2 }, 0, 3, { tone: "mid" }) + chefBox({ x: 2, y: -3, w: 7, d: 11, r: 2 }, 0, 3, { tone: "mid" }) + cyl(x, y, 8, 3, 16, { tone: "mid" }, 28)));
   const jacket = cyl(x, y, 11, 19, 30, { tone: "hi" }, 36) + L(k.sideArc(x, y, 11, 30, P, 24), { tone: "lo" });
-  out.push(M("sun", jacket + dots([[x - 3.5, y + 10.6, 46], [x - 3.5, y + 10.6, 41], [x + 3.5, y + 10.6, 46], [x + 3.5, y + 10.6, 41]], { size: 1.3, tone: "hi" })));
-  const apron = { x: x - 8, y: y + 9.5, w: 16, d: 2.2, r: 1 };
-  out.push(M("cream", slab(apron, 12, 18, { tone: "hi", crease: "lo" }, 2, 0) + `<g transform="${face(x - 4, y + 11.8, 24)}"><rect class="pocket" x="0" y="0" width="8" height="5" rx="1"/></g>`));
-  out.push(`<g class="arms-down">${M("sun", slab({ x: x + 11, y: y - 4, w: 5, d: 8, r: 2 }, 26, 20, { tone: "hi" }, 2))}${skin(x + 13.5, y, 24, 2.6)}</g>`);
-  out.push(`<g class="arms-shrug" style="opacity:0">${M("sun", slab({ x: x - 25, y: y - 1, w: 12, d: 5, r: 2 }, 38, 5, { tone: "hi" }, 2) + slab({ x: x + 13, y: y - 1, w: 12, d: 5, r: 2 }, 38, 5, { tone: "hi" }, 2))}${skin(x - 26, y + 1, 45, 2.8)}${skin(x + 26, y + 1, 45, 2.8)}</g>`);
-  out.push(`<g class="arms-up" style="opacity:0">${M("sun", slab({ x: x + 11, y: y - 2, w: 5, d: 6, r: 2 }, 44, 18, { tone: "hi" }, 2))}${skin(x + 13.5, y + 1, 65, 3.2)}${thumb(x + 13.5, y + 1, 68.5)}</g>`);
-  out.push(M("red", cyl(x, y, 6.6, 49, 3, { tone: "mid" }, 24) + slab({ x: x - 2.5, y: y + 6, w: 5, d: 2, r: 1 }, 45, 5, { tone: "mid" }, 2, 0)));
+  out.push(M("sun", jacket + dots([chefAt(-3.5, 10.6, 46), chefAt(-3.5, 10.6, 41), chefAt(3.5, 10.6, 46), chefAt(3.5, 10.6, 41)], { size: 1.3, tone: "hi" })));
+  const pocket = k.pathOf([chefAt(-4, 11.8, 24), chefAt(4, 11.8, 24), chefAt(4, 11.8, 19), chefAt(-4, 11.8, 19)].map(at), true);
+  out.push(M("cream", chefBox({ x: -8, y: 9.5, w: 16, d: 2.2, r: 1 }, 12, 18, { tone: "hi", crease: "lo" }, 2, 0) + `<path class="pocket" d="${pocket}"/>`));
+  const armDown = (side) => M("sun", chefBox({ x: side < 0 ? -16 : 11, y: -4, w: 5, d: 8, r: 2 }, 26, 20, { tone: "hi" })) + skin(...chefAt(side * 13.5, 0, 24), 2.6);
+  out.push(`<g class="arms-down arm-left">${armDown(-1)}</g>`);
+  out.push(`<g class="arms-down">${armDown(1)}</g>`);
+  const shoulder = chefAt(-11, 0);
+  const hand = [PHONE.x + PHONE.w + 6, PHONE.y + 2];
+  out.push(`<g class="arm-type" style="opacity:0">${M("sun", bar(shoulder, hand, 5, 43, 5, { tone: "hi" }))}<g class="typing-hand">${skin(hand[0], hand[1], 50.5, 2.8)}</g></g>`);
+  const shrug = (side) => M("sun", bar(chefAt(side * 11, 0), chefAt(side * 25, 3), 5, 38, 5, { tone: "hi" })) + skin(...chefAt(side * 26, 3, 45), 2.8);
+  out.push(`<g class="arms-shrug" style="opacity:0">${shrug(-1)}${shrug(1)}</g>`);
+  out.push(`<g class="arms-up" style="opacity:0">${M("sun", chefBox({ x: 11, y: -3, w: 5, d: 6, r: 2 }, 44, 18, { tone: "hi" }))}${skin(...chefAt(13.5, 0, 65), 3.2)}${thumb(...chefAt(13.5, 0, 68.5))}</g>`);
+  out.push(M("red", cyl(x, y, 6.6, 49, 3, { tone: "mid" }, 24) + chefBox({ x: -2.5, y: 6, w: 5, d: 2, r: 1 }, 45, 5, { tone: "mid" }, 2, 0)));
   const head = at([x, y, 58]);
   out.push(`<circle class="skin" cx="${f1(head[0])}" cy="${f1(head[1])}" r="${f1(8.2 * KS)}"/>`);
-  const p = (dx, dz) => at([x + dx, y + 7.6, 58 + dz]);
+  const p = (du, dz) => at(chefAt(du, 7.6, 58 + dz));
   out.push(`<g class="eyes"><circle class="eye" cx="${f1(p(-3, 1.5)[0])}" cy="${f1(p(-3, 1.5)[1])}" r="${f1(1.05 * KS)}"/><circle class="eye" cx="${f1(p(3, 1.5)[0])}" cy="${f1(p(3, 1.5)[1])}" r="${f1(1.05 * KS)}"/></g>`);
   const mouth = (bend) => { const a = p(-2.6, -4.2); const b = p(2.6, -4.2); const c = p(0, -4.2 + bend); return `M${f1(a[0])} ${f1(a[1])}Q${f1(c[0])} ${f1(c[1])} ${f1(b[0])} ${f1(b[1])}`; };
   out.push(`<path class="mouth mouth-smile" d="${mouth(-2.4)}" style="opacity:0"/><path class="mouth mouth-frown" d="${mouth(2)}" style="opacity:0"/>`);
@@ -307,28 +333,29 @@ function logoSign() {
   return `<g class="logo-sign"><rect class="logo-shadow" x="${f1(x + 4)}" y="${f1(y + 5)}" width="${f1(w + 2 * pad)}" height="${f1(h + 2 * pad)}" rx="8"/><rect class="logo-plate" x="${f1(x)}" y="${f1(y)}" width="${f1(w + 2 * pad)}" height="${f1(h + 2 * pad)}" rx="8"/><image href="assets/valio-aimo-logo.svg" x="${f1(cx - w / 2)}" y="${f1(cy - h / 2)}" width="${f1(w)}" height="${f1(h)}" preserveAspectRatio="xMidYMid meet"/></g>`;
 }
 
-/** Border fence along x = GATE_X: petrol panels with bands, magenta caps and posts with bolts. */
+/** Border fence along x = GATE_X: petrol panels with bands, rose caps and graphite posts with bolts. */
 function fence(from, to) {
   const plan = { x: GATE_X - 3, y: from, w: 6, d: to - from, r: 0.6 };
   const panel = M("petrol", slab(plan, 0, 30, { tone: "mid" }, 2, 0.4) + L([10, 20].map((z) => k.sideSeam(plan, z, P, 2)).join(""), { tone: "lo" }));
-  const cap = M("magenta", slab({ x: GATE_X - 4, y: from, w: 8, d: to - from, r: 1 }, 30, 3, { tone: "mid" }, 2, 0.4));
+  const cap = M("rose", slab({ x: GATE_X - 4, y: from, w: 8, d: to - from, r: 1 }, 30, 3, { tone: "mid" }, 2, 0.4));
   const posts = [];
   for (let y = from; y <= to - 6; y += Math.max(20, (to - from - 6) / Math.round((to - from) / 28))) posts.push(slab({ x: GATE_X - 5, y, w: 10, d: 6, r: 1 }, 0, 38, { tone: "mid" }, 2, 0.4) + dots([[GATE_X, y + 3, 38]], { size: 1, tone: "hi" }));
-  return panel + cap + M("magenta", posts.join(""));
+  return panel + cap + M("gate", posts.join(""));
 }
 
-/** A magenta gate post on a dark base plate, with bolts, bands and hinge knuckles on its lane side. */
+/** A graphite gate post on a dark base plate, with bolts, bands, a rose collar and hinge knuckles on its lane side. */
 function post(y0, hinge) {
   const plan = { x: GATE_X - 8, y: y0, w: 16, d: 14, r: 1.5 };
   const base = M("dark", slab(k.insetPlan(plan, -3), 0, 3, { tone: "mid" }, 3, 0.4) + dots(k.corners(k.insetPlan(plan, -1.5), 0).map(([x, y]) => [x, y, 3]), { size: 1, tone: "hi" }));
   let out = slab(plan, 3, 97, { tone: "mid" }, 3, 0.8) + L(k.sideSeam(plan, 14, P, 3) + k.sideSeam(plan, 86, P, 3), { tone: "lo" });
   if (hinge) for (const z of [12, 44, 74]) out += cyl(HINGE[0], HINGE[1] + 1, 2.2, z, 7, { tone: "hi" }, 16);
-  return base + M("magenta", out);
+  return base + M("gate", out) + M("rose", slab(k.insetPlan(plan, -0.6), 84, 4, { tone: "mid" }, 3, 0.4));
 }
 
-/** Beam over the gate with its scanner head, glass strip, beacon lamp and the LAZYDOOR sign on two masts. */
+/** Graphite beam over the gate with its scanner head, glass strip, beacon lamp and the engraved LAZYDOOR sign on two masts. */
 function beam() {
-  const out = [M("magenta", slab({ x: GATE_X - 10, y: -30, w: 20, d: 82, r: 1.5 }, 100, 10, { tone: "mid" }, 3, 0.8) + dots([[GATE_X - 6, -26, 110], [GATE_X - 6, 48, 110], [GATE_X + 6, -26, 110], [GATE_X + 6, 48, 110]], { size: 1, tone: "hi" }))];
+  const out = [M("gate", slab({ x: GATE_X - 10, y: -30, w: 20, d: 82, r: 1.5 }, 100, 10, { tone: "mid" }, 3, 0.8) + dots([[GATE_X - 6, -26, 110], [GATE_X - 6, 48, 110], [GATE_X + 6, -26, 110], [GATE_X + 6, 48, 110]], { size: 1, tone: "hi" }))];
+  out.push(M("rose", slab({ x: GATE_X - 10.6, y: -30.6, w: 21.2, d: 83.2, r: 1.8 }, 100, 2.6, { tone: "mid" }, 3, 0.4)));
   out.push(M("dark", slab({ x: GATE_X - 20, y: -10, w: 10, d: 42, r: 1.5 }, 92, 10, { tone: "mid" }, 3, 0.6)));
   out.push(`<path class="scan-glass" d="${k.pathOf([at([GATE_X - 20, -8, 92]), at([GATE_X - 20, 30, 92]), at([GATE_X - 17, 30, 92]), at([GATE_X - 17, -8, 92])], true)}"/>`);
   out.push(M("dark", cyl(GATE_X, 11, 8, 110, 4, { tone: "mid" }, 28)));
@@ -336,7 +363,7 @@ function beam() {
   out.push(M("dark", cyl(GATE_X, 11, 7, 125, 2.4, { tone: "mid" }, 28)));
   out.push(M("dark", cyl(GATE_X, -22, 1.4, 110, 22, { tone: "mid" }, 10) + cyl(GATE_X, 0, 1.4, 110, 22, { tone: "mid" }, 10)));
   const [sx, sy] = at([GATE_X, -11, 138]);
-  out.push(`<g class="neon"><rect class="neon-back" x="${f1(sx - 92)}" y="${f1(sy - 26)}" width="184" height="44" rx="10"/><text class="neon-text" x="${f1(sx)}" y="${f1(sy + 6)}" text-anchor="middle">LAZYDOOR</text></g>`);
+  out.push(`<g class="neon"><rect class="neon-back" x="${f1(sx - 84)}" y="${f1(sy - 24)}" width="168" height="40" rx="9"/><text class="neon-text" x="${f1(sx + 2)}" y="${f1(sy + 3.5)}" text-anchor="middle">LAZYDOOR</text></g>`);
   return out.join("");
 }
 
@@ -356,7 +383,7 @@ function phone() {
  * A cab-over delivery truck built at the origin, cab front at x = 0 facing −x, body along +x, side at y = 38 facing the viewer:
  * chassis, bumper with plate and fog lamps, cab with windscreen, wipers, grille and headlights, roof deflector and lights,
  * side window, door, handle, steps and mirror, exhaust stack, fuel tank, an open-sided box (curtain rolled up under the roof,
- * VALIO AIMO livery on it) with eight crate places inside, marker lights,
+ * plain, no lettering) with eight crate places inside, marker lights,
  * wheels with tyres, rims, hubs and nuts under arches, mudflap.
  */
 function truck() {
@@ -377,8 +404,7 @@ function truck() {
   out.push(`<g data-id="tcrates">${load.join("")}</g>`);
   out.push(M("sun", [box.x, box.x + box.w - 3].map((px) => slab({ x: px, y: D - 3, w: 3, d: 3, r: 0.4 }, 17, 53, { tone: "mid" }, 2, 0)).join("")));
   const curtain = { x: box.x, y: D - 4, w: box.w, d: 5, r: 2.4 };
-  const livery = `<g transform="${face(box.x, D + 1.1, 70)}"><text class="livery-text" x="${box.w / 2}" y="15.6" font-size="13" text-anchor="middle">VALIO AIMO</text></g>`;
-  out.push(M("cobalt", slab(curtain, 50, 20, { tone: "mid" }, 4, 0.4) + L(k.sideSeam(curtain, 54, P, 4), { tone: "lo" }) + livery));
+  out.push(M("cobalt", slab(curtain, 50, 20, { tone: "mid" }, 4, 0.4) + L(k.sideSeam(curtain, 54, P, 4), { tone: "lo" })));
   out.push(M("dark", slab({ x: box.x - 1, y: -1, w: box.w + 2, d: D + 2, r: 2 }, 70, 3, { tone: "mid" }, 2, 0.4)));
   out.push(`<g class="markers">${dots([...Array(7)].map((_, i) => [box.x + 7 + i * 13.3, D + 0.2, 15.5]), { size: 1.6, tone: "hi" })}</g>`);
   out.push(M("dark", slab({ x: 42, y: 2, w: 4, d: D - 4, r: 1 }, 14, 48, { tone: "mid" }, 2, 0)));
@@ -506,9 +532,18 @@ export function truckRun(tr, age) {
   return { n, load: n * 0.22 + 0.45, front: DOCK_X, v: 0, accepted: false };
 }
 
+/**
+ * Whether the dock boom is up at age seconds into the truck's state: from just before an accepted truck leaves until it
+ * is parked at the dock again, so it rises once per run; a refused, stuck or parked truck keeps it down.
+ */
+export function boomOpen(tr, age) {
+  const run = truckRun(tr, age);
+  return run.accepted && age >= run.go - 0.5 && age < run.home + 0.3;
+}
+
 /** Builds the scene into host (back SVG, lamp canvas, front SVG) and returns draw(state, t, dt, options). */
 export function buildScene(host) {
-  const back = `<svg class="iso-svg scene-back" viewBox="0 0 ${W} ${H}" role="img" aria-label="Isometric scene: a hotel chef in his kitchen, the buyer agent robot, Lazydoor's magenta gate and road barrier, Valio Aimo's brick warehouse with racks, the manager's phone, and a delivery truck on the road between the warehouse dock and the kitchen.">${plate()}${backWalls()}</svg>`;
+  const back = `<svg class="iso-svg scene-back" viewBox="0 0 ${W} ${H}" role="img" aria-label="Isometric scene: a hotel chef in his kitchen, the buyer agent robot, Lazydoor's gate and road barrier, Valio Aimo's brick warehouse with racks, the manager's phone, and a delivery truck on the road between the warehouse dock and the kitchen.">${plate()}${backWalls()}</svg>`;
   const front = `<svg class="iso-svg scene-front" viewBox="0 0 ${W} ${H}" aria-hidden="true">
 <defs><filter id="glow" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="7"/></filter></defs>
 <g>${logoSign()}${wallClock()}${LAMPS.map(lamp).join("")}${kitchen()}${[3, 2, 1, 0].map(rack).join("")}${fence(-120, -28)}${post(-28, true)}${phone()}</g>
@@ -521,6 +556,8 @@ export function buildScene(host) {
 <g>${post(36, false)}${beam()}</g>
 <g data-id="naive" class="naive" style="opacity:0">${robot("grey", "grey")}</g>
 <g data-id="trail"></g>
+<g data-id="letter" class="letter" style="opacity:0">${LETTER}</g>
+<g data-id="nletter" class="letter naive-letter" style="opacity:0">${LETTER}</g>
 ${truck()}
 <g data-id="exhaust"></g>
 <g>${barrier()}</g>
@@ -534,9 +571,9 @@ ${truck()}
 <g data-id="confetti"></g>
 <g data-id="chips"></g>
 <g data-id="phonechip" class="chip-g" style="opacity:0"><rect class="chip-box"/><g class="chip-icon"></g><text class="chip-text"></text></g>
-<g data-id="receipt" class="receipt" style="opacity:0"><rect class="receipt-box" width="250" height="92" rx="12"/><g class="receipt-icon">${icon("receipt", 16, 16, 36)}</g><text class="receipt-amount" x="62" y="42"></text><text class="receipt-day" x="62" y="74">Mon 16 Nov</text></g>
+<g data-id="receipt" class="receipt" style="opacity:0"><rect class="receipt-box" width="216" height="80" rx="12"/><g class="receipt-icon">${icon("receipt", 14, 14, 31)}</g><text class="receipt-amount" x="54" y="37"></text><text class="receipt-day" x="54" y="64">Mon 16 Nov</text></g>
 <g data-id="gateshock" style="opacity:0"><circle class="stamp-shock" r="20"/><circle class="stamp-shock s2" r="20"/></g>
-<g data-id="stampfx" style="opacity:0"><rect class="banner-box" x="0" y="0" width="398" height="250" rx="12"/><g class="stamp-badge" transform="translate(58 58)"><g class="badge-in"><circle class="stamp-disc" r="40"/><g class="stamp-icon"></g></g></g><g class="stamp-labels"></g></g>
+<g data-id="stampfx" style="opacity:0"><rect class="banner-box" x="0" y="0" width="344" height="232" rx="12"/><g class="stamp-badge" transform="translate(50 50)"><g class="badge-in"><circle class="stamp-disc" r="34"/><g class="stamp-icon"></g></g></g><g class="stamp-labels"></g></g>
 <g data-id="bubble" class="typed" style="opacity:0"><path class="typed-box"/><text class="typed-text"></text></g>
 <g data-id="label" class="label" style="opacity:0"><rect class="label-box" rx="10"/><text class="label-text"></text></g>
 </svg>`;
@@ -544,7 +581,7 @@ ${truck()}
   const root = host.querySelector(".scene-front");
   const stage = host.closest(".stage") ?? host;
   const q = (id) => root.querySelector(`[data-id="${id}"]`);
-  const ids = ["agent", "naive", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "bubble", "label", "exhaust", "doorfly", "bursts", "doorchips", "dockchip", "rings", "confetti", "stampfx", "gateshock", "chips", "phonechip", "receipt", "flying", "counter", "chef", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "phonei"];
+  const ids = ["agent", "naive", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "bubble", "label", "exhaust", "doorfly", "bursts", "doorchips", "dockchip", "rings", "confetti", "stampfx", "gateshock", "chips", "phonechip", "receipt", "flying", "counter", "chef", "letter", "nletter", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "phonei"];
   const el = Object.fromEntries(ids.map((id) => [id, q(id)]));
   const racks = [...root.querySelectorAll(".rack")].sort((a, b) => a.dataset.rack - b.dataset.rack);
   const counterCrates = [...el.counter.querySelectorAll(".ccrate")];
@@ -588,7 +625,7 @@ ${truck()}
   const svgNode = (tag, cls) => `<${tag} class="${cls}"/>`;
   const chipMarkup = () => `<g class="chip-g"><rect class="chip-box"/><g class="chip-icon"></g><text class="chip-text"></text></g>`;
   /** A label chip: rounded box, icon and text at a screen point, sized to its text. */
-  const chip = (node, { x, y, text, iconName, tone, size = 24, anchor = "middle" }) => {
+  const chip = (node, { x, y, text, iconName, tone, size = 21, anchor = "middle" }) => {
     const perChar = text === text.toUpperCase() && /[A-Z]/.test(text) ? 0.68 : 0.57;
     const width = Math.round(text.length * size * perChar + (iconName ? size * 1.5 : 0) + 30);
     const height = Math.round(size * 1.75);
@@ -619,7 +656,7 @@ ${truck()}
   const RC = lengths(ROUTE);
   const STATION = { chef: RC[0], home: RC[1], door: RC[2], truck: RC[0] };
   const NAIVE_AT = [-126, 44];
-  const live = { s: STATION.home, v: 0, leaf: 0, leafShown: "", warm: 0, red: 0, lampDrawn: -1, boom: 0, today: ["SAT", "14"], happy: false };
+  const live = { s: STATION.home, v: 0, leaf: 0, leafShown: "", warm: 0, red: 0, lampDrawn: -1, boom: 0, today: ["SAT", "14"], happy: false, handKey: null, handAt: null };
 
   /** Moves s toward target along a route with a speed limit and a short ease in and out. */
   const travel = (s, v, target, dt) => {
@@ -650,8 +687,8 @@ ${truck()}
       const phi = (i / 28) * Math.PI * 2;
       seal.push(onFace(25 + Math.cos(phi) * 9, 54 + Math.sin(phi) * 9));
     }
-    const extra = share < 0.55 ? `<path class="leaf-panel" d="${quad(6, 44, 10, 38)}"/><path class="leaf-window" d="${quad(9, 41, 70, 79)}"/><path class="leaf-seal" data-stamp="${STAMP[stamp] ? stamp : ""}" d="${k.pathOf(seal, true)}"/><path class="leaf-kick" d="${quad(3, 47, 5, 9)}"/>${k.dotsSvg([onFace(44, 42)], { size: 1.8, tone: "hi" })}` : "";
-    el.leaf.innerHTML = M("plum", S(paths, { tone: "hi", crease: "lo" }) + extra);
+    const extra = share < 0.55 ? `<path class="leaf-panel" d="${quad(6, 44, 10, 38)}"/><path class="leaf-window" d="${quad(9, 41, 70, 79)}"/><path class="leaf-seal" data-stamp="${STAMP[stamp] ? stamp : ""}" d="${k.pathOf(seal, true)}"/><path class="leaf-kick" d="${quad(3, 47, 5, 9)}"/><path class="leaf-slot-frame" d="${quad(13, 37, 40.5, 44.5)}"/><path class="leaf-slot" d="${quad(15, 35, 41.5, 43.5)}"/>${k.dotsSvg([onFace(44, 42)], { size: 1.8, tone: "hi" })}` : "";
+    el.leaf.innerHTML = M("garnet", S(paths, { tone: "hi", crease: "lo" }) + extra);
   };
 
   /** Draws one frame from state at scene time t; snap jumps eased parts to their targets, calm turns effects off. */
@@ -673,7 +710,8 @@ ${truck()}
     setAttr(el.agent, "transform", k.translateAlong(P, [ax, ay, bob]));
     setAttr(cardEl, "data-carry", state.agent.carry ?? "none");
     setAttr(cardEl, "data-stamp", state.agent.carry === "quote" || state.agent.carry === "rejected" ? stamp ?? "" : state.agent.carry === "receipt" ? "AUTO" : "");
-    setAttr(cardEl, "style", state.agent.carry ? null : "opacity:0");
+    const posted = drawLetter(state, t, snap, calm, ax, ay, bob);
+    setAttr(cardEl, "style", state.agent.carry && !posted ? null : "opacity:0");
 
     drawNaive(state.naive, t);
     drawRacks(state, t, calm);
@@ -718,7 +756,53 @@ ${truck()}
       const grow = naive.step === "enter" ? clamp01((t - naive.since - 0.8) / 1.2) : 1;
       setAttr(el.sneak, "d", `M${f1(a[0])} ${f1(a[1])}Q${f1(c[0])} ${f1(c[1])} ${f1(b[0])} ${f1(b[1])}`);
       setAttr(el.sneak, "style", `opacity:${(op * grow).toFixed(3)};stroke-dashoffset:${f1(-t * 30)}`);
-    } else setAttr(el.sneak, "style", "opacity:0");
+      const u = naive.step === "enter" ? (t - naive.since - 1.4) / 1.3 : 2;
+      if (u > 0 && u < 1) {
+        const e = ease(u);
+        const q = (i) => (1 - e) * (1 - e) * a[i] + 2 * e * (1 - e) * c[i] + e * e * b[i];
+        placeLetter(el.nletter, q(0), q(1), 1 - 0.3 * e, u > 0.85 ? (1 - u) / 0.15 : 1);
+      } else setAttr(el.nletter, "style", "opacity:0");
+    } else {
+      setAttr(el.sneak, "style", "opacity:0");
+      setAttr(el.nletter, "style", "opacity:0");
+    }
+  }
+
+  /** Puts a flying envelope at a screen point with a scale and opacity. */
+  function placeLetter(node, x, y, scale, op) {
+    setAttr(node, "transform", `translate(${f1(x)} ${f1(y)}) scale(${scale.toFixed(3)})`);
+    setAttr(node, "style", `opacity:${clamp01(op).toFixed(3)}`);
+  }
+
+  /**
+   * The agent posts its request: once it stands at the door, its card flies as an envelope into the door's slot and the
+   * agent waits empty-handed; the quote comes back out of the slot into its hands. Returns true while the card is not in
+   * the agent's hands.
+   */
+  function drawLetter(state, t, snap, calm, ax, ay, bob) {
+    const ag = state.agent;
+    const atDoor = ag.at === "door" && Math.abs(live.s - STATION.door) < 0.5 && Math.abs(live.v) < 3;
+    if (ag.at === "door" && live.handKey !== ag.since) [live.handKey, live.handAt] = [ag.since, null];
+    if (live.handAt === null && atDoor) live.handAt = snap ? Math.min(t, ag.since + 1.8) : t;
+    if (ag.at !== "door" || live.handAt === null) {
+      setAttr(el.letter, "style", "opacity:0");
+      return false;
+    }
+    const back = ag.carry === "quote" && state.quote ? Math.max(state.quote.at, live.handAt + 1.2) : Infinity;
+    const hand = at([ax, ay + 13, 24 + bob]);
+    const slot = at(DOOR_SLOT);
+    let flight = null;
+    if (t - live.handAt < 0.9) flight = { u: (t - live.handAt) / 0.9, from: hand, to: slot };
+    else if (t >= back && t < back + 0.7) flight = { u: (t - back) / 0.7, from: slot, to: hand };
+    if (!flight || calm) setAttr(el.letter, "style", "opacity:0");
+    else {
+      const e = ease(flight.u);
+      const lift = Math.sin(Math.PI * e) * 40;
+      const intoSlot = flight.from === hand ? e : 1 - e;
+      const { from, to } = flight;
+      placeLetter(el.letter, from[0] + (to[0] - from[0]) * e, from[1] + (to[1] - from[1]) * e - lift, 1 - 0.35 * intoSlot, intoSlot > 0.9 ? (1 - intoSlot) / 0.1 : 1);
+    }
+    return t < back + 0.7;
   }
 
   /** Racks: an icon on the tag, a big label chip above, the alarm light and snapping lock on a closed shelf, the X on a crossed one. */
@@ -747,7 +831,7 @@ ${truck()}
       const node = chips[i];
       if (status !== "naive" || !text) return setAttr(node, "style", "opacity:0");
       const [cx, cy] = at([RACK_X[i] + RACK.w / 2, RACK.y + RACK.d, RACK.h + 20]);
-      chip(node, { x: cx + 6, y: cy - 4, text, iconName, tone: status, size: 23, anchor: "start" });
+      chip(node, { x: cx + 6, y: cy - 4, text, iconName, tone: status, size: 20, anchor: "start" });
       setAttr(node, "style", `opacity:${(calm ? 1 : clamp01(age / 0.25)).toFixed(3)}`);
     });
   }
@@ -825,7 +909,7 @@ ${truck()}
       const arrive = q.at + 0.2 + items.indexOf(item) * 0.45 + 0.6;
       if (t < arrive && !calm) return setAttr(node, "style", "opacity:0");
       const text = item.code === "STOCK_LIMITED" ? (item.remaining !== null ? `Only ${item.remaining} left` : "Stock limited") : item.code === "CUTOFF_PASSED" ? "Cut-off passed" : reasonText(item.code);
-      chip(node, { x: cx + 40, y: cy + refused * 50, text, iconName: "cross", tone: "reject", size: 23, anchor: "start" });
+      chip(node, { x: cx + 40, y: cy + refused * 44, text, iconName: "cross", tone: "reject", size: 20, anchor: "start" });
       setAttr(node, "style", `opacity:${(calm ? 1 : clamp01((t - arrive) / 0.25)).toFixed(3)}`);
       refused += 1;
     });
@@ -879,7 +963,7 @@ ${truck()}
     if (!words && parked && state.phone.status === "expired") words = ["Approval expired", "clock", "reject"];
     if (!words) return setAttr(el.dockchip, "style", "opacity:0");
     const [px, py] = at([BARRIER.x, BARRIER.post, 0]);
-    chip(el.dockchip, { x: px - 24, y: py + 4, text: words[0], iconName: words[1], tone: words[2], size: 23, anchor: "end" });
+    chip(el.dockchip, { x: px - 24, y: py + 4, text: words[0], iconName: words[1], tone: words[2], size: 20, anchor: "end" });
     setAttr(el.dockchip, "style", null);
   }
 
@@ -906,17 +990,17 @@ ${truck()}
     const badge = group.querySelector(".badge-in");
     const scale = 1 + 0.9 * (1 - backOut(age / 0.26));
     setAttr(badge, "transform", scale !== 1 ? `scale(${scale.toFixed(3)})` : null);
-    setIcon(group.querySelector(".stamp-icon"), meta.icon, -24, -24, 48);
+    setIcon(group.querySelector(".stamp-icon"), meta.icon, -21, -21, 42);
     const words = reasons.map(reasonText);
     if (stamp === "NEEDS_APPROVAL" && phoneStatus === "approved") words.push("Approved on phone");
-    const items = [{ text: meta.label, tone: meta.cls, size: 26, x: 110, y: 82 }];
+    const items = [{ text: meta.label, tone: meta.cls, size: 22, x: 94, y: 70 }];
     words.slice(0, 3).forEach((w, i) => {
       const approved = w === "Approved on phone";
-      items.push({ text: w, tone: approved ? "auto" : "plain", size: 23, x: 20, y: 150 + i * 50, iconName: approved ? "check" : null });
+      items.push({ text: w, tone: approved ? "auto" : "plain", size: 20, x: 18, y: 128 + i * 44, iconName: approved ? "check" : null });
     });
-    const height = 116 + Math.min(3, words.length) * 50;
+    const height = 100 + Math.min(3, words.length) * 44;
     setAttr(group.querySelector(".banner-box"), "height", height);
-    setAttr(group, "transform", `translate(${W - 16 - 398} ${CARD_BOTTOM - height})`);
+    setAttr(group, "transform", `translate(${W - 16 - 344} ${CARD_BOTTOM - height})`);
     const rows = pool(group.querySelector(".stamp-labels"), items.length, chipMarkup);
     rows.forEach((row, i) => {
       const item = items[i];
@@ -976,9 +1060,7 @@ ${truck()}
     setAttr(el.truck, "transform", k.translateAlong(P, [run.front, TRUCK_Y, 0]));
 
     const rear = run.front + T_LEN;
-    const near = run.front < BARRIER.x + 90 && rear > BARRIER.x - 30;
-    const waiting = (age > run.go - 0.4 && age < run.go) || (age > run.back - 0.4 && age < run.back);
-    live.boom = follow(live.boom, run.accepted && (near || waiting) ? 1 : 0, dt, 0.16, snap || calm);
+    live.boom = follow(live.boom, boomOpen(tr, age) ? 1 : 0, dt, 0.16, snap || calm);
     const a = live.boom * Math.PI * 0.5;
     const pivot = [BARRIER.x, BARRIER.post - 1, BARRIER.z];
     const tip = [BARRIER.x, pivot[1] - Math.cos(a) * BARRIER.len, pivot[2] + Math.sin(a) * BARRIER.len];
@@ -1023,7 +1105,7 @@ ${truck()}
     setText(el.calday, day);
     setAttr(el.caldate, "data-flip", delivered ? "" : null);
     if (run.accepted && age >= run.unloadDone - 0.2 && age < run.home + 1.5) {
-      setAttr(el.receipt, "transform", `translate(40 ${CARD_BOTTOM - 102})`);
+      setAttr(el.receipt, "transform", `translate(40 ${CARD_BOTTOM - 90})`);
       setText(el.receipt.querySelector(".receipt-amount"), state.receipt?.netCents != null ? euro(state.receipt.netCents) : "Delivered");
       setAttr(el.receipt, "style", `opacity:${(calm ? 1 : clamp01((age - run.unloadDone + 0.2) / 0.3)).toFixed(3)}`);
     } else setAttr(el.receipt, "style", "opacity:0");
@@ -1099,7 +1181,7 @@ ${truck()}
       left -= line.length + 1;
       return part;
     });
-    const size = 25;
+    const size = 21;
     const lineH = size * 1.3;
     const width = Math.max(...full.map((l) => l.length + 1)) * size * 0.62 + 40;
     const height = full.length * lineH + 26;
@@ -1150,7 +1232,7 @@ ${truck()}
     const lines = cardLines(state);
     if (!lines.length) return setAttr(el.label, "style", "opacity:0");
     const head = at([ax, ay, 66 + bob]);
-    const size = 24;
+    const size = 21;
     const width = Math.max(...lines.map((l) => l.length)) * size * 0.56 + 32;
     const height = lines.length * size * 1.3 + 18;
     const top = head[1] - height - 8;

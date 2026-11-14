@@ -45,17 +45,6 @@ const collect = () => {
   add("logo sign", scene.querySelector('image[href*="valio-aimo-logo"]'));
   add("calendar", scene.querySelector(".cal-head")?.parentNode);
   add("terminal screen", scene.querySelector(".phone-screen"));
-  const livery = scene.querySelector(".livery-text");
-  if (seen(livery)) {
-    // Skewed text: test sample points of its own box, not the screen-aligned box around it.
-    const b = livery.getBBox();
-    const m = livery.getScreenCTM();
-    const pts = [];
-    for (let i = 0; i <= 12; i++) for (let j = 0; j <= 3; j++) pts.push(new DOMPoint(b.x + (b.width * i) / 12, b.y + (b.height * j) / 3).matrixTransform(m));
-    const xs = pts.map((p) => p.x);
-    const ys = pts.map((p) => p.y);
-    items.push({ name: "truck livery", x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys), pts: pts.map((p) => [p.x, p.y]) });
-  }
   const html = (sel, name) => {
     const node = document.querySelector(sel);
     if (!node || node.hidden || !node.textContent.trim()) return;
@@ -87,14 +76,7 @@ function check({ items, stage }, when) {
       const b = items[j];
       const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
       const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
-      if (w <= 2 || h <= 2) continue;
-      const skewed = a.pts ? [a, b] : b.pts ? [b, a] : null;
-      if (!skewed) note([a.name, b.name].sort().join(" | "), w * h);
-      else {
-        const [p, r] = skewed;
-        const inside = p.pts.filter(([x, y]) => x > r.x + 2 && x < r.x + r.w - 2 && y > r.y + 2 && y < r.y + r.h - 2).length;
-        if (inside) note([a.name, b.name].sort().join(" | "), w * h);
-      }
+      if (w > 2 && h > 2) note([a.name, b.name].sort().join(" | "), w * h);
     }
   }
 }

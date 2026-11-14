@@ -6,13 +6,15 @@ Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 
 Mở http://localhost:8790/ (dev server đang chạy, phục vụ thẳng thư mục `demo/`), bấm Play hoặc kéo thanh thời gian. Chưa quay video mới: `demo/story.mp4` vẫn là bản cũ, sẽ quay lại sau khi Kane duyệt.
 
-Cần xem (bản sửa: màn hình bếp bị chef che, thẻ quyết định đè nhãn bến):
-1. 0:01 đến 0:06: chef đứng bên phải màn hình bếp và gõ trên bàn phím gắn bên hông; màn hình lộ hoàn toàn, chữ gõ hiện ở ô phía trên bên trái ([ảnh](shots/after-chef-terminal.png)).
-2. 0:53 đến 1:00: màn hình vàng có chuông, chef chạm duyệt; nhãn màn hình nằm dưới màn hình, cạnh chân đế.
-3. 1:00 đến 1:13: thẻ quyết định ở góc dưới phải, hoá đơn ở góc dưới trái cạnh chỗ xe dỡ hàng ([ảnh](shots/after-delivery.png)).
-4. Live, phát file mẫu tới `approval.expired`: thẻ REJECT ở góc dưới phải, "Approval expired" dưới thanh chắn bến, không chữ nào đè nhau ([ảnh](shots/after-live-expired.png)).
+Cần xem (6 sửa theo nhận xét của Kane về 77db1ef; tổng quan: [ảnh](shots/after-overview.png)):
+1. Chef: quay mặt thẳng về người xem, hai vai ngang nhau, hai tay gắn đối xứng vào thân ở mọi tư thế (đứng, gõ phím, nhún vai, giơ ngón cái) ([ảnh](shots/after-chef-poses.png)).
+2. Xe tải: bỏ hẳn chữ VALIO AIMO trên xe ([giao hàng](shots/after-delivery.png)).
+3. Thanh chắn bến: mỗi chuyến xe chỉ mở một lần (mở trước khi xe chạy, đóng khi xe đã về đỗ), không mở khi hàng bị từ chối hay hết hạn. Trong Story: mở 62,7 s, đóng 73,7 s; mở 80,9 s, đóng 92,0 s.
+4. Agent: 0:36 đến 0:38 đi tới trước cổng, thả phong thư vào khe thư trên cánh cổng, đứng chờ ngoài cổng tay không; báo giá đi ra từ khe về tay agent ([ảnh](shots/after-letter.png)). Agent ngây thơ (0:12): cũng đi tới trước cổng, nhưng phong thư bay vòng qua cổng theo đường nét đứt xám tới kệ (đây là ý "bỏ qua cổng" của cảnh này) ([ảnh](shots/after-naive-letter.png)).
+5. Màu Lazydoor: bỏ hồng neon. Cổng màu graphite, cánh cổng màu đỏ garnet trầm, viền hồng đậm (#b8456b) ở nắp hàng rào, cổ trụ và dầm; biển LAZYDOOR chữ hồng nhạt khắc trên tấm graphite, không phát sáng. Giao diện dùng cùng tông: chữ "Lazydoor", nút đang chọn, vạch dừng, tia quét ([cổng](shots/after-gate.png)).
+6. Chữ nhỏ hơn một bậc: phụ đề 2,25% chiều rộng (43 px ở 1080p), nhãn và thẻ 20 đến 22 đơn vị (24 đến 26 px), khung sự kiện và đồng hồ 1,3%, số đếm ngược 2,75%; thẻ quyết định và hoá đơn thu nhỏ theo.
 
-Kiểm tra chồng chữ tự động ở 1080p: `node demo/dev/label-overlap.mjs` (Story mỗi 0,25 giây, Live phát hết file mẫu) báo `label overlaps: 0`.
+Kiểm tra: `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 giây, Live phát hết file mẫu); 31 test pass.
 
 ## Nhật ký
 
@@ -123,6 +125,14 @@ Vấn đề tìm thấy:
   - Nhãn "999999?" của agent ngây thơ nằm bên phải biển LAZYDOOR.
   - Thẻ kết thúc phủ toàn khung nên không tính chồng.
 - Test 28 pass; 120 khung/giây ở 1080p.
+
+### 14. Sửa theo nhận xét của Kane về 77db1ef (chef, xe, thanh chắn, phong thư, màu, cỡ chữ)
+- Chef: dựng lại trong hệ trục quay mặt về người xem (vai theo hướng nằm ngang trên màn hình), nên hai vai ngang và hai tay đối xứng; tay gõ phím là một thanh nối từ vai tới bàn phím bên hông màn hình.
+- Xe tải: bỏ chữ trên rèm.
+- Thanh chắn: nguyên nhân mở hai lần là điều kiện "xe ở gần thanh chắn" cũng đúng khi xe đang đỗ ở bến (chỗ đỗ nằm sát thanh chắn). Vì vậy thanh chắn mở lúc chất hàng, hạ khi xe chạy qua, mở lại khi xe quay về, rồi đứng mở tới sự kiện sau. Thay bằng `boomOpen(tr, age)` (thuần, có test): mở từ 0,5 giây trước khi xe chạy tới khi xe đã đỗ lại ở bến. Test: mở đúng một lần mỗi chuyến, xe không bao giờ chạy qua khi thanh chắn hạ, xe ngây thơ/kẹt/đỗ không làm nó mở.
+- Phong thư: khe thư (viền vàng) trên cánh cổng; agent tới trước cổng thì thẻ trên tay bay thành phong thư vào khe, agent đứng chờ tay không; báo giá đi ra khỏi khe về tay agent (chờ ít nhất 1,2 giây sau khi thả thư). Agent ngây thơ: phong thư bay theo đường cong xám vòng qua cổng tới kệ.
+- Màu: theo design-taste-frontend, một màu nhấn duy nhất, độ bão hoà thấp hơn 80%, không phát sáng neon: hồng đậm `--brand #d65c84` (chữ trên nền tối, tương phản 5,0:1), `--brand-strong #b8456b` (nền nút có chữ trắng, 5,1:1), `--brand-soft #eba3ba` (đường mảnh, chữ biển). Không dùng xanh lá, vàng hay đỏ vì đó là màu tín hiệu AUTO / chờ duyệt / REJECT, không dùng xanh dương vì trùng Valio Aimo.
+- Cỡ chữ: giữa bản trước khi phóng to (nhãn 14 đến 19, phụ đề 2,15%) và bản 77db1ef (nhãn 23 đến 26, phụ đề 2,5%).
 
 ## Còn lại / cần làm sau
 - Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).
