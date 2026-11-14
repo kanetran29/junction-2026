@@ -1521,7 +1521,7 @@ function liveCard(state, t) {
 function liveList(state) {
   const refused = state.quote?.rejections ?? [];
   if (!refused.length) return null;
-  const rows = refused.slice(0, 3).map((r) => ({ text: `✕ ${r.productId ?? "—"} · ${r.code}`, tone: "reject" }));
+  const rows = refused.slice(0, 3).map((r) => ({ text: `✕ ${r.productId ?? "unknown product"} · ${r.code}`, tone: "reject" }));
   if (refused.length > 3) rows.push({ text: `+${refused.length - 3} more refused`, tone: "dim" });
   const rack = state.shelves.findIndex((x) => x.productId && x.productId === String(refused[0].productId));
   return { rows, rack: rack >= 0 ? rack : undefined };

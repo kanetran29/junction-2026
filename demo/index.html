@@ -66,17 +66,18 @@
   </section>
 
   <section id="compare-page" class="compare-page" aria-labelledby="why" hidden>
-    <h1 id="why">Why a door?</h1>
-    <p class="lede">Agents will order on behalf of kitchens. Lazydoor sits at Valio and checks every order before it becomes real.</p>
-    <table class="cmp-table">
-      <thead><tr><th scope="col"><span class="sr-only">What</span></th><th scope="col">Agent calls Valio's API directly</th><th scope="col">Person orders in the webshop</th><th scope="col">Lazydoor</th></tr></thead>
-      <tbody id="cmp-body"></tbody>
-    </table>
-    <p class="cmp-note">Every Lazydoor line was measured on the deployed door; the tag under it names the acceptance case, reason code or endpoint. In the webshop column, "—" means we do not know.</p>
-    <footer class="cmp-foot">Live door: <a href="https://lazydoor.lazydoor.workers.dev">lazydoor.lazydoor.workers.dev</a> · Code: <a href="https://github.com/kanetran29/junction-2026">github.com/kanetran29/junction-2026</a> · 49 acceptance cases pass.</footer>
+    <header class="compare-head-page">
+      <h1 id="why">Why a door?</h1>
+      <p class="lede">Agents will order on behalf of kitchens. Lazydoor sits at Valio and checks every order before it becomes real.</p>
+      <p class="compare-note" id="compare-note"></p>
+    </header>
+    <div class="pairs-legend" aria-hidden="true"><span class="legend-without">Without the door</span><span class="legend-with">With Lazydoor</span></div>
+    <div id="compare-groups" class="compare-groups"></div>
+    <footer class="cmp-foot"><a class="btn btn-ghost" href="https://lazydoor.lazydoor.workers.dev">The live door</a><a class="btn btn-ghost" href="https://github.com/kanetran29/junction-2026">Code on GitHub</a><span class="foot-fact">49 acceptance cases pass on the deployed door.</span></footer>
   </section>
-  <section id="inside-page" class="compare-page inside-page" aria-label="Inside Lazydoor" hidden></section>
-  <p id="live-note" class="live-note" hidden>Live: the scene follows Hotel Aurora's agent at the door, as it happens; other hotels' agents show as letters from the left. Nothing is sent from this page.</p>
+  <section id="inside-page" class="inside-page" aria-label="Inside Lazydoor" hidden></section>
+  <section id="try-panel" class="try-panel" aria-label="Try it" hidden></section>
+  <p id="live-note" class="live-note" hidden>Live: the scene follows Hotel Aurora's agent at the door as it happens, or your own order while you try one; other agents show as letters from the left.</p>
 </main>
 <script type="module" src="main.mjs"></script>
 </body>

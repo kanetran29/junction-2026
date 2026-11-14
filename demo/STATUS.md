@@ -244,6 +244,23 @@ Vấn đề tìm thấy:
 - `dev/fake-gateway.mjs --door URL` chuyển các route công khai đó sang door thật (phía server), để xem kết quả thật ở máy. Story không đổi.
 - Test: 58 pass với Playwright (từng file một), 55 + 3 bỏ qua khi không có; `label overlaps: 0`. Trên door đang chạy lúc này: rules (14: 11 seller, 2 buyer, 1 approver) và reason codes (35) có kết quả; audit (401), jwks và discovery (404) hiện "Coming with the next deploy" tới lần deploy tới.
 
+### 32. "Try it" trong Live: khách là chef, rồi là kitchen manager
+- Dưới sân khấu Live (ẩn trong kiosk): "Try it: you are the chef", ô nhập có nhãn (tối đa 200 ký tự), nút Send, 4 chip mẫu điền vào ô, vùng kết quả `aria-live`. Gọi `POST /v1/try` (theo hợp đồng của session build) và `POST /v1/try/decision`, không key.
+- Kết quả (`try.mjs` `viewOf`): needs_input → câu hỏi "Gemini read Fri 13 Nov, Gemma read Fri 20 Nov" với hai nút gửi `answer`; no_offer → "No offer: every candidate was refused." với các mã từ chối nhiều nhất; ACCEPTED → dòng xanh có giá net và "On the pallet for delivery day"; REJECTED → dòng đỏ, mỗi mã kèm câu của nó từ `/v1/reason-codes`; HELD → thẻ "You are the kitchen manager" (net, gross, lý do giữ, hạn), nút Approve/Reject, rồi trạng thái cuối (ACCEPTED, REJECTED, EXPIRED, PRICE_CHANGED nếu có). 400 → "Type a request of 1 to 200 characters."; 429 → "Busy: try again in N s"; 404 → ẩn cả khung.
+- Trong lúc thử, cảnh đi theo buyer sandbox của khách (`visitor-…`): event của lần thử được phát lại cho buyer đó, Aurora thành "another hotel", bảng luật của Aurora ẩn; nút "Back to Hotel Aurora" trả cảnh về `hotel-a`. Visitor và buyerId giữ trong `sessionStorage` (bọc try/catch).
+- `dev/fake-gateway.mjs`: hai route đó, trả lời cố định theo câu (Friday → needs_input rồi ACCEPTED, oat → no_offer, milk → HELD 1.010,00 € rồi duyệt/từ chối, còn lại → AUTO), giới hạn 8 lần/phút → 429, `--no-try` → 404; event ghi dưới buyer sandbox.
+- Test: 63 pass với Playwright (từng file một), 58 + 5 bỏ qua khi không có; `label overlaps: 0`; 375 px không cuộn ngang.
+
+### 33. Thiết kế lại Inside, Compare, Try it theo skill design-taste-frontend (Kane: "AI slop quá")
+- Đọc thiết kế: trang dự án cho giám khảo, giữ thương hiệu (sân khấu petrol tối, hồng #d65c84, Geist + Geist Mono, cảnh isometric), giọng bình tĩnh, kỹ thuật, kiểu editorial; CSS thuần + JS thuần. Dial VARIANCE 6, MOTION 3, DENSITY 4. Story và cảnh Live không đổi; tên tab giữ nguyên.
+- Ảnh thật từ cảnh của mình (`assets/stills/`, 1600×800 webp): held (hero), refusals (flow), nomilk (guardrails), delivery (path to production); poster cho video agent (`assets/proof/agent-run-poster.webp`).
+- Inside: hero chia đôi, canh trái (punchline 2 dòng ở mọi bề rộng, một câu 20 chữ, "Watch the story" và "Try it live" mở Live tại khung Try), ảnh bên phải; flow là một đường ray 7 nút có động từ và một dòng chi tiết (dọc trên điện thoại); guardrails 3 cụm, mã và số AC là chip riêng; bento đúng 4 ô live (audit, signing key, rules + codes, discovery có "All endpoints") và lệnh có nút Copy; proof là số lớn từ proof.json, video có poster, link pitch chỉ khi có URL; Built with 3 nhóm, logo Simple Icons (CC0, `assets/logos/`, Aiven không có trong Simple Icons nên dùng logo PostgreSQL). Không có eyebrow nào; 0 gạch ngang dài.
+- Compare: bỏ cột webshop, thay bằng một câu; các cặp "Without the door / With Lazydoor" theo 4 nhóm, glyph Phosphor ✕/✓, chip bằng chứng; 13 cặp.
+- Try it: nhãn trên ô nhập, chip là nút thật, trạng thái trống / đang gửi (skeleton, tắt khi reduced motion) / lỗi rõ ràng, thẻ điện thoại cho đơn bị giữ (thanh "Approval request from Lazydoor"); dòng lý do không còn "Held: " lặp dấu hai chấm.
+- Một màu nhấn (hồng); xanh và đỏ chỉ cho trạng thái; viền teal là bề mặt; bán kính 10 px, chip 6 px.
+- Kiểm: Pre-Flight Check của skill đạt; 63 test pass với Playwright (từng file một); `label overlaps: 0` (replay, LIVE_SECONDS=25); 375 px không cuộn ngang; file giọng không đổi. Ảnh trước/sau ở thư mục ghi chú chung `taste-shots/`.
+- Ngoại lệ còn lại (Story/Live, không đổi theo yêu cầu): HUD "Valio's rules · same for every buyer", dòng kết nối ở màn kết và CONNECT_LINE của Story có nhiều hơn một dấu chấm giữa.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

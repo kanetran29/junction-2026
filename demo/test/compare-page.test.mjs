@@ -2,20 +2,23 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { STRENGTHS, PAGE_ONLY } from "../compare.mjs";
+import { STRENGTHS, PAGE_ONLY, GROUPS } from "../compare.mjs";
 
 const SERVER = fileURLToPath(new URL("../dev/fake-gateway.mjs", import.meta.url));
 const PORT = 8798;
 /** playwright-core from PLAYWRIGHT_CORE (or the default resolution); the browser test is skipped when it is not installed. */
 const pw = await import(process.env.PLAYWRIGHT_CORE ?? "playwright-core").catch(() => null);
 
-test("compare: thirteen rows, each Lazydoor line with its evidence; the webshop column never claims more than we know", () => {
+test("compare: thirteen pairs in four groups, each Lazydoor line with its evidence chips; no webshop guesses", () => {
   const rows = [...STRENGTHS, ...PAGE_ONLY];
   assert.equal(STRENGTHS.length, 8);
   assert.equal(rows.length, 13);
+  const groups = new Set(GROUPS.map((g) => g.id));
   for (const row of rows) {
-    assert.ok(row.topic && row.without && row.with && row.evidence, row.topic);
-    assert.ok(["—", "the person, if they notice"].includes(row.webshop), `${row.topic}: ${row.webshop}`);
+    assert.ok(row.topic && row.without && row.with, row.topic);
+    assert.ok(groups.has(row.group), `${row.topic}: ${row.group}`);
+    assert.ok(Array.isArray(row.evidence) && row.evidence.length >= 1, row.topic);
+    assert.equal("webshop" in row, false);
   }
 });
 
@@ -31,7 +34,7 @@ test("compare page: no horizontal scroll at 375 px, and every row is on the page
   const { scroll, client, rows, stage } = await page.evaluate(() => ({
     scroll: document.documentElement.scrollWidth,
     client: document.documentElement.clientWidth,
-    rows: document.querySelectorAll("#cmp-body tr").length,
+    rows: document.querySelectorAll("#compare-groups .pair").length,
     stage: document.getElementById("stage").hidden,
   }));
   assert.ok(scroll <= client, `page is ${scroll} px wide in a ${client} px viewport`);

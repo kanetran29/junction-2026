@@ -2,9 +2,11 @@
 // Run: node demo/dev/fake-gateway.mjs [--port 8790] [--no-sse] [--replay [file]] [--pace 1]
 //   --no-sse   the stream endpoint answers 404, so the page falls back to polling
 //   --replay   replays a recorded run (default fixtures/story-v2.json) once a viewer reads the event log; --pace scales its gaps
+//   --no-try   the "Try it" sandbox routes answer 404, as on a door that is not in demo mode
 //   --door URL passes the door's public read routes (rules, reason codes, audit, keys, discovery, OpenAPI) through to that door,
 //              so the Inside tab shows real results locally; without it they answer 404 ("coming with the next deploy")
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,7 +51,94 @@ function interpret(text) {
   return { text, category: "10400", claims: /lactose/i.test(text) ? ["FREE_FROM_LACTOSE"] : [], quantity: unclear.length ? null : { value: cases ? n * 20 : n, unit: "l" }, unclear };
 }
 
+/** Visitors of "Try it": their sandbox buyer and recent tries; held orders by approval token. */
+const visitors = new Map();
+const approvals = new Map();
+const TRY_PER_MINUTE = 8;
+
+/**
+ * POST /v1/try, deterministic by text: "…Friday…" asks which Friday (needs_input) until answered, "…oat…" has no offer,
+ * "…milk…" is HELD over the kitchen's 500 € per-order limit, anything else is accepted AUTO. Events go to the log with the
+ * visitor's sandbox buyerId, a step at a time, so the Live scene can follow them.
+ */
+async function tryRoute(req, res) {
+  if (arg("--no-try")) return json(res, 404, { error: "not found" });
+  const { text = "", visitor: given, draftId: answeredDraft, answer } = await body(req);
+  const t = String(text).trim();
+  if (!t || t.length > 200) return json(res, 400, { error: "INVALID_REQUEST", detail: "text must be 1 to 200 characters" });
+  const visitor = given || randomUUID();
+  const sandbox = visitors.get(visitor) ?? { buyerId: `visitor-${visitor.replace(/-/g, "").slice(0, 8)}`, tries: [] };
+  visitors.set(visitor, sandbox);
+  sandbox.tries = sandbox.tries.filter((at) => Date.now() - at < 60000);
+  if (sandbox.tries.length >= TRY_PER_MINUTE) return json(res, 429, { error: "TRY_RATE_LIMITED", retryAfter: Math.ceil((60000 - (Date.now() - sandbox.tries[0])) / 1000) });
+  sandbox.tries.push(Date.now());
+  const who = { buyerId: sandbox.buyerId };
+  const reply = (extra) => json(res, 200, { visitor, buyerId: sandbox.buyerId, ...extra });
+  const step = async (ms, type, data, ids = {}) => {
+    await later(ms);
+    emit(type, data, { ...who, ...ids });
+  };
+  const friday = /friday/i.test(t);
+  const draftId = answeredDraft || `drf_${++ids}`;
+  if (friday && !answer) {
+    const draft = { id: draftId, text: t, category: "18750", claims: [], quantity: { value: 40, unit: "kg" }, unclear: [] };
+    await step(400, "draft.created", { ...draft, crossCheck: { model: "gemma-4-31b-it", result: "disagreed", fields: ["deliverBy"] } }, { draftId });
+    return reply({ step: "needs_input", draft, question: { field: "deliverBy", readings: [{ model: "gemini-3.8-flash", value: "2026-11-13" }, { model: "gemma-4-31b-it", value: "2026-11-20" }] } });
+  }
+  const oat = /oat/i.test(t);
+  const milk = !oat && /milk/i.test(t);
+  const units = friday ? 40 : milk ? 1000 : oat ? 50 : 20;
+  if (!answer) await step(400, "draft.created", { text: t, category: milk ? "10400" : oat ? "10402" : "18750", claims: milk ? ["FREE_FROM_LACTOSE"] : oat ? ["FREE_FROM_GLUTEN"] : [], quantity: { value: units, unit: milk || oat ? "l" : "kg" }, unclear: [], crossCheck: { model: "gemma-4-31b-it", result: "agreed", fields: [] } }, { draftId });
+  await step(500, "draft.confirmed", {}, { draftId });
+  const quoteId = `q_${++ids}`;
+  await step(800, "search.done", { count: oat ? 2 : milk ? 35 : 107, categories: [] }, { draftId, quoteId });
+  await step(500, "valio.called", { endpoint: "availability", ids: oat ? 2 : 35, replay: true }, { draftId, quoteId });
+  await step(400, "valio.called", { endpoint: "price", ids: oat ? 2 : 35, replay: true }, { draftId, quoteId });
+  if (oat) {
+    const rejections = [{ productId: "468465", code: "NOT_ORDERABLE", detail: "no stock lines" }, { productId: "470863", code: "NEW_ALLERGEN", detail: "adds allergen AW" }];
+    await step(800, "quote.created", { offers: [], rejections: rejections.map(({ productId, code }) => ({ productId, code })) }, { draftId, quoteId });
+    return reply({ step: "no_offer", draft: { id: draftId }, quote: { quoteId, offers: [], rejections, jws: null } });
+  }
+  const netCents = milk ? 101000 : friday ? 30800 : 15400;
+  const grossCents = Math.round(netCents * 1.135);
+  const productId = milk ? "464306" : "472673";
+  const offers = [{ offerId: "o1", lines: [{ productId, salesUnits: milk ? 1000 : units }], netCents, changes: [] }];
+  await step(800, "quote.created", { offers, rejections: [] }, { draftId, quoteId });
+  const orderId = `ord_${++ids}`;
+  if (milk) {
+    const reasons = [{ code: "OVER_ORDER_AUTO", detail: "1,010.00 € is over the kitchen's 500 € per-order limit" }];
+    await step(700, "policy.decided", { outcome: "NEEDS_APPROVAL", reasons: reasons.map((r) => r.code) }, { quoteId, orderId });
+    const token = randomUUID();
+    approvals.set(token, { visitor, orderId, quoteId, offers, netCents, grossCents, who });
+    await step(300, "approval.requested", { orderId, expiresAt: "2026-11-15T17:00:00+02:00" }, { quoteId, orderId });
+    return reply({ step: "decided", quote: { quoteId, offers, rejections: [], jws: null }, order: { orderId, state: "HELD", reasons, netCents, grossCents }, approval: { token, expiresAt: "2026-11-15T17:00:00+02:00" } });
+  }
+  await step(700, "policy.decided", { outcome: "AUTO", reasons: [] }, { quoteId, orderId });
+  await step(400, "order.accepted", { lines: offers[0].lines, netCents }, { quoteId, orderId });
+  return reply({ step: "decided", quote: { quoteId, offers, rejections: [], jws: null }, order: { orderId, state: "ACCEPTED", reasons: [], netCents, grossCents } });
+}
+
+/** POST /v1/try/decision: the visitor, as the kitchen manager, approves or rejects their own held sandbox order. */
+async function tryDecision(req, res) {
+  if (arg("--no-try")) return json(res, 404, { error: "not found" });
+  const { visitor, token, decision } = await body(req);
+  const held = approvals.get(token);
+  if (!held || held.visitor !== visitor || !["approve", "reject"].includes(decision)) return json(res, 409, { error: "INVALID_DECISION", detail: "unknown token, visitor or decision" });
+  approvals.delete(token);
+  const refs = { ...held.who, quoteId: held.quoteId, orderId: held.orderId };
+  if (decision === "reject") {
+    emit("approval.rejected", {}, refs);
+    return json(res, 200, { order: { orderId: held.orderId, state: "REJECTED", reasons: [] } });
+  }
+  emit("approval.approved", {}, refs);
+  await later(500);
+  emit("order.accepted", { lines: held.offers[0].lines, netCents: held.netCents }, refs);
+  return json(res, 200, { order: { orderId: held.orderId, state: "ACCEPTED", reasons: [], netCents: held.netCents, grossCents: held.grossCents } });
+}
+
 async function api(req, res, url) {
+  if (req.method === "POST" && url.pathname === "/v1/try") return tryRoute(req, res);
+  if (req.method === "POST" && url.pathname === "/v1/try/decision") return tryDecision(req, res);
   const buyerId = url.searchParams.get("buyer") || "hotel-a";
   // Reads need no key and return every buyer's events, like the door's event log in demo mode.
   if (req.method === "GET" && url.pathname.startsWith("/v1/events")) startReplay().catch((error) => console.error(`replay: ${error.message}`));

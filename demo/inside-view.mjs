@@ -1,6 +1,8 @@
-// Builds the Inside tab from inside.mjs and proof.json with DOM calls only (text, never markup), then fills its live
-// checks from the door. Called once when the tab first opens.
-import { WHAT, FLOW, FLOW_NOTE, GUARDRAILS, BUILT_WITH, PRODUCTION, CHECKS, COMMANDS, DOOR_URL, REPO_URL, runCheck } from "./inside.mjs";
+// Builds the Inside tab from inside.mjs and proof.json with DOM calls only (text, never markup), then fills its four live
+// tiles from the door. Called once when the tab first opens. Each section uses its own layout: a split hero, a flow track,
+// three guardrail clusters, a bento of live tiles, display numerals with the agent-run video, logo groups, a closing split.
+import { HERO, FLOW, FLOW_NOTE, FLOW_STILL, GUARDRAILS, GUARD_STILL, BUILT_WITH, PRODUCTION, CHECKS, COMMANDS, DOOR_URL, REPO_URL, runCheck } from "./inside.mjs";
+import { ICONS } from "./icons.mjs";
 
 /** An element with a class and text. */
 function el(tag, cls = "", text = "") {
@@ -10,143 +12,227 @@ function el(tag, cls = "", text = "") {
   return node;
 }
 
-/** A link that opens in the same tab. */
-function link(href, text) {
-  const a = el("a", "", text);
+/** A link styled as a button or a plain link. */
+function link(href, text, cls = "") {
+  const a = el("a", cls, text);
   a.href = href;
   return a;
 }
 
-/** One numbered section with its heading. */
-function section(n, title, ...children) {
-  const s = el("section", "inside-section");
-  s.dataset.section = String(n);
-  s.append(el("h2", "", title), ...children);
+/** A Phosphor icon from icons.mjs as inline SVG (paths from the library, not drawn here). */
+function icon(name, cls = "icon") {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 256 256");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", cls);
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", ICONS[name]);
+  svg.append(path);
+  return svg;
+}
+
+/** A figure with a still from the scene and its caption. */
+function still({ src, alt, caption }, cls = "", eager = false) {
+  const figure = el("figure", `still ${cls}`.trim());
+  const img = el("img");
+  Object.assign(img, { src, alt, width: 1600, height: 800, decoding: "async", loading: eager ? "eager" : "lazy" });
+  figure.append(img);
+  if (caption) figure.append(el("figcaption", "", caption));
+  return figure;
+}
+
+/** Small chips, one per value. */
+function chips(values, cls) {
+  const span = el("span", "chips");
+  for (const v of values) span.append(el("span", `chip ${cls}`, v));
+  return span;
+}
+
+/** A section with its heading. */
+function section(id, title, ...children) {
+  const s = el("section", `inside-section is-${id}`);
+  s.dataset.section = id;
+  if (title) s.append(el("h2", "", title));
+  s.append(...children);
   return s;
 }
 
-/** A list of label/value rows as a definition list. */
-function rows(items, label, value) {
-  const dl = el("dl", "inside-rows");
-  for (const item of items) dl.append(el("dt", "", item[label]), el("dd", "", item[value]));
-  return dl;
+/** The split hero: punchline, one sentence, two actions, and the held-order still. */
+function hero(go) {
+  const text = el("div", "hero-text");
+  const watch = el("button", "btn btn-primary", "Watch the story");
+  watch.type = "button";
+  watch.addEventListener("click", () => go("story"));
+  const tryIt = el("button", "btn btn-ghost", "Try it live");
+  tryIt.type = "button";
+  tryIt.addEventListener("click", () => go("live", "try-panel"));
+  const actions = el("div", "hero-actions");
+  actions.append(watch, tryIt);
+  text.append(el("h1", "", HERO.punchline), el("p", "hero-sentence", HERO.sentence), actions);
+  return section("hero", null, text, still(HERO.still, "hero-still", true));
 }
 
-/** The proof numbers from proof.json, each marked pending until confirmed on the deployed door. */
-function proofNumbers(proof) {
-  const ul = el("ul", "proof-numbers");
-  for (const key of ["acceptance", "scenarios", "tests"]) {
-    const p = proof[key];
-    if (!p) continue;
-    const li = el("li");
-    li.dataset.key = key;
-    li.append(el("b", "", p.total ? `${p.passed} / ${p.total}` : String(p.passed)), el("span", "", ` ${p.label}`));
-    if (!p.confirmed) li.append(el("span", "pending-tag", "pending final deploy"));
-    ul.append(li);
-  }
-  return ul;
-}
-
-/**
- * Builds every section into `root`: what it is, the flow, guardrails, live checks (filled from `base`), proof, the
- * stack, and the path to production with links. Returns a promise that settles when the live checks have answered.
- */
-export async function mountInside(root, base, proofUrl = "proof.json") {
-  const what = section(1, "What it is", el("p", "punchline", WHAT.punchline), ...WHAT.lines.map((line) => el("p", "lede", line)));
-
-  const flow = el("ol", "flow");
+/** The flow as one track: a line through seven nodes, a verb under each node and one line of detail. */
+function flow() {
+  const track = el("ol", "track");
   for (const f of FLOW) {
     const li = el("li");
-    li.append(el("b", "", f.step), el("span", "", f.text));
-    flow.append(li);
+    li.append(el("span", "node"), el("b", "", f.verb), el("span", "detail", f.detail));
+    track.append(li);
   }
-  const how = section(2, "How an order flows", flow, el("p", "flow-note", FLOW_NOTE));
+  const below = el("div", "flow-below");
+  below.append(still(FLOW_STILL, "flow-still"), el("p", "flow-note", FLOW_NOTE));
+  return section("flow", "How an order flows", track, below);
+}
 
-  const table = el("table", "guard-table");
-  const head = el("tr");
-  for (const h of ["Guardrail", "Code", "Proof"]) {
-    const th = el("th", "", h);
-    th.scope = "col";
-    head.append(th);
+/** Guardrails in three clusters, each item one sentence with code chips and proof chips. */
+function guardrails() {
+  const grid = el("div", "clusters");
+  for (const c of GUARDRAILS) {
+    const cluster = el("div", "cluster");
+    const list = el("ul");
+    for (const item of c.items) {
+      const li = el("li");
+      const tags = el("div", "tags");
+      tags.append(chips(item.codes, "code"), chips(item.proof, "proof"));
+      li.append(el("p", "", item.text), tags);
+      list.append(li);
+    }
+    cluster.append(el("h3", "", c.heading), list);
+    grid.append(cluster);
   }
-  const thead = el("thead");
-  thead.append(head);
-  const tbody = el("tbody");
-  for (const g of GUARDRAILS) {
-    const tr = el("tr");
-    const name = el("th", "", g.what);
-    name.scope = "row";
-    const code = el("td", "code", g.code);
-    code.dataset.label = "Code";
-    const proofCell = el("td", "proof", g.proof);
-    proofCell.dataset.label = "Proof";
-    tr.append(name, code, proofCell);
-    tbody.append(tr);
-  }
-  table.append(thead, tbody);
-  const guards = section(3, "Guardrails, with evidence", table);
+  return section("guardrails", "Guardrails, with evidence", still(GUARD_STILL, "guard-still"), grid);
+}
 
-  const checks = el("ul", "live-checks");
-  const slots = CHECKS.map((check) => {
-    const li = el("li");
-    li.dataset.check = check.id;
-    li.dataset.state = "loading";
-    const result = el("span", "check-result", "Checking…");
-    li.append(el("b", "", check.title), el("code", "", check.path), result);
-    checks.append(li);
-    return { check, li, result };
-  });
-  const links = el("p", "check-links");
-  links.append(link(`${DOOR_URL}/openapi.json`, "/openapi.json"), document.createTextNode(" · MCP at "), el("code", "", `${DOOR_URL}/mcp`));
+/** The four live tiles and the copyable commands; returns the section and a function that fills the tiles. */
+function checks(base) {
+  const bento = el("div", "bento");
+  const tile = (id, title, cls = "") => {
+    const t = el("article", `tile ${cls}`.trim());
+    t.dataset.check = id;
+    t.dataset.state = "loading";
+    const value = el("p", "tile-value", "Checking");
+    const text = el("p", "tile-text", "");
+    t.append(el("h3", "", title), value, text);
+    bento.append(t);
+    return { t, value, text };
+  };
+  const tiles = { audit: tile("audit", "Audit chain", "tile-wide"), jwks: tile("jwks", "Signing key"), rules: tile("rules", "Rules and reason codes"), discovery: tile("discovery", "Discovery") };
   const commands = el("ul", "commands");
   for (const cmd of COMMANDS) {
     const li = el("li");
-    const button = el("button", "copy", "Copy");
+    const button = el("button", "btn btn-ghost btn-small", "Copy");
     button.type = "button";
+    button.setAttribute("aria-label", `Copy: ${cmd}`);
     button.addEventListener("click", () => navigator.clipboard?.writeText(cmd).then(() => (button.textContent = "Copied"), () => {}));
     li.append(el("code", "", cmd), button);
     commands.append(li);
   }
-  const live = section(4, "Check it yourself, live", el("p", "lede", "Read from the door when this tab opens:"), checks, links, commands);
+  const links = el("p", "check-links");
+  links.append(link(`${DOOR_URL}/openapi.json`, "OpenAPI document"), link(`${DOOR_URL}/.well-known/agent-gateway.json`, "Discovery document"));
+  const s = section("checks", "Check it yourself, live", bento, commands, links);
 
-  const proofBody = el("div", "proof-body");
-  const proof = section(5, "Proof", proofBody);
+  /** Puts one result into a tile. */
+  const fill = ({ t, value, text }, out) => {
+    t.dataset.state = out.state;
+    value.replaceChildren();
+    if (out.state === "ok") value.append(icon("check", "icon ok"));
+    if (out.state === "bad") value.append(icon("cross", "icon bad"));
+    value.append(document.createTextNode(out.value));
+    text.textContent = out.text;
+  };
+  const run = async () => {
+    const results = Object.fromEntries(await Promise.all(CHECKS.map(async (c) => [c.id, await runCheck(base, c)])));
+    fill(tiles.audit, results.audit);
+    fill(tiles.jwks, results.jwks);
+    const r = results.rules;
+    const c = results.codes;
+    fill(tiles.rules, r.state === "ok" && c.state === "ok" ? { state: "ok", value: `${r.value}, ${c.value}`, text: r.text } : r.state === "ok" ? r : c);
+    fill(tiles.discovery, results.discovery);
+    if (results.discovery.list) {
+      const details = el("details", "endpoints");
+      const ul = el("ul");
+      for (const url of results.discovery.list) ul.append(el("li", "", url));
+      details.append(el("summary", "", "All endpoints"), ul);
+      tiles.discovery.t.append(details);
+    }
+  };
+  return { s, run };
+}
 
-  const built = section(6, "Built with", rows(BUILT_WITH, "part", "does"));
+/** Proof: display numerals from proof.json, the agent-run video with its poster, and the pitch link when there is one. */
+function proof(data) {
+  const numbers = el("dl", "numerals");
+  for (const key of ["acceptance", "scenarios", "tests"]) {
+    const p = data[key];
+    if (!p) continue;
+    const item = el("div", "numeral");
+    item.dataset.key = key;
+    const dd = el("dd", "", p.label);
+    if (!p.confirmed) dd.append(el("span", "pending-tag", "pending final deploy"));
+    item.append(el("dt", "", p.total ? `${p.passed}/${p.total}` : String(p.passed)), dd);
+    numbers.append(item);
+  }
+  const video = el("video", "agent-run");
+  Object.assign(video, { src: data.agentRun.src, poster: data.agentRun.poster ?? "", controls: true, preload: "none", playsInline: true });
+  video.setAttribute("aria-label", data.agentRun.caption);
+  const figure = el("figure", "agent-figure");
+  figure.append(video, el("figcaption", "", data.agentRun.caption));
+  const parts = [numbers, figure];
+  if (data.pitchVideo?.url) {
+    const p = el("p", "pitch-link");
+    p.append(link(data.pitchVideo.url, data.pitchVideo.label));
+    parts.push(p);
+  }
+  const s = section("proof", "Proof", ...parts);
+  s.dataset.loaded = "";
+  return s;
+}
 
-  const linksP = el("p", "inside-links");
-  linksP.append(link(REPO_URL, "Code on GitHub"), document.createTextNode(" · "), link(DOOR_URL, "The door"), document.createTextNode(" · MCP: "), el("code", "", `${DOOR_URL}/mcp`));
-  const production = section(7, "Path to production", el("p", "lede", PRODUCTION), linksP);
+/** Built with: three groups, each part one line with its logo (Simple Icons, CC0) when there is one. */
+function builtWith() {
+  const groups = el("div", "stack-groups");
+  for (const g of BUILT_WITH) {
+    const box = el("div", "stack-group");
+    const ul = el("ul");
+    for (const part of g.parts) {
+      const li = el("li");
+      const mark = el("span", part.logo ? "logo" : "logo logo-none");
+      if (part.logo) mark.style.setProperty("--logo", `url("assets/logos/${part.logo}.svg")`);
+      mark.setAttribute("aria-hidden", "true");
+      const words = el("div");
+      words.append(el("b", "", part.name), el("span", "", part.line));
+      li.append(mark, words);
+      ul.append(li);
+    }
+    box.append(el("h3", "", g.group), ul);
+    groups.append(box);
+  }
+  return section("stack", "Built with", groups);
+}
 
-  root.replaceChildren(what, how, guards, live, proof, built, production);
+/** The closing split: Monday's delivery and the path to production, with the links. */
+function production() {
+  const text = el("div", "closing-text");
+  const links = el("div", "closing-links");
+  links.append(link(REPO_URL, "Code on GitHub", "btn btn-ghost"), link(DOOR_URL, "The live door", "btn btn-ghost"));
+  const mcp = el("p", "mcp-line");
+  mcp.append(document.createTextNode("MCP endpoint: "), el("code", "", `${DOOR_URL}/mcp`));
+  text.append(el("h2", "", "Path to production"), el("p", "closing-sentence", PRODUCTION.sentence), links, mcp);
+  return section("production", null, still(PRODUCTION.still, "closing-still"), text);
+}
 
+/**
+ * Builds every section into `root` and fills the live tiles from the door at `base`; `go(mode, anchor)` switches tabs
+ * for the hero's two actions. Resolves once proof.json and the live checks have answered.
+ */
+export async function mountInside(root, base, go, proofUrl = "proof.json") {
+  const live = checks(base);
+  const proofSlot = section("proof", "Proof", el("p", "muted", "Loading the proof numbers."));
+  root.replaceChildren(hero(go), flow(), guardrails(), live.s, proofSlot, builtWith(), production());
   const proofLoad = fetch(proofUrl)
     .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-    .then((data) => {
-      const video = el("video", "agent-run");
-      video.src = data.agentRun.src;
-      video.controls = true;
-      video.preload = "metadata";
-      video.playsInline = true;
-      const figure = el("figure", "agent-figure");
-      figure.append(video, el("figcaption", "", data.agentRun.caption));
-      const pitch = el("p", "pitch-link");
-      if (data.pitchVideo?.url) pitch.append(link(data.pitchVideo.url, data.pitchVideo.label));
-      else pitch.textContent = `${data.pitchVideo?.label ?? "The pitch video"}: the link comes once it is uploaded.`;
-      proofBody.replaceChildren(proofNumbers(data), figure, pitch);
-      proofBody.dataset.loaded = "";
-    })
-    .catch(() => proofBody.replaceChildren(el("p", "lede", "The proof numbers could not be loaded.")));
-
-  const liveLoad = Promise.all(slots.map(async ({ check, li, result }) => {
-    const out = await runCheck(base, check);
-    li.dataset.state = out.state;
-    result.textContent = out.text;
-    if (out.list) {
-      const ul = el("ul", "endpoint-list");
-      for (const url of out.list) ul.append(el("li", "", url));
-      li.append(ul);
-    }
-  }));
-  await Promise.all([proofLoad, liveLoad]);
+    .then((data) => proofSlot.replaceWith(proof(data)))
+    .catch(() => proofSlot.replaceChildren(el("h2", "", "Proof"), el("p", "muted", "The proof numbers could not be loaded.")));
+  await Promise.all([proofLoad, live.run()]);
 }

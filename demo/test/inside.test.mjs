@@ -3,19 +3,22 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { WHAT, FLOW, GUARDRAILS, BUILT_WITH, CHECKS, COMMANDS, summarize, runCheck } from "../inside.mjs";
+import { HERO, FLOW, GUARDRAILS, BUILT_WITH, CHECKS, COMMANDS, summarize, runCheck } from "../inside.mjs";
 
 const SERVER = fileURLToPath(new URL("../dev/fake-gateway.mjs", import.meta.url));
 const PORT = 8796;
 /** playwright-core from PLAYWRIGHT_CORE (or the default resolution); the browser test is skipped when it is not installed. */
 const pw = await import(process.env.PLAYWRIGHT_CORE ?? "playwright-core").catch(() => null);
 
-test("inside: every section has content; the flow has seven steps; eleven guardrails, each with a code and its proof", () => {
-  assert.ok(WHAT.punchline && WHAT.lines.length === 2);
+test("inside: hero sentence of at most 20 words; seven verbs on the track; eleven guardrails in three clusters, codes and proof as separate chips", () => {
+  assert.ok(HERO.punchline && HERO.sentence.split(/\s+/).length <= 20);
   assert.equal(FLOW.length, 7);
-  assert.equal(GUARDRAILS.length, 11);
-  for (const g of GUARDRAILS) assert.ok(g.what && g.code && g.proof, g.what);
-  assert.equal(BUILT_WITH.length, 6);
+  for (const f of FLOW) assert.ok(/^[A-Z][a-z]+$/.test(f.verb) && f.detail, f.verb);
+  assert.deepEqual(GUARDRAILS.map((c) => c.heading), ["Valio's data, read right", "The kitchen's limits", "Safety and honesty"]);
+  const items = GUARDRAILS.flatMap((c) => c.items);
+  assert.equal(items.length, 11);
+  for (const g of items) assert.ok(g.text && g.codes.length && g.proof.length && !g.codes.concat(g.proof).some((v) => v.includes("·")), g.text);
+  assert.deepEqual(BUILT_WITH.map((g) => g.group), ["Data", "Models", "Runtime and interfaces"]);
   assert.deepEqual(CHECKS.map((c) => c.path), ["/v1/audit/verify", "/.well-known/jwks.json", "/.well-known/agent-gateway.json", "/v1/rules", "/v1/reason-codes"]);
   assert.match(COMMANDS[0], /^node scripts\/verify-audit\.mjs https:\/\//);
 });
@@ -24,24 +27,25 @@ test("inside: proof.json loads with the numbers, the agent-run video and the pit
   const proof = JSON.parse(readFileSync(new URL("../proof.json", import.meta.url), "utf8"));
   for (const key of ["acceptance", "scenarios", "tests"]) assert.equal(typeof proof[key].passed, "number", key);
   assert.equal(proof.agentRun.src, "assets/proof/agent-run.mp4");
+  assert.ok(readFileSync(new URL(`../${proof.agentRun.poster}`, import.meta.url)).length > 10000, "the video has a poster frame");
   assert.ok(readFileSync(new URL(`../${proof.agentRun.src}`, import.meta.url)).length > 1e6);
   assert.ok("url" in proof.pitchVideo);
 });
 
 test("inside: each live check degrades gracefully: 404 or 401 is 'coming with the next deploy', no answer is 'not reachable'", async () => {
   for (const check of CHECKS) {
-    assert.deepEqual(await runCheck("http://door", check, async () => new Response("no", { status: 404 })), { state: "pending", text: "Coming with the next deploy." });
+    assert.deepEqual(await runCheck("http://door", check, async () => new Response("no", { status: 404 })), { state: "pending", value: "Next deploy", text: "Coming with the next deploy." });
     assert.equal((await runCheck("http://door", check, async () => new Response("key", { status: 401 }))).state, "pending");
     assert.equal((await runCheck("http://door", check, async () => { throw new TypeError("Failed to fetch"); })).state, "down");
   }
 });
 
 test("inside: live results read like the door's own replies", () => {
-  assert.equal(summarize("audit", 200, { valid: true, count: 1189, headHash: "0123456789abcdef" }).text, "Chain valid ✓ · 1189 events · head 0123456789ab");
+  assert.deepEqual(summarize("audit", 200, { valid: true, count: 1189, headHash: "0123456789abcdef" }), { state: "ok", value: "Chain valid", text: "1189 events, head 0123456789ab" });
   assert.equal(summarize("audit", 200, { valid: false, count: 9, firstBadSeq: 4, headHash: "x" }).state, "bad");
-  assert.equal(summarize("rules", 200, { decisions: [{ owner: "seller" }, { owner: "seller" }, { owner: "buyer" }] }).text, "3 rules · 2 seller, 1 buyer");
-  assert.equal(summarize("codes", 200, { codes: [{}, {}] }).text, "2 reason codes, each with its text and resolution");
-  assert.match(summarize("jwks", 200, { keys: [{ kid: "abc", alg: "EdDSA", crv: "Ed25519" }] }).text, /^Key id abc/);
+  assert.deepEqual(summarize("rules", 200, { decisions: [{ owner: "seller" }, { owner: "seller" }, { owner: "buyer" }] }), { state: "ok", value: "3 rules", text: "2 seller, 1 buyer" });
+  assert.equal(summarize("codes", 200, { codes: [{}, {}] }).value, "2 codes");
+  assert.deepEqual(summarize("jwks", 200, { keys: [{ kid: "abcdefghijklmnop", alg: "EdDSA", crv: "Ed25519" }] }), { state: "ok", value: "EdDSA Ed25519", text: "Key id abcdefghijkl" });
   assert.equal(summarize("discovery", 200, { openapi: "a", mcp: { url: "b" }, jwks: "c" }).list.length, 3);
 });
 
@@ -54,18 +58,30 @@ test("inside page: renders every section, loads proof.json, shows each live chec
   t.after(() => browser.close());
   const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
   await page.goto(`http://localhost:${PORT}/?mode=inside`);
-  await page.waitForFunction(() => document.querySelector(".proof-body[data-loaded]") && ![...document.querySelectorAll(".live-checks li")].some((li) => li.dataset.state === "loading"));
+  await page.waitForFunction(() => document.querySelector('.inside-section[data-section="proof"][data-loaded]') && ![...document.querySelectorAll(".tile")].some((t) => t.dataset.state === "loading"));
   const out = await page.evaluate(() => ({
-    sections: [...document.querySelectorAll("#inside-page .inside-section h2")].map((h) => h.textContent),
-    states: [...document.querySelectorAll(".live-checks li")].map((li) => li.dataset.state),
-    numbers: document.querySelectorAll(".proof-numbers li").length,
-    video: document.querySelector("video.agent-run")?.getAttribute("src"),
+    sections: [...document.querySelectorAll("#inside-page .inside-section")].map((s) => s.dataset.section),
+    h1: document.querySelector("#inside-page h1")?.textContent,
+    h1Lines: (() => { const h = document.querySelector("#inside-page h1"); return Math.round(h.getBoundingClientRect().height / (parseFloat(getComputedStyle(h).fontSize) * 1.05)); })(),
+    stills: [...document.querySelectorAll("#inside-page .still img")].map((i) => i.getAttribute("src")),
+    track: document.querySelectorAll(".track li").length,
+    clusters: document.querySelectorAll(".cluster").length,
+    tiles: [...document.querySelectorAll(".tile")].map((t) => `${t.dataset.check}:${t.dataset.state}`),
+    numerals: document.querySelectorAll(".numeral").length,
+    poster: document.querySelector("video.agent-run")?.getAttribute("poster"),
+    pitch: document.querySelectorAll(".pitch-link").length,
+    logos: document.querySelectorAll(".stack-group .logo:not(.logo-none)").length,
     scroll: document.documentElement.scrollWidth,
     client: document.documentElement.clientWidth,
   }));
-  assert.deepEqual(out.sections, ["What it is", "How an order flows", "Guardrails, with evidence", "Check it yourself, live", "Proof", "Built with", "Path to production"]);
-  assert.deepEqual(out.states, ["pending", "pending", "pending", "pending", "pending"], "the dev server has none of the door's routes: each says it is coming");
-  assert.equal(out.numbers, 3);
-  assert.equal(out.video, "assets/proof/agent-run.mp4");
+  assert.deepEqual(out.sections, ["hero", "flow", "guardrails", "checks", "proof", "stack", "production"]);
+  assert.equal(out.h1, "Lazy at the order, strict at the border.");
+  assert.ok(out.h1Lines <= 2, `the punchline takes ${out.h1Lines} lines at 375 px`);
+  assert.equal(out.stills.length, 4);
+  assert.deepEqual([out.track, out.clusters, out.numerals], [7, 3, 3]);
+  assert.deepEqual(out.tiles, ["audit:pending", "jwks:pending", "rules:pending", "discovery:pending"], "the dev server has none of the door's routes: each tile says it is coming");
+  assert.equal(out.poster, "assets/proof/agent-run-poster.webp");
+  assert.equal(out.pitch, 0, "no pitch link until proof.json has its URL");
+  assert.equal(out.logos, 4);
   assert.ok(out.scroll <= out.client, `page is ${out.scroll} px wide in a ${out.client} px viewport`);
 });
