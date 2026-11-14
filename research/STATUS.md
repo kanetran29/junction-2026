@@ -142,3 +142,31 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 - Worker `lazydoor` đã deploy lên account Cloudflare hackathon (token trong `cf.env`, không dùng login mặc định):
   **https://lazydoor.lazydoor.workers.dev** — subdomain workers.dev mới tạo nên đang chờ chứng chỉ TLS (vài phút). Secrets
   `VALIO_API_KEY`, `GEMINI_API_KEY`, `ADMIN_KEY` (ngẫu nhiên, chỉ lưu ở `.data/valio/keys/deploy-admin.key`) đã đặt.
+
+### Tổng kết phiên build (Thứ Bảy 14/11, ~03:00)
+- **Xong**: Phase A (spec/plan/49 case/đổi tên) + Phase B (Task 0–13, 14a) trên `main`, mọi task qua review Opus (hoặc Sonnet cho phần nhỏ)
+  với vòng sửa; review toàn nhánh (Opus) không có lỗi Critical; một đợt sửa cuối đã re-review sạch.
+- **Kiểm chứng local** (`wrangler dev`, replay bản ghi Thứ Sáu, Gemini thật): nghiệm thu **49/49** (11 lần chạy liên tiếp sau lần sửa
+  interpret), **vitest 297/297**, **scenarios 11/11**, agent Gemini chạy thật ví dụ đề bài tới ACCEPTED sau khi người duyệt bấm.
+- **Deploy**: Worker đã lên, nhưng kiểm chứng trên URL bị chặn bởi hạn mức ghi D1 miễn phí — xem mục "Cần Kane quyết định" ở đầu file.
+- Chưa làm: phục vụ `/demo` (chờ nhánh `demo-animation` merge); các lỗi nhỏ đã hoãn có danh sách trong ledger local
+  (`.superpowers/sdd/.../progress.md`, không commit).
+
+### Các quyết định mình tự đưa ra thay Kane (sai thì tốn gì)
+1. Làm thẳng trên `main` (task yêu cầu push `main`) — sai: phải tách nhánh sau.
+2. Một review Opus mỗi task, implementer Sonnet, cổng cuối Opus; review Sonnet cho 12b, 10b, README (phần nhỏ, không có tiền/bảo mật).
+3. Gộp 12a (subtype đã review cho sữa/gà/bơ, không dùng model) vào Task 2; gộp Task 4 vào Task 3; tách Task 10 thành 10a/10b.
+4. Quote không lọc thương hiệu ở bước search mà từ chối có mã (BRAND_EXCLUDED) để "mọi ứng viên được tính đúng một lần" (AC46).
+5. Thứ tự mã từ chối: NEW_ALLERGEN trước CLAIM_MISSING (AC17 cần) — spec đã sửa cho khớp.
+6. Giỏ/tham chiếu thiếu hàng: lấy hết hàng của sản phẩm tham chiếu trước, rồi mới hàng thay thế rẻ nhất.
+7. Replay chỉ có thể bật cưỡng bức, không tắt được sau CN 17:00 (khi đó live cũng không bán gì).
+8. Ký lại mandate làm token duyệt đang chờ hết hiệu lực (409).
+9. Dòng hàng không còn đặt được lúc commit → STOCK_TAKEN, available 0.
+10. Xác thực là middleware chung cho `/v1/*` (chỉ `/v1/rules`, `/v1/reason-codes` công khai).
+11. Câu có từ claim bị phủ định ("not lactose-free") thì không confirm được nếu thiếu claim — an toàn, buyer phải viết lại.
+12. Không retry Gemini trong request (một đợt lỗi giống rate-limit; agent nhận 503 và tự thử lại).
+13. Bản deploy giữ `DEMO_MODE=1` (cần đặt đồng hồ/replay cho demo), admin route chỉ mở với `ADMIN_KEY` ngẫu nhiên dài.
+14. Judge key: `POST /admin/judge-key`, role judge gắn với hotel-b, sống qua reset — trang demo/giám khảo không cần admin key.
+15. CORS chỉ cho `GET /v1/events*` (origin *, header Bearer, không nhận key qua query string).
+16. Hoãn: `reliability.tri` của quote theo sàn mặc định 0.9 (policy vẫn dùng sàn trong mandate); quét cả bảng ở resolve/families (đủ cho demo);
+    guard secret có thể bỏ sót biến tên kiểu `exportADMIN_KEY` (không tồn tại).
