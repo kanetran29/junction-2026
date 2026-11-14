@@ -34,4 +34,4 @@ export const GROUPS = [
 export const COMPARE_NOTE = "A person ordering in the webshop catches what they notice. An agent calling Valio's API directly catches only what it was built to check.";
 
 /** The closing line under the Story's comparison. */
-export const CONNECT_LINE = "Any agent connects: HTTP API · /openapi.json   MCP · /mcp (9 tools) · 49 acceptance cases pass.";
+export const CONNECT_LINE = "Any agent connects: HTTP API · /openapi.json   MCP · /mcp (9 tools)";

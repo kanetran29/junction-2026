@@ -3,7 +3,7 @@
 import { cpSync, rmSync } from 'node:fs';
 
 const OUT = 'dist/assets';
-const PAGE = ['index.html', 'demo.css', 'main.mjs', 'model.mjs', 'story.mjs', 'live.mjs', 'scene.mjs', 'compare.mjs', 'icons.mjs', 'inside.mjs', 'inside-view.mjs', 'proof.json', 'kit', 'fixtures', 'assets'];
+const PAGE = ['index.html', 'demo.css', 'main.mjs', 'model.mjs', 'story.mjs', 'live.mjs', 'scene.mjs', 'compare.mjs', 'icons.mjs', 'inside.mjs', 'inside-view.mjs', 'try.mjs', 'try-view.mjs', 'proof.json', 'kit', 'fixtures', 'assets'];
 
 rmSync(OUT, { recursive: true, force: true });
 for (const p of PAGE) cpSync(`demo/${p}`, `${OUT}/demo/${p}`, { recursive: true });
