@@ -10,6 +10,7 @@ import { STRENGTHS, PAGE_ONLY, GROUPS, COMPARE_NOTE, CONNECT_LINE } from "./comp
 import { ICONS } from "./icons.mjs";
 import { mountInside } from "./inside-view.mjs";
 import { mountDeck } from "./deck-view.mjs";
+import { mountConnect } from "./connect.mjs";
 import { AC_ID, acChip, acNote, labelAcChips } from "./acceptance-view.mjs";
 import { runCheck, CHECKS } from "./inside.mjs";
 import { mountTry } from "./try-view.mjs";
@@ -33,6 +34,8 @@ let mode = ["live", "compare", "inside", "deck"].includes(params.get("mode")) ? 
 const PAGES = ["compare", "inside", "deck"];
 let insideMounted = false;
 let deckMounted = false;
+let connectMounted = false;
+let connectOk = false;
 const story = { t: 0, next: 0, state: initialState(), playing: false, snap: true };
 /** Live watches the door at ?gateway= (a local preview against the deployed door) or the page's own origin, and follows ?buyer=. */
 const GATEWAY = params.get("gateway") || location.origin;
@@ -359,6 +362,14 @@ function setMode(next) {
   $("story-controls").hidden = mode !== "story";
   $("live-note").hidden = mode !== "live";
   $("try-panel").hidden = mode !== "live" || kiosk;
+  $("connect-panel").hidden = mode !== "live" || kiosk || !connectOk;
+  if (mode === "live" && !kiosk && !connectMounted) {
+    connectMounted = true;
+    mountConnect($("connect-panel"), GATEWAY).then((ok) => {
+      connectOk = ok;
+      $("connect-panel").hidden = mode !== "live" || kiosk || !ok;
+    });
+  }
   if (mode === "live" && !kiosk && !tryMounted) {
     tryMounted = true;
     mountTry({ root: $("try-panel"), base: GATEWAY, follow: followBuyer, started: () => (live.tryFrom = live.lastSeq) });
@@ -369,7 +380,7 @@ function setMode(next) {
   $("deck-page").hidden = mode !== "deck";
   if (mode === "deck" && !deckMounted) {
     deckMounted = true;
-    mountDeck($("deck-page"));
+    mountDeck($("deck-page"), "deck.json", GATEWAY);
   }
   if (mode !== "live") $("audit-chip").hidden = true;
   if (mode === "inside" && !insideMounted) {

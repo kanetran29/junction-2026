@@ -1,5 +1,7 @@
 // The Deck tab: the pitch deck's slides in one column, each with its speaker notes in a closed "Notes" disclosure, and the
-// PDF to download. Built from deck.json (written by deck/build.mjs --site from pitch.json) with DOM calls only.
+// PDF to download. Built from deck.json (written by deck/build.mjs --site from pitch.json) with DOM calls only. On a door
+// that supports the Claude connector, the demo slide's notes say how to connect it.
+import { CONNECT, connectReady } from "./connect.mjs";
 
 /** An element with a class and text. */
 function el(tag, cls = "", text = "") {
@@ -10,7 +12,7 @@ function el(tag, cls = "", text = "") {
 }
 
 /** Builds the tab into `root` from deck.json at `url`; resolves once the slides (or the reason they are missing) show. */
-export async function mountDeck(root, url = "deck.json") {
+export async function mountDeck(root, url = "deck.json", base = location.origin) {
   let deck;
   try {
     const res = await fetch(url);
@@ -36,4 +38,9 @@ export async function mountDeck(root, url = "deck.json") {
   });
   root.replaceChildren(head, list);
   root.dataset.loaded = "";
+  connectReady(base).then((ok) => {
+    if (!ok) return;
+    const at = deck.slides.findIndex((s) => s.id === "demo");
+    list.children[at >= 0 ? at : deck.slides.length - 1].querySelector(".deck-notes").append(el("p", "deck-connect", CONNECT.deckNote));
+  });
 }

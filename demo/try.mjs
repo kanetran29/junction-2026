@@ -141,3 +141,60 @@ function replyView({ status, body, retryAfter }, codes, byManager) {
       return { kind: "final", tone: "", title: `Order ${order.state}.`, lines: reasons };
   }
 }
+
+/** The longest voice request, in seconds; the recording stops itself there. */
+export const VOICE_MAX_S = 30;
+/** Recording formats in the order the panel asks MediaRecorder for them (Safari records mp4). */
+export const VOICE_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/ogg", "audio/mp4"];
+
+/** The first recording format `supported(type)` accepts, or "" to let the browser choose. */
+export const pickMime = (supported) => VOICE_TYPES.find((t) => supported(t)) ?? "";
+
+/**
+ * Sends a recording to POST /v1/try/voice as multipart form data (`audio`, and `visitor` when the visitor has a sandbox);
+ * never throws: { status, body, retryAfter }, status 0 when the door does not answer.
+ */
+export async function postVoice(base, blob, visitor, fetchImpl = fetch) {
+  const form = new FormData();
+  const ext = /mp4/.test(blob.type) ? "mp4" : /ogg/.test(blob.type) ? "ogg" : "webm";
+  form.append("audio", blob, `voice.${ext}`);
+  if (visitor) form.append("visitor", visitor);
+  try {
+    const res = await fetchImpl(`${String(base).replace(/\/+$/, "")}/v1/try/voice`, { method: "POST", body: form });
+    const body = await res.json().catch(() => null);
+    return { status: res.status, body, retryAfter: Number(body?.retryAfter ?? res.headers?.get?.("Retry-After")) || null };
+  } catch {
+    return { status: 0, body: null, retryAfter: null };
+  }
+}
+
+/**
+ * What the panel does with a voice reply: { kind: "transcript", text } to put in the input (never sent by itself), kind
+ * "hide-voice" when the door has no voice route, else an error view as viewOf gives it (429 counts down, 503 busy models).
+ */
+export function voiceViewOf(res) {
+  const text = typeof res.body?.transcript === "string" ? res.body.transcript.trim() : "";
+  if (res.status === 200 && text) return { kind: "transcript", text };
+  if (res.status === 200) return { kind: "error", tone: "reject", title: "No words came through. Try again, or type your request.", lines: [] };
+  if (res.status === 404) return { kind: "hide-voice" };
+  if (res.status === 400) return { kind: "error", tone: "reject", title: "The recording was not clear enough. Try again closer to the microphone, or type it.", lines: [] };
+  if (res.status === 413) return { kind: "error", tone: "reject", title: `Too long: keep a voice request under ${VOICE_MAX_S} s.`, lines: [] };
+  return viewOf(res);
+}
+
+/** The door's Peppol route as its OpenAPI document lists it. */
+export const PEPPOL_ROUTE = /^\/v1\/orders\/\{[^}]+\}\/peppol$/;
+
+/** The link under an accepted order and its caption. */
+export const PEPPOL_LABEL = "Peppol order (UBL XML)";
+export const PEPPOL_CAPTION = "Peppol BIS Order 3.0, the format Finnish kitchens' systems already exchange. Export only; nothing is sent.";
+
+/** Fetches an order's Peppol XML with the visitor's token; never throws: { status, blob }, blob null unless 200. */
+export async function getPeppol(base, orderId, visitor, fetchImpl = fetch) {
+  try {
+    const res = await fetchImpl(`${String(base).replace(/\/+$/, "")}/v1/orders/${encodeURIComponent(orderId)}/peppol`, { headers: { Authorization: `Bearer ${visitor}`, Accept: "application/xml" } });
+    return { status: res.status, blob: res.ok ? await res.blob() : null };
+  } catch {
+    return { status: 0, blob: null };
+  }
+}

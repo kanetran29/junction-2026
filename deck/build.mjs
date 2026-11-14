@@ -134,7 +134,7 @@ function publish(count) {
   const slides = pitch.slides.slice(0, count).map((s, i) => {
     const n = String(i + 1).padStart(2, "0");
     execFileSync(process.env.CWEBP ?? "cwebp", ["-quiet", "-q", "90", "-resize", "1600", "0", join(out, "slides", `${n}.png`), "-o", join(dir, `${n}.webp`)]);
-    return { src: `assets/deck/${n}.webp`, heading: s.heading, notes: s.notes };
+    return { id: s.id, src: `assets/deck/${n}.webp`, heading: s.heading, notes: s.notes };
   });
   copyFileSync(join(out, "deck.pdf"), join(dir, "lazydoor-deck.pdf"));
   const pdfBytes = statSync(join(dir, "lazydoor-deck.pdf")).size;
