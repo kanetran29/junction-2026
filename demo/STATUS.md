@@ -230,7 +230,12 @@ Vấn đề tìm thấy:
 - Lớp phủ so sánh, các dòng của nó và màn kết trước đây hiện bằng animation CSS theo đồng hồ thật, nên tua thẳng vào (?t=112, kéo thanh tua) có thể thấy bảng trên cảnh chưa bị phủ. Giờ độ mờ là hàm của giờ Story (`closingFades` trong `model.mjs`, `fadeAt`), nên tua và phát liền cho cùng một giá trị; bỏ `@keyframes fade` và transition của các dòng.
 - Test mới: độ mờ ở 112 s sau khi tua bằng độ mờ sau khi phát từng khung tới đó (model), và trong trình duyệt (tua tới 112 s so với phát từ 106 s, cả hai `opacity` 1). 53 test pass với Playwright.
 
+### 30. Quay `demo/story.mp4` có tiếng (Kane: "Quay story.mp4")
+- Quay từng khung từ 64e04a3 (`?kiosk=1&manual=1`, `window.__step`), 1920×1080, 30 fps, 3567 khung, đẩy thẳng vào ffmpeg (H.264 CRF 18, yuv420p), trên một server riêng (cổng 8792, đã tắt). Dài 118,9 s.
+- Tiếng: 12 đoạn giọng và `sfx/rewind.mp3` đặt đúng `at` trong `story.mjs` (adelay, amix normalize=0), loudnorm hai lượt: −16,5 LUFS, đỉnh thật −1,9 dBTP sau AAC 192k; ghép `+faststart`. File giọng không đổi.
+- Kiểm: ffprobe một luồng h264 + một luồng aac, 118,9 s, 16,5 MB; silencedetect: 13/13 đoạn bắt đầu trong khoảng +0,00…+0,05 s so với `at` (phần lệch là 0,05 s lặng đầu file). Đã xem ảnh tổng và các khung 0:16, 0:19, 0:48,5, 1:45,5, 1:52,5, 1:57.
+- Bản cho Kane tải lên: `~/junction-2026/.data/pitch/lazydoor-pitch.mp4` (không tải lên đâu cả).
+
 ## Còn lại / cần làm sau
-- Quay `demo/story.mp4` khi Kane duyệt Story mới (ghép giọng từ `VOICE`).
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).
