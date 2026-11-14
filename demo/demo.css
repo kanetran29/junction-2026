@@ -394,11 +394,11 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
  * 10px (--radius) for cards, tiles, buttons, inputs and media; 6px (--radius-sm) for chips. Motion: hover and press only.
  */
 :root { --line: #1d5e6c; --surface: rgb(6 34 42 / .62); --surface-2: rgb(3 20 25 / .72); --radius-sm: 6px; --ok: #2bd576; --bad: #ff6b6b; --muted-bad: #e8a3a3; }
-.stage[hidden], .compare-page[hidden], .inside-page[hidden] { display: none; }
+.stage[hidden], .compare-page[hidden], .inside-page[hidden], .deck-page[hidden] { display: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 600 15px/1.2 var(--sans); padding: 11px 18px; border-radius: var(--radius); border: 1px solid transparent; text-decoration: none; cursor: pointer; white-space: nowrap; transition: background-color .15s, border-color .15s, transform .15s; }
 .btn:active { transform: translateY(1px); }
-.btn:focus-visible, .try-chip:focus-visible, .try-input:focus-visible, .endpoints summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.btn:focus-visible, .try-chip:focus-visible, .try-input:focus-visible, .endpoints summary:focus-visible, .deck-notes summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .btn-primary { background: var(--brand-strong); color: #fff; }
 .btn-primary:hover { background: #a63c60; }
 .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
@@ -554,6 +554,16 @@ body.kiosk .try-panel { display: none; }
 .try-restart:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .try-restart[hidden], .try-back[hidden] { display: none; }
 
+/* Deck: the slides in one column, each with its speaker notes folded under it, and the PDF at the top. */
+.deck-page { color: var(--ink); max-width: 1200px; }
+.deck-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 24px 0 28px; }
+.deck-head h1 { margin: 0; font: 800 clamp(30px, 3.6vw, 44px)/1.1 var(--sans); letter-spacing: -.03em; color: #fff; }
+.deck-slides { list-style: none; margin: 0; padding: 0 0 48px; display: grid; gap: 40px; }
+.deck-slide img { display: block; width: 100%; height: auto; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface-2); }
+.deck-notes { margin-top: 12px; }
+.deck-notes summary { width: fit-content; cursor: pointer; font-weight: 600; color: var(--brand-soft); }
+.deck-notes p { margin: 10px 0 0; max-width: 70ch; font-size: 16px; line-height: 1.6; color: var(--ink); }
+
 /* Phones and narrow windows: every multi-column layout above becomes one column; the flow track turns vertical. */
 @media (max-width: 860px) {
   .is-hero, .flow-below, .is-production { grid-template-columns: 1fr; gap: 28px; }
@@ -572,4 +582,4 @@ body.kiosk .try-panel { display: none; }
   .side.with .chips { margin-left: 28px; }
   .inside-section { padding: 36px 0; }
 }
-@media (max-width: 480px) { .try-form { grid-template-columns: 1fr; } .try-send { width: 100%; } .commands li { flex-direction: column; align-items: stretch; } }
+@media (max-width: 480px) { .modes button { padding: 8px 11px; } .try-form { grid-template-columns: 1fr; } .try-send { width: 100%; } .commands li { flex-direction: column; align-items: stretch; } }

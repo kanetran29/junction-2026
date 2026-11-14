@@ -1,15 +1,18 @@
 // Builds the pitch deck from pitch.json: every heading, bullet and note comes from that file; the visuals are the demo's
 // stills, real screenshots of the deployed demo (deck/shots, from capture.mjs) and one architecture diagram.
-// Usage: node deck/build.mjs <pitch.json> <out dir>   writes deck/index.html, <out>/deck.pdf, <out>/slides/NN.png, <out>/notes.md.
-// PLAYWRIGHT_CORE and CHROME as for demo/dev/label-overlap.mjs. One browser, closed at the end.
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+// Usage: node deck/build.mjs <pitch.json> <out dir> [--site]   writes deck/index.html, <out>/deck.pdf, <out>/slides/NN.png,
+// <out>/notes.md; --site also publishes the deck to the demo's Deck tab: demo/assets/deck/NN.webp (1600 px, cwebp),
+// demo/assets/deck/lazydoor-deck.pdf and demo/deck.json (each slide's heading and notes, from the same pitch.json).
+// PLAYWRIGHT_CORE and CHROME as for demo/dev/label-overlap.mjs; CWEBP when cwebp is not on the PATH. One browser, closed at the end.
+import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const [pitchPath, out] = process.argv.slice(2);
-if (!pitchPath || !out) throw new Error("usage: node deck/build.mjs <pitch.json> <out dir>");
+const [pitchPath, out, flag] = process.argv.slice(2);
+if (!pitchPath || !out) throw new Error("usage: node deck/build.mjs <pitch.json> <out dir> [--site]");
 const pitch = JSON.parse(readFileSync(pitchPath, "utf8"));
 const slide = Object.fromEntries(pitch.slides.map((s) => [s.id, s]));
 
@@ -116,6 +119,27 @@ writeFileSync(join(ROOT, "deck/index.html"), html);
 
 const notes = `# ${pitch.title}: live pitch notes (3 min)\n\n${pitch.slides.map((s, i) => `## ${String(i + 1).padStart(2, "0")} ${s.heading}\n\n${s.notes}\n`).join("\n")}`;
 
+const PDF_LIMIT = 25 * 1024 * 1024;
+
+/**
+ * Publishes the rendered deck to the demo's Deck tab: each slide as a 1600 px WebP, the PDF, and demo/deck.json with each
+ * slide's image, heading (its alt text) and speaker notes, so the tab always matches this render of pitch.json.
+ */
+function publish(count) {
+  const dir = join(ROOT, "demo/assets/deck");
+  mkdirSync(dir, { recursive: true });
+  const slides = pitch.slides.slice(0, count).map((s, i) => {
+    const n = String(i + 1).padStart(2, "0");
+    execFileSync(process.env.CWEBP ?? "cwebp", ["-quiet", "-q", "90", "-resize", "1600", "0", join(out, "slides", `${n}.png`), "-o", join(dir, `${n}.webp`)]);
+    return { src: `assets/deck/${n}.webp`, heading: s.heading, notes: s.notes };
+  });
+  copyFileSync(join(out, "deck.pdf"), join(dir, "lazydoor-deck.pdf"));
+  const pdfBytes = statSync(join(dir, "lazydoor-deck.pdf")).size;
+  if (pdfBytes > PDF_LIMIT) throw new Error(`deck.pdf is ${pdfBytes} bytes, over the 25 MiB asset limit`);
+  writeFileSync(join(ROOT, "demo/deck.json"), `${JSON.stringify({ title: pitch.title, pdf: "assets/deck/lazydoor-deck.pdf", slides }, null, 2)}\n`);
+  console.log(`site: ${slides.length} slides and the PDF (${(pdfBytes / 1048576).toFixed(1)} MB) into demo/assets/deck, demo/deck.json`);
+}
+
 const TYPES = { ".html": "text/html", ".css": "text/css", ".webp": "image/webp", ".png": "image/png", ".svg": "image/svg+xml", ".woff2": "font/woff2" };
 const server = createServer((req, res) => {
   const path = normalize(join(ROOT, decodeURIComponent(new URL(req.url, "http://x").pathname)));
@@ -148,6 +172,7 @@ try {
   writeFileSync(join(out, "notes.md"), notes);
   for (const r of report) console.log(r.id, r.over.length ? `OUTSIDE ${r.over.join(" ")}` : "fits", r.small.length ? `SMALL ${r.small.join(" | ")}` : "");
   console.log(`deck: ${shots.length} slides into ${out}`);
+  if (flag === "--site") publish(shots.length);
 } finally {
   await browser.close();
   server.close();

@@ -291,6 +291,12 @@ Vấn đề tìm thấy:
 - Try it: trong lúc door làm việc, hộp chờ hiện ba bước "Reading your request…", "Asking Valio…", "Deciding…" (bắt đầu ở 0, 2,5 và 5 s; bước xong chấm xanh, bước đang chạy chấm hồng và chữ đậm), sau 9 s thêm "Free text can take up to 15 s.". Các bước theo thời gian vì door trả lời một lần; tắt khi có trả lời.
 - Test: 68 pass với Playwright; `label overlaps: 0`. Lưu ý: `main` đã có số mới trong `demo/proof.json`, `compare.mjs`, `index.html` (từ build session); nhánh này không sửa các file đó nên merge không đụng.
 
+### 39. Tab "Deck" (Kane: "thêm cả deck vào trang đi")
+- `?mode=deck`, tab thứ năm sau Inside: 9 slide thành một cột, rộng hết khung nội dung, ảnh đầu tải ngay, các ảnh sau tải lười; alt của mỗi ảnh là tiêu đề slide; dưới mỗi slide là "Notes" (đóng sẵn) với lời nói từ `pitch.json`; nút "Download PDF" ở đầu trang. Inside có thêm nút "Deck" cạnh "Code on GitHub" và "The live door".
+- `node deck/build.mjs <pitch.json> <out> --site` xuất luôn `demo/assets/deck/NN.webp` (1600 px, cwebp q90, 60 tới 110 KB), `demo/assets/deck/lazydoor-deck.pdf` (8,6 MB) và `demo/deck.json` (ảnh, tiêu đề, notes), nên tab luôn khớp với bản render 63/63, 406.
+- 375 px: thanh tab 5 nút vừa khít (nút hẹp hơn dưới 480 px). `dev/fake-gateway.mjs` biết thêm kiểu `.webp`, `.png`, `.pdf` (server 8790 cần khởi động lại mới trả đúng kiểu; không khởi động lại vẫn chạy).
+- Test: 70 pass với Playwright; `label overlaps: 0`.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

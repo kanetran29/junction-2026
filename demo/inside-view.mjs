@@ -224,11 +224,16 @@ function builtWith() {
   return section("stack", "Built with", groups);
 }
 
-/** The closing split: Monday's delivery and the path to production, with the links. */
-function production() {
+/** The closing split: Monday's delivery and the path to production, with the links (the Deck one switches tabs). */
+function production(go) {
   const text = el("div", "closing-text");
   const links = el("div", "closing-links");
-  links.append(link(REPO_URL, "Code on GitHub", "btn btn-ghost"), link(DOOR_URL, "The live door", "btn btn-ghost"));
+  const deck = link("?mode=deck", "Deck", "btn btn-ghost");
+  deck.addEventListener("click", (e) => {
+    e.preventDefault();
+    go("deck", "deck-page");
+  });
+  links.append(link(REPO_URL, "Code on GitHub", "btn btn-ghost"), link(DOOR_URL, "The live door", "btn btn-ghost"), deck);
   const mcp = el("p", "mcp-line");
   mcp.append(document.createTextNode("MCP endpoint: "), el("code", "", `${DOOR_URL}/mcp`));
   text.append(el("h2", "", "Path to production"), el("p", "closing-sentence", PRODUCTION.sentence), links, mcp);
@@ -242,7 +247,7 @@ function production() {
 export async function mountInside(root, base, go, proofUrl = "proof.json") {
   const live = checks(base);
   const proofSlot = section("proof", "Proof", el("p", "muted", "Loading the proof numbers."));
-  root.replaceChildren(hero(go), flow(), guardrails(), live.s, proofSlot, builtWith(), production());
+  root.replaceChildren(hero(go), flow(), guardrails(), live.s, proofSlot, builtWith(), production(go));
   const proofLoad = fetch(proofUrl)
     .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
     .then((data) => proofSlot.replaceWith(proof(data)))
