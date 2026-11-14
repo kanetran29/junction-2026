@@ -535,3 +535,23 @@ Tắt Try it ngay lập tức: `node scripts/demo-admin.mjs try-off`. Bật lạ
   - `dev/`, `test/` vẫn 404;
   - `/v1/try` với chip ví dụ cho ra `decided`, `cached`, ACCEPTED.
 - Test demo 65 pass, 0 fail; tsc sạch; check-secrets OK. Đã reset chuẩn.
+
+### C13. /demo ẩn tới 09:45 (xong, **chưa push**)
+- Mọi request tới `/demo` và `/demo/*` trả đúng 404 của route không tồn tại, cho tới **2026-11-15T07:45:00Z (09:45 Helsinki)**.
+  Door so với giờ thật (`Date.now`), không dùng đồng hồ demo. Sau mốc đó trang tự mở, không cần deploy hay thao tác tay
+  (`DEMO_OPENS_AT` trong `wrangler.jsonc`).
+- Xem trước bằng token: `?preview=<token>` (so sánh constant-time) hiện trang và đặt cookie `lazydoor_preview` cho `/demo`
+  (HttpOnly, Secure, SameSite=Lax), hết hạn đúng lúc mở. Cookie này mở được mọi file. Token sai trả 404.
+- Token nằm ở `~/.config/junction2026/demo-preview.token` (quyền 600) và trong Worker secret `DEMO_PREVIEW_TOKEN`.
+  Chưa từng in ra; check-secrets bắt được nếu token lọt vào git.
+- **Mở bản xem trước (đừng dán token vào chat):** chạy trên Mac
+  `open "https://lazydoor.lazydoor.workers.dev/demo/?preview=$(cat ~/.config/junction2026/demo-preview.token)"`.
+  Lệnh tự ghép URL từ file; trình duyệt nhận cookie rồi `/demo/` dùng bình thường.
+- **Mở sớm nếu Kane muốn:** `node scripts/demo-admin.mjs demo-open`. Ẩn lại tới 09:45: `demo-hide`. Reset không đụng tới
+  hai lệnh này.
+- Deploy `c6fdb1b1`. Kiểm live:
+  - không có token: `/demo`, `/demo/`, PDF deck, WebP, mp3 và token sai đều 404;
+  - có token: 200 kèm cookie đúng thuộc tính;
+  - có cookie: PDF, WebP 200, mp3 với Range 206;
+  - API (`/health`, `/v1/rules`, `/openapi.json`, `/.well-known/*`) 200; `/mcp` không key vẫn 401.
+- Test 412/412. Commit `afba0f2`. Đã reset chuẩn.
