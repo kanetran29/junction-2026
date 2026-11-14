@@ -340,7 +340,10 @@ async function main(): Promise<void> {
   }
   const cases: Case[] = spec.cases.filter((c: Case) => !only || only.includes(c.id));
   const tally = { PASS: 0, FAIL: 0, BLOCKED_ON_GEMINI: 0 };
-  for (const c of cases) {
+  const pause = Number(process.env.CASE_DELAY_MS ?? 0);
+  for (const [i, c] of cases.entries()) {
+    // a pause between cases keeps a door on the Workers Free plan inside its CPU allowance
+    if (i && pause) await new Promise((r) => setTimeout(r, pause));
     const { status, detail } = await runCase(c, spec.defaults);
     tally[status]++;
     console.log(`${status} ${c.id} ${c.title}${detail ? `\n    ${detail}` : ''}`);

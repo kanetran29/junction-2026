@@ -1,9 +1,9 @@
 {
  "note": "Numbers shown on the Inside tab, read on the deployed door (measuredOn). confirmed = measured, not expected.",
- "measuredOn": { "door": "https://lazydoor.lazydoor.workers.dev", "version": "eec84341-0152-43f5-bd99-2a080b83ad11", "date": "2026-11-14" },
- "acceptance": { "passed": 60, "total": 60, "label": "acceptance cases pass on the deployed door", "confirmed": true },
+ "measuredOn": { "door": "https://lazydoor.lazydoor.workers.dev", "version": "32795cea-9fb8-4e3f-86d3-2f087ad46bff", "date": "2026-11-15" },
+ "acceptance": { "passed": 63, "total": 63, "label": "acceptance cases pass on the deployed door", "confirmed": true },
  "scenarios": { "passed": 11, "total": 11, "label": "scenarios pass", "confirmed": true },
- "tests": { "passed": 390, "label": "unit tests pass", "confirmed": true },
+ "tests": { "passed": 406, "label": "unit tests pass", "confirmed": true },
  "agentRun": {
   "src": "assets/proof/agent-run.mp4",
   "poster": "assets/proof/agent-run-poster.webp",
