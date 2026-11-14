@@ -46,7 +46,7 @@ describe('GET /approve/:token', () => {
     const html = await res.text();
     expect(res.status).toBe(200);
     expect(html).toContain('<title>Lazydoor – approve order</title>');
-    for (const s of ['QS', 'Requested 200 l, delivered 200 l', 'OVER_ORDER_AUTO', 'Need, as understood', '&quot;deliverBy&quot;', 'Net 600.00 EUR', 'Gross 681.00 EUR', 'not reserved: 250 available now', 'data-cutoff="2026-11-15T17:00:00+02:00"', `action="/approve/${token}"`, `action="/reject/${token}"`]) expect(html).toContain(s);
+    for (const s of ['QS', 'Requested 200 l, delivered 200 l', 'OVER_ORDER_AUTO', 'Need, as understood', '&quot;deliverBy&quot;', 'Net 600.00 EUR', 'Gross 681.00 EUR', 'not reserved: 250 available now', 'data-left="157800"', `action="/approve/${token}"`, `action="/reject/${token}"`]) expect(html).toContain(s);
   });
 
   it('is write-free: the order stays HELD and no event is logged', async () => {

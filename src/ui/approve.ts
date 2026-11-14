@@ -64,8 +64,8 @@ const notFound = (what: string) => ({ status: 404 as const, html: page('Lazydoor
 
 /**
  * The phone approval page of one order by its token: the lines with live free stock ("not reserved"), the need as understood,
- * what differs from it with the reasons' human text, the agent's reason, net and gross, the cut-off (ISO time in a data
- * attribute for the countdown) and the Approve / Reject forms. Past the cut-off, or once resolved, it shows "expired" or the
+ * what differs from it with the reasons' human text, the agent's reason, net and gross, the cut-off (seconds left by the door's clock in a
+ * data attribute, so the countdown ignores the phone clock) and the Approve / Reject forms. Past the cut-off, or once resolved, it shows "expired" or the
  * final state and no forms. An unknown token is 404.
  */
 export async function renderApprovePage(env: Env, token: string, fetchFn: typeof fetch = fetch): Promise<{ status: 200 | 404; html: string }> {
@@ -74,7 +74,8 @@ export async function renderApprovePage(env: Env, token: string, fetchFn: typeof
   if (!m || !view) return notFound('No order for this approval link.');
   const { order, decision } = view;
   const drafts = await draftsOf(env, m);
-  const live = order.state === 'HELD' && (await now(env)).getTime() < Date.parse(m.expires_at!);
+  const nowMs = (await now(env)).getTime();
+  const live = order.state === 'HELD' && nowMs < Date.parse(m.expires_at!);
   const stock = live ? await pageStock(env, order.lines, fetchFn) : new Map<string, number | null>();
   const products = await getProducts(env, order.lines.map((l) => l.productId));
 
@@ -91,9 +92,9 @@ export async function renderApprovePage(env: Env, token: string, fetchFn: typeof
 
   let action: string;
   if (live) {
-    action = `<p class="muted">Decide within <b id="left" data-cutoff="${escapeHtml(m.expires_at)}"></b></p>
+    action = `<p class="muted">Decide within <b id="left" data-left="${Math.max(0, Math.floor((Date.parse(m.expires_at!) - nowMs) / 1000))}"></b></p>
 <form method="post" action="/approve/${escapeHtml(token)}"><button>Approve</button></form><form method="post" action="/reject/${escapeHtml(token)}"><button class="no">Reject</button></form>
-<script>var el=document.getElementById('left'),t=Date.parse(el.dataset.cutoff);function tick(){var s=Math.max(0,Math.floor((t-Date.now())/1000));el.textContent=Math.floor(s/3600)+'h '+Math.floor(s%3600/60)+'m '+s%60+'s'}tick();setInterval(tick,1000)</script>`;
+<script>var el=document.getElementById('left'),t=Date.now()+el.dataset.left*1000;function tick(){var s=Math.max(0,Math.floor((t-Date.now())/1000));el.textContent=Math.floor(s/3600)+'h '+Math.floor(s%3600/60)+'m '+s%60+'s'}tick();setInterval(tick,1000)</script>`;
   } else {
     const label = order.state === 'HELD' || order.state === 'EXPIRED' ? 'expired' : order.state;
     action = `<p class="state">This approval is ${escapeHtml(label)}${view.reason ? ` (${escapeHtml(view.reason)})` : ''}.</p>`;
