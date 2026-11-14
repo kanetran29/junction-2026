@@ -37,9 +37,12 @@ const DOOR_SLOT = [GATE_X - 1.8, 11, 42.5];
 /** A small envelope drawn around its centre: body, flap and seal. */
 const LETTER = `<rect class="letter-body" x="-12" y="-8" width="24" height="16" rx="1.6"/><path class="letter-flap" d="M-12 -8L0 1.5L12 -8"/><circle class="letter-seal" cx="0" cy="1.5" r="2.8"/>`;
 const LAMP_Z = 88;
+/** Height of the card the robot vacuum carries on its mast: where letters leave and quotes arrive. */
+const HAND_Z = 14;
 const LAMPS = RACK_X.map((x) => x + RACK.w / 2);
 const WINDOWS = [[-46, 22], [104, 22], [134, 22], [272, 22]];
-const LOGO = { at: [18, WALL_Y, 124], width: 150, ratio: 179.06 / 537.17 };
+/** Logo plate on the wall between the first window and the lamps: world x, bottom z, width, height, inner margin, logo aspect. */
+const LOGO = { x: -6, z: 98, w: 92, h: 32, pad: 4, ratio: 179.06 / 537.17 };
 const CLOCK = [222, WALL_Y, 112, 15];
 /** Bottom edge for the corner cards (decision, receipt): just above where a two-line caption starts. */
 const CARD_BOTTOM = 748;
@@ -249,30 +252,29 @@ const thumb = (x, y, z) => {
   return `<path class="thumb" d="M${f1(a[0])} ${f1(a[1])}L${f1(b[0])} ${f1(b[1])}"/>`;
 };
 
-/** A robot at the origin facing the viewer: tracks, body with chest screen and vents, shoulders, arms, head with visor and antenna. */
-function robot(body, head) {
-  const out = [`<path class="iso-halo" d="${k.haloOf({ x: -14, y: -12, w: 28, d: 24, r: 10 }, 0, 0.1, P)}" style="filter:blur(4px)"/>`];
-  const tracks = [-13, 7].map((x) => slab({ x, y: -11, w: 6, d: 22, r: 3 }, 0, 6, { tone: "mid" }, 4, 0.4) + dots([[x + 6, -5, 3], [x + 6, 0, 3], [x + 6, 5, 3]], { size: 1.2, tone: "hi" })).join("");
-  out.push(M("dark", tracks + slab({ x: -10, y: -9, w: 20, d: 18, r: 2 }, 6, 3, { tone: "mid" }, 2, 0.4)));
-  const torso = { x: -11, y: -9, w: 22, d: 18, r: 4 };
-  const vents = [12, 15, 18].map((z) => seg([10.6, -6, z], [10.6, 4, z])).join("");
-  out.push(M(body, slab(torso, 9, 25, { tone: "hi" }, 5, 0.8) + L(k.sideSeam(torso, 30, P, 5), { tone: "lo" }) + L(vents, { tone: "lo" }) + cyl(-12.5, 0, 3, 26, 5, { tone: "mid" }, 16) + cyl(12.5, 0, 3, 26, 5, { tone: "mid" }, 16)));
-  out.push(`<g transform="${face(-6, 9.05, 28)}"><rect class="chest" x="0" y="0" width="12" height="8" rx="1.5"/><circle class="chest-led" cx="3" cy="4" r="1.5"/><rect class="chest-bar" x="6" y="3" width="4" height="2" rx=".8"/></g>`);
-  out.push(M(body, slab({ x: -15, y: -2, w: 4, d: 13, r: 1.5 }, 18, 4, { tone: "mid" }, 2) + slab({ x: 11, y: -2, w: 4, d: 13, r: 1.5 }, 18, 4, { tone: "mid" }, 2)));
-  out.push(M("dark", cyl(0, 0, 3.4, 34, 3, { tone: "mid" }, 20)));
-  const hd = { x: -10, y: -8, w: 20, d: 16, r: 4 };
-  out.push(M(head, slab(hd, 37, 15, { tone: "hi" }, 5, 0.8) + cyl(-10.5, 0, 2.2, 42, 4, { tone: "mid" }, 12) + cyl(10.5, 0, 2.2, 42, 4, { tone: "mid" }, 12)));
-  out.push(`<g transform="${face(-7.5, 8.05, 48.5)}"><rect class="visor" x="0" y="0" width="15" height="7" rx="3"/><rect class="eye-lit" x="3" y="2" width="3" height="3" rx="1.5"/><rect class="eye-lit" x="9" y="2" width="3" height="3" rx="1.5"/></g>`);
-  out.push(M("dark", L(seg([0, 0, 52], [0, 0, 61]), { tone: "mid" })));
-  const tip = at([0, 0, 62]);
-  out.push(`<circle class="antenna" cx="${f1(tip[0])}" cy="${f1(tip[1])}" r="${f1(2 * KS)}"/>`);
+/**
+ * The agent as a small robot vacuum at the origin, about one floor tile across: dark bumper ring, coral shell with a lid
+ * seam and a front sensor window, lidar turret, status light, a side brush on the floor.
+ */
+function robot() {
+  const out = [`<path class="iso-halo" d="${k.haloOf({ x: -10, y: -10, w: 20, d: 20, r: 10 }, 0, 0.1, P)}" style="filter:blur(3px)"/>`];
+  const brush = [0, 1, 2].map((i) => {
+    const a = i * 2.1 + 0.4;
+    return seg([6.6, 6.6, 0.7], [6.6 + Math.cos(a) * 4, 6.6 + Math.sin(a) * 4, 0.7]);
+  }).join("");
+  out.push(M("dark", L(brush, { tone: "mid" }) + cyl(0, 0, 9, 0.6, 3.2, { tone: "mid" }, 40) + L(k.sideArc(0, 0, 9, 2.2, P, 28), { tone: "lo" })));
+  out.push(M("coral", cyl(0, 0, 8.5, 3.8, 2.6, { tone: "hi" }, 40) + L(k.ring(0, 0, 5.6, 6.4, P, 32), { tone: "lo" })));
+  out.push(M("dark", cyl(-1.5, -1, 2.8, 6.4, 2.2, { tone: "mid" }, 20)));
+  out.push(M("sun", cyl(-1.5, -1, 2.2, 8.6, 0.8, { tone: "hi" }, 20)));
+  const led = at([3.8, 4.6, 6.5]);
+  out.push(`<circle class="chest-led" cx="${f1(led[0])}" cy="${f1(led[1])}" r="${f1(0.9 * KS)}"/>`);
   return out.join("");
 }
 
-/** The card the agent holds in front of its body; colour comes from data-carry and data-stamp. */
+/** The card the robot carries on a short mast, facing the viewer; colour comes from data-carry and data-stamp. */
 function card() {
-  const plan = { x: -9, y: 11, w: 18, d: 1.6, r: 0.6 };
-  return `<g class="card">${M("cream", slab(plan, 13, 19, { tone: "hi", crease: "lo" }, 2, 0))}<g transform="${face(-8, 12.65, 31)}"><rect class="card-face" x="0" y="0" width="16" height="17" rx="1"/><rect class="card-line" x="2.5" y="3" width="11" height="1.4"/><rect class="card-line" x="2.5" y="6.5" width="8" height="1.4"/><circle class="card-stamp" cx="11" cy="12" r="3.4"/></g></g>`;
+  const plan = { x: 0.5, y: 1, w: 11, d: 1, r: 0.4 };
+  return `<g class="card">${M("dark", L(seg([1, 1.5, 6.4], [1, 1.5, HAND_Z + 5]), { tone: "mid" }))}${M("cream", slab(plan, HAND_Z - 3, 8, { tone: "hi", crease: "lo" }, 2, 0))}<g transform="${face(1, 2.05, HAND_Z + 5)}"><rect class="card-face" x="0" y="0" width="10" height="8" rx=".8"/><rect class="card-line" x="1.5" y="1.8" width="6" height="1"/><circle class="card-stamp" cx="7.4" cy="5.4" r="1.8"/></g></g>`;
 }
 
 /** A wall lamp over one rack: bracket, shade and bulb. Its light is the WebGL layer under the front SVG. */
@@ -324,15 +326,12 @@ function wallClock() {
   return `<path class="clock-rim" d="${k.pathOf(ring, true)}"/><path class="clock-ticks" d="${ticks.join("")}"/><path data-id="hands" class="clock-hands" d=""/>`;
 }
 
-/** Valio Aimo's official logo on a light plate fixed to the warehouse wall, facing the viewer so it is only scaled. */
+/** Valio Aimo's official logo on a light plate fixed flat to the warehouse wall above the lamps, drawn in the wall's plane. */
 function logoSign() {
-  const [cx, cy] = at(LOGO.at);
-  const w = LOGO.width;
-  const h = w * LOGO.ratio;
-  const pad = 10;
-  const x = cx - w / 2 - pad;
-  const y = cy - h / 2 - pad;
-  return `<g class="logo-sign"><rect class="logo-shadow" x="${f1(x + 4)}" y="${f1(y + 5)}" width="${f1(w + 2 * pad)}" height="${f1(h + 2 * pad)}" rx="8"/><rect class="logo-plate" x="${f1(x)}" y="${f1(y)}" width="${f1(w + 2 * pad)}" height="${f1(h + 2 * pad)}" rx="8"/><image href="assets/valio-aimo-logo.svg" x="${f1(cx - w / 2)}" y="${f1(cy - h / 2)}" width="${f1(w)}" height="${f1(h)}" preserveAspectRatio="xMidYMid meet"/></g>`;
+  const { x, z, w, h, pad, ratio } = LOGO;
+  const imgH = h - 2 * pad;
+  const imgW = imgH / ratio;
+  return `<g class="logo-sign">${M("cream", slab({ x, y: WALL_Y, w, d: 1.6, r: 1 }, z, h, { tone: "hi", crease: "lo" }, 2, 0.4))}<g transform="${face(x, WALL_Y + 1.7, z + h)}"><rect class="logo-plate" x="0" y="0" width="${w}" height="${h}" rx="1.5"/><image href="assets/valio-aimo-logo.svg" x="${f1((w - imgW) / 2)}" y="${pad}" width="${f1(imgW)}" height="${f1(imgH)}" preserveAspectRatio="xMidYMid meet"/></g></g>`;
 }
 
 /** Border fence along x = GATE_X: petrol panels with bands, rose caps and graphite posts with bolts. */
@@ -367,10 +366,10 @@ function beam() {
   return out.join("");
 }
 
-/** The LAZYDOOR sign on the beam's masts: pale rose letters engraved on a graphite plate. */
+/** The LAZYDOOR sign on the beam's masts, in the gate's own plane: pale rose letters on a graphite plate that faces the kitchen side. */
 function sign() {
-  const [sx, sy] = at([GATE_X, -11, 138]);
-  return `<g class="neon"><rect class="neon-back" x="${f1(sx - 84)}" y="${f1(sy - 24)}" width="168" height="40" rx="9"/><text class="neon-text" x="${f1(sx + 2)}" y="${f1(sy + 3.5)}" text-anchor="middle">LAZYDOOR</text></g>`;
+  const [y0, w, z, h] = [-50, 78, 128, 20];
+  return `<g class="neon">${M("gate", slab({ x: GATE_X - 3, y: y0, w: 2.4, d: w, r: 0.6 }, z, h, { tone: "mid" }, 2, 0.4))}<g transform="${faceX(GATE_X - 3.1, y0, z + h)}"><rect class="neon-back" x="1" y="1" width="${w - 2}" height="${h - 2}" rx="2"/><text class="neon-text" x="${w / 2 + 1}" y="${h / 2 + 4}" font-size="11" text-anchor="middle">LAZYDOOR</text></g></g>`;
 }
 
 /** The kitchen terminal on a pedestal: a glowing screen facing the viewer with an icon per state, and a keypad on its right side where the chef types. */
@@ -388,8 +387,8 @@ function phone() {
 /**
  * A cab-over delivery truck built at the origin, cab front at x = 0 facing −x, body along +x, side at y = 38 facing the viewer:
  * chassis, bumper with plate and fog lamps, cab with windscreen, wipers, grille and headlights, roof deflector and lights,
- * side window, door, handle, steps and mirror, exhaust stack, fuel tank, an open-sided box (curtain rolled up under the roof,
- * plain, no lettering) with eight crate places inside, marker lights,
+ * side window, door, handle, steps and mirror, exhaust stack, fuel tank, an open-sided box (a plain top rail in the frame's
+ * colour, no panel, no lettering) with eight crate places inside, marker lights,
  * wheels with tyres, rims, hubs and nuts under arches, mudflap.
  */
 function truck() {
@@ -409,8 +408,7 @@ function truck() {
   }
   out.push(`<g data-id="tcrates">${load.join("")}</g>`);
   out.push(M("sun", [box.x, box.x + box.w - 3].map((px) => slab({ x: px, y: D - 3, w: 3, d: 3, r: 0.4 }, 17, 53, { tone: "mid" }, 2, 0)).join("")));
-  const curtain = { x: box.x, y: D - 4, w: box.w, d: 5, r: 2.4 };
-  out.push(M("cobalt", slab(curtain, 50, 20, { tone: "mid" }, 4, 0.4) + L(k.sideSeam(curtain, 54, P, 4), { tone: "lo" })));
+  out.push(M("sun", slab({ x: box.x, y: D - 4, w: box.w, d: 4, r: 1 }, 66, 4, { tone: "mid" }, 2, 0.4)));
   out.push(M("dark", slab({ x: box.x - 1, y: -1, w: box.w + 2, d: D + 2, r: 2 }, 70, 3, { tone: "mid" }, 2, 0.4)));
   out.push(`<g class="markers">${dots([...Array(7)].map((_, i) => [box.x + 7 + i * 13.3, D + 0.2, 15.5]), { size: 1.6, tone: "hi" })}</g>`);
   out.push(M("dark", slab({ x: 42, y: 2, w: 4, d: D - 4, r: 1 }, 14, 48, { tone: "mid" }, 2, 0)));
@@ -559,7 +557,7 @@ export function buildScene(host) {
 <path data-id="sneak" class="sneak" d="" style="opacity:0"/>
 <g data-id="leaf"></g>
 <g data-id="chef">${chef()}</g>
-<g data-id="agent">${robot("coral", "sun")}${card()}</g>
+<g data-id="agent">${robot()}${card()}</g>
 <g data-id="gate-front">${post(36, false)}${beam()}</g>
 <g data-id="gate-sign">${sign()}</g>
 <g data-id="trail"></g>
@@ -686,7 +684,8 @@ ${truck()}
     return [x, y];
   };
 
-  const ROUTE = [[-188, LANE], [-140, LANE], [-106, LANE]];
+  /** The robot's path: parked at the foot of the kitchen terminal, out round the chef onto the lane, along it to the door's scan line. */
+  const ROUTE = [[-284, -11], [-258, LANE], [-106, LANE]];
   const lengths = (route) => route.reduce((acc, p, i) => (i ? [...acc, acc[i - 1] + Math.hypot(p[0] - route[i - 1][0], p[1] - route[i - 1][1])] : [0]), []);
   const pointOn = (route, cum, s) => {
     const i = Math.max(1, cum.findIndex((c) => c >= s));
@@ -696,8 +695,8 @@ ${truck()}
     return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
   };
   const RC = lengths(ROUTE);
-  const STATION = { chef: RC[0], home: RC[1], door: RC[2], truck: RC[0] };
-  const HAND_AT_DOOR = at([ROUTE[2][0], ROUTE[2][1] + 13, 24]);
+  const STATION = { chef: 0, home: 0, door: RC[2] };
+  const HAND_AT_DOOR = at([ROUTE[2][0] + 6, ROUTE[2][1] + 2, HAND_Z + 1]);
   const RACK_TOP = at([RACK_X[0] + RACK.w / 2, RACK.y + RACK.d, RACK.h + 18]);
   /** Control point of the raw API arc in Act 1: high over the place where the door will stand. */
   const RAW_BEND = [(HAND_AT_DOOR[0] + RACK_TOP[0]) / 2, Math.min(HAND_AT_DOOR[1], RACK_TOP[1]) - 150];
@@ -753,11 +752,10 @@ ${truck()}
       live.leafShown = leafKey;
     }
     const [ax, ay] = pointOn(ROUTE, RC, live.s);
-    const bob = calm ? 0 : Math.abs(live.v) > 4 ? Math.abs(Math.sin(t * 13)) * 1.6 : Math.sin(t * 2.2) * 0.4;
-    setAttr(el.agent, "transform", k.translateAlong(P, [ax, ay, bob]));
+    setAttr(el.agent, "transform", k.translateAlong(P, [ax, ay, 0]));
     setAttr(cardEl, "data-carry", state.agent.carry ?? "none");
     setAttr(cardEl, "data-stamp", state.agent.carry === "quote" || state.agent.carry === "rejected" ? stamp ?? "" : state.agent.carry === "receipt" ? "AUTO" : "");
-    const posted = drawLetter(state, t, snap, calm, ax, ay, bob);
+    const posted = drawLetter(state, t, snap, calm, ax, ay);
     setAttr(cardEl, "style", state.agent.carry && !posted ? null : "opacity:0");
 
     const o = at([0, 0, 0]);
@@ -765,7 +763,7 @@ ${truck()}
       const q = at(p);
       return bodyBox(node, q[0] - o[0], q[1] - o[1]);
     };
-    const agentBox = moved(el.agent, [ax, ay, bob]);
+    const agentBox = moved(el.agent, [ax, ay, 0]);
     const leaf = el.leaf.getBBox();
     const gateParts = state.gate.built ? [...["gate-fence", "gate-post", "gate-front", "gate-sign"].map((id) => bodyBox(el[id])), leaf.width ? [leaf.x, leaf.y, leaf.x + leaf.width, leaf.y + leaf.height] : null] : [];
     taken.length = 0;
@@ -777,9 +775,9 @@ ${truck()}
 
     setAttr(el.asks, "style", state.door.scan ? `stroke-dashoffset:${f1(-t * 24)}` : "opacity:0");
     if (state.door.scan && Math.abs(live.v) < 6) {
-      const z = 14 + (calm ? 0.5 : Math.sin((t - state.door.since) * 3.4) * 0.5 + 0.5) * 40;
+      const z = 1 + (calm ? 0.5 : Math.sin((t - state.door.since) * 3.4) * 0.5 + 0.5) * 18;
       const y = ay + 10;
-      const ends = [at([ax - 13, y, z + bob]), at([ax + 13, y, z + bob])];
+      const ends = [at([ax - 10, y, z]), at([ax + 10, y, z])];
       const head = [at([GATE_X - 16, -6, 92]), at([GATE_X - 16, 28, 92])];
       el.scan.innerHTML = `<path class="scan-fan" d="${k.pathOf([head[0], head[1], ends[1], ends[0]], true)}"/><path class="scan-line" d="${k.pathOf(ends)}"/>`;
     } else if (el.scan.firstChild) el.scan.innerHTML = "";
@@ -795,15 +793,16 @@ ${truck()}
     drawTruck(state, t, dt, snap, calm);
     flushBursts(t, calm);
     drawChef(state, t, typed, calm);
-    drawLabel(state, ax, ay, bob, agentBox);
+    drawLabel(state, ax, ay, agentBox);
     drawSky(state, dt, snap || calm);
   }
 
-  /** The door is not there in Story Act 1; once it is built its parts lower into place one after another. */
+  /** The door is not there in Story Act 1; once it is built its parts lower into place one after another and the sign lights up in place. */
   function drawGate(gate, t, calm) {
     for (const [id, delay] of GATE_PARTS) {
       const e = !gate.built ? 0 : calm ? 1 : ease((t - gate.since - delay) / 0.9);
-      setAttr(el[id], "transform", e < 1 ? k.translateAlong(P, [0, 0, 20 * (1 - e)]) : null);
+      const drop = id === "gate-sign" ? 0 : 20;
+      setAttr(el[id], "transform", e < 1 && drop ? k.translateAlong(P, [0, 0, drop * (1 - e)]) : null);
       setAttr(el[id], "style", e < 1 ? `opacity:${e.toFixed(3)}` : null);
     }
   }
@@ -830,7 +829,7 @@ ${truck()}
    * the envelope flies straight over to rack 0 instead, the raw API, and nothing comes back. Returns true while the card
    * is not in the agent's hands.
    */
-  function drawLetter(state, t, snap, calm, ax, ay, bob) {
+  function drawLetter(state, t, snap, calm, ax, ay) {
     const ag = state.agent;
     const atDoor = ag.at === "door" && Math.abs(live.s - STATION.door) < 0.5 && Math.abs(live.v) < 3;
     if (ag.at === "door" && live.handKey !== ag.since) [live.handKey, live.handAt] = [ag.since, null];
@@ -839,7 +838,7 @@ ${truck()}
       setAttr(el.letter, "style", "opacity:0");
       return false;
     }
-    const hand = at([ax, ay + 13, 24 + bob]);
+    const hand = at([ax + 6, ay + 2, HAND_Z + 1]);
     if (!state.gate.built) {
       const u = (t - live.handAt) / 1.3;
       if (calm || u < 0 || u >= 1) setAttr(el.letter, "style", "opacity:0");
@@ -1109,7 +1108,11 @@ ${truck()}
     }[ph.status];
     if (!words) return setAttr(el.phonechip, "style", "opacity:0");
     const [px, py] = at([PHONE.x + PHONE.w, PHONE.y + PHONE.d, 0]);
-    taken.push(chip(el.phonechip, { x: px - 8, y: py + 18, text: words[0], iconName: words[1], tone: words[2], anchor: "end" }));
+    const { width, height } = chipSize(words[0], words[1]);
+    const [screen] = KEEP_CLEAR;
+    const spot = place("phonechip", width, height, [[screen[0] - 8 - width, screen[3] - height], [px - 8 - width, py + 18 - height], [px - 8 - width, py + 40]]);
+    if (!spot) return setAttr(el.phonechip, "style", "opacity:0");
+    chip(el.phonechip, { x: spot[0], y: spot[1] + height, text: words[0], iconName: words[1], tone: words[2], anchor: "start" });
     setAttr(el.phonechip, "style", null);
   }
 
@@ -1304,14 +1307,14 @@ ${truck()}
   }
 
   /** The agent's card content as a label next to it: over its head, else under its feet or beside it, never over the cast, the door or other text. */
-  function drawLabel(state, ax, ay, bob, body) {
+  function drawLabel(state, ax, ay, body) {
     const lines = cardLines(state);
     if (!lines.length || !body) return setAttr(el.label, "style", "opacity:0");
-    const head = at([ax, ay, 66 + bob]);
+    const head = at([ax, ay, HAND_Z + 7]);
     const size = 21;
     const width = Math.max(...lines.map((l) => l.length)) * size * 0.56 + 32;
     const height = lines.length * size * 1.3 + 18;
-    const [hx, above, below, mid] = [head[0], head[1] - height - 8, body[3] + 12, (body[1] + body[3]) / 2 - height / 2];
+    const [hx, above, below, mid] = [head[0], head[1] - height - 8, body[3] + 16, (body[1] + body[3]) / 2 - height / 2];
     const spot = place("label", width, height, [
       [hx - width / 2, above], [hx - width / 2, below],
       [hx - 24, above], [hx + 24 - width, above], [hx - 24, below], [hx + 24 - width, below],

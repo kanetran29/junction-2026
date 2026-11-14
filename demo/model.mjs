@@ -9,7 +9,7 @@ const CROSSING = new Set(["NEW_ALLERGEN", "SUBTYPE_MISMATCH", "CLAIM_MISSING", "
 /** Empty shelf slot; productId null means nothing is shown on its tag. */
 const emptyShelf = () => ({ productId: null, status: "idle", remaining: null, code: null, more: 0, since: 0 });
 
-/** The scene before any event: agent docked by the chef, the door standing and idle, truck parked. */
+/** The scene before any event: the robot parked at the foot of the kitchen terminal, the door standing and idle, truck parked. */
 export function initialState() {
   return {
     seq: 0,
@@ -124,7 +124,7 @@ export function reduce(state, ev, t) {
     case "policy.decided":
       if (!OUTCOMES.has(d.outcome)) break;
       s.door = { scan: false, stamp: d.outcome, reasons: codesOf(d.reasons), since: t };
-      if (d.outcome === "REJECT") goAgent("chef", "rejected");
+      goAgent("home", d.outcome === "REJECT" ? "rejected" : s.agent.carry);
       break;
     case "approval.requested":
       s.phone = { status: "buzzing", orderId: d.orderId ?? ev.orderId ?? null, expiresAt: d.expiresAt ?? null, cents: d.netCents ?? s.quote?.offers?.[0]?.netCents ?? null, since: t };
@@ -134,7 +134,7 @@ export function reduce(state, ev, t) {
       break;
     case "approval.rejected":
       s.phone = { ...s.phone, status: "rejected", since: t };
-      goAgent("chef", "rejected");
+      goAgent("home", "rejected");
       break;
     case "approval.expired":
       s.phone = { ...s.phone, status: "expired", since: t };
@@ -143,7 +143,7 @@ export function reduce(state, ev, t) {
       const units = (Array.isArray(d.lines) ? d.lines : []).reduce((sum, l) => sum + (Number(l?.salesUnits) || 0), 0);
       s.truck = { status: "loading", crates: Math.min(8, Math.max(1, Math.ceil(units / 125))), naive: false, since: t };
       s.receipt = { orderId: ev.orderId ?? d.orderId ?? null, netCents: Number.isFinite(d.netCents) ? d.netCents : null };
-      goAgent("truck", "receipt");
+      goAgent("home", "receipt");
       break;
     }
     case "stock.denied": {

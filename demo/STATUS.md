@@ -152,6 +152,13 @@ Vấn đề tìm thấy:
 - `demo/dev/label-overlap.mjs` thêm khung của chef, agent, xe tải, rào/cột/khung/cánh cổng và biển LAZYDOOR làm vật cứng: chữ không được chạm chúng (vật cứng chạm nhau thì bỏ qua). Lần chạy đầu: 11 cặp; sau khi sửa: `label overlaps: 0` (Story mỗi 0,25 giây, Live phát hết file mẫu).
 - Điện thoại dọc (≤ 640 px): dòng gợi ý "Turn your phone sideways to see the whole scene." với biểu tượng xoay (Phosphor device-rotate). Xoay ngang thì tự ẩn và sân khấu vừa chiều cao màn hình. Đã kiểm 375×812 và 812×375.
 
+### 18. Robot hút bụi, biển theo mặt iso, thùng xe trơn (theo nhận xét hình của Kane)
+- Agent giờ là robot hút bụi tròn dẹt cỡ một viên gạch lát (vòng cản đen, vỏ san hô có đường nắp, cửa cảm biến, tháp lidar nắp vàng, đèn trạng thái, chổi cạnh), thẻ đơn cắm trên cột nhỏ. Đỗ ngay dưới chân màn hình bếp; nhận lệnh thì chạy vòng qua chef ra làn, tới vạch quét của cổng; cổng quyết định xong (AUTO, NEEDS_APPROVAL hay REJECT) thì tự chạy về chỗ đỗ, không chờ xe tải. Đơn được nhận thì robot vẫn đỗ, chỉ đổi thẻ sang biên nhận. Áp cho cả Story và Live (`model.mjs`: `policy.decided`, `approval.rejected`, `order.accepted` đều đưa robot về `home`; test đã đổi theo).
+- Biển Valio Aimo là tấm phẳng gắn trên mặt tường kho (trên hàng đèn, giữa cửa sổ đầu và đèn thứ hai), logo vẽ trong mặt phẳng tường. Biển LAZYDOOR là tấm trên hai cột của dầm cổng, nằm trong mặt phẳng của cổng, quay về phía bếp. Khi dựng cổng, biển sáng dần tại chỗ (không hạ xuống), nên không lướt qua logo.
+- Xe tải: bỏ tấm xanh ở thành thùng; thay bằng thanh ray trên cùng màu khung vàng, thùng để trơn.
+- Nhãn màn hình bếp ("Approve …?", "Approved …") giờ cũng đi qua bộ đặt chữ: mặc định nằm bên trái màn hình, không che robot đang đỗ.
+- `label overlaps: 0`, 36 test pass.
+
 ## Còn lại / cần làm sau
 - Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

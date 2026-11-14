@@ -152,8 +152,7 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .win-frame { fill: #3a160c; }
 .win-glass { fill: #ffc65a; }
 .win-bar { fill: none; stroke: #8a3a16; stroke-width: 1.4px; }
-.logo-plate { fill: #fffaf0; stroke: #03161c; stroke-width: 2px; }
-.logo-shadow { fill: #021015; opacity: .55; }
+.logo-plate { fill: #fffaf0; stroke: #03161c; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
 .clock-rim { fill: #f7e8c8; stroke: #13262e; stroke-width: 2.4px; }
 .clock-ticks { fill: none; stroke: #13262e; stroke-width: 1.8px; stroke-linecap: round; }
 .clock-hands { fill: none; stroke: #13262e; stroke-width: 3px; stroke-linecap: round; }
@@ -208,8 +207,8 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .leaf-seal[data-stamp="AUTO"] { fill: var(--auto); }
 .leaf-seal[data-stamp="NEEDS_APPROVAL"] { fill: var(--hold); }
 .leaf-seal[data-stamp="REJECT"] { fill: var(--reject); }
-.neon-back { fill: #11191e; stroke: #56606a; stroke-width: 1.5px; }
-.neon-text { fill: var(--brand-soft); font: 700 21px var(--sans); letter-spacing: .18em; }
+.neon-back { fill: #11191e; stroke: #56606a; stroke-width: 1.2px; vector-effect: non-scaling-stroke; }
+.neon-text { fill: var(--brand-soft); font-family: var(--sans); font-weight: 700; letter-spacing: .18em; }
 .scan-fan { fill: var(--brand); opacity: .18; }
 .scan-line { fill: none; stroke: var(--brand-soft); stroke-width: 3; stroke-linecap: round; }
 [data-id="asks"] .iso-line { stroke: var(--brand-soft); stroke-width: 2; }

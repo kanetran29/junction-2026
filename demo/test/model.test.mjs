@@ -40,6 +40,7 @@ test("reduce: happy path to an approved order on the truck", () => {
   s = run([ev("policy.decided", { outcome: "NEEDS_APPROVAL", reasons: [{ code: "OVER_ORDER_AUTO" }, "PACK_SIZE_CHANGED"] })], s);
   assert.equal(s.door.stamp, "NEEDS_APPROVAL");
   assert.deepEqual(s.door.reasons, ["OVER_ORDER_AUTO", "PACK_SIZE_CHANGED"]);
+  assert.deepEqual([s.agent.at, s.agent.carry], ["home", "quote"], "the robot drives home as soon as the door decides");
 
   s = run([ev("approval.requested", { orderId: "o1", expiresAt: "2026-11-15T17:00:00+02:00" }, { orderId: "o1" })], s);
   assert.equal(s.phone.status, "buzzing");
@@ -50,14 +51,14 @@ test("reduce: happy path to an approved order on the truck", () => {
   assert.equal(s.phone.status, "approved");
   assert.equal(s.truck.status, "loading");
   assert.ok(s.truck.crates >= 1);
-  assert.equal(s.agent.at, "truck");
+  assert.equal(s.agent.at, "home", "the truck runs on its own; the robot stays parked");
   assert.equal(s.agent.carry, "receipt");
 });
 
 test("reduce: REJECT sends the agent back with a red card", () => {
   const s = run([ev("draft.created", { text: "1000 cases", quantity: { value: 20000, unit: "l" }, unclear: [] }), ev("policy.decided", { outcome: "REJECT", reasons: [{ code: "OVER_ORDER_HARD" }] })]);
   assert.equal(s.door.stamp, "REJECT");
-  assert.equal(s.agent.at, "chef");
+  assert.equal(s.agent.at, "home");
   assert.equal(s.agent.carry, "rejected");
 });
 
