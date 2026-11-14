@@ -201,4 +201,29 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
   (nó quét cả `~/.config/junction2026/aiven.env`, đã chạy thử).
 - Ghi chú: mở Docker Desktop để chạy Postgres local làm vài container cũ của Kane (restart policy) tự chạy lại; mình không đụng tới chúng.
 - README có mục "Aiven PostgreSQL holds every write": sổ kho một transaction, audit log thứ tự chặt, không còn hạn mức ghi theo dòng.
+- Review Opus cho C1: không có lỗi nghiêm trọng (sổ kho, idempotency, thứ tự event đều đúng). Hai lỗi đã sửa ở `9677a8e`:
+  `net_cents`/`gross_cents` phải là BIGINT (SQLite INTEGER là 64-bit; tồn kho "không biết" cho phép báo giá vượt 2^31 cent → trước đây 500);
+  `since` > 2^31 trả trang rỗng thay vì 500, và SSE đóng stream khi đọc lỗi thay vì treo. Rủi ro deploy reviewer nêu (cache Hyperdrive bật
+  mặc định) đã nằm trong cách tạo: tắt cache; sau deploy sẽ thử đổi `/admin/clock` rồi xem `/health` thấy ngay.
+
+### C2. Gemma 4 đọc lại mỗi yêu cầu (xong local, commit `b94bd60`)
+- **Ruling:**
+  1. Model: lấy từ `models.list` của key AI Studio: có `gemma-4-26b-a4b-it` và `gemma-4-31b-it`. Chọn **`gemma-4-31b-it`**: nhận đúng
+     prompt hệ thống + JSON schema, trả lời 3–5 s; bản 26B-A4B treo quá 300 s không trả lời. Đặt ở biến `GEMMA_MODEL` (wrangler vars).
+  2. Gemma đọc **độc lập, song song** với Gemini, cùng prompt và schema; cả hai bản đọc qua cùng bộ luật `validate`, rồi so từng trường
+     (claims so như tập hợp, tên brand không phân biệt hoa thường). Khác nhau ở bất kỳ trường nào → `needs_input`: trường đó bị bỏ
+     khỏi draft, ghi trong `missing` và `disagreement` (mỗi model đọc ra gì); người mua điền ở `confirm_draft`. Door không chọn bên nào.
+  3. `confirm_draft` nhận draft `needs_input` chỉ khi fill có đủ mọi trường trong `missing` (`needs` không bao giờ điền được, nên yêu cầu
+     không có loại hàng vẫn bị từ chối như trước).
+  4. Gemma không trả lời (lỗi, quá 20 s, hết quota) → draft giữ nguyên như Gemini đọc, ghi `crossCheck.result = "unavailable"`; không
+     chặn việc đặt hàng. Lý do: quota Gemma của key chỉ ~15k token/phút (prompt ~4k token; đo được: 8 lời gọi ngắn liên tiếp OK, ~4 lời
+     gọi đầy đủ trong một phút thì 429). Muốn chặt hơn (fail closed) chỉ cần đổi một chỗ.
+  5. Gemma đôi khi bọc JSON trong khối Markdown ``` → đọc phần `{...}` ngoài cùng.
+  6. **Đổi schema event (thêm, không phá):** `draft.created` có thêm `crossCheck: { model, result, fields }`; đã ghi vào `docs/events.md`.
+- Ví dụ thật (đo trên API): "We need 40 kg of chicken breast fillet for Friday, Atria only" gửi Thứ Sáu 13/11: Gemini đọc 13/11, Gemma
+  đọc 20/11 → giờ door hỏi lại người mua thay vì đoán. Với AC01/AC24/AC44 hai model đọc giống nhau.
+- Key không vào repo: test dùng stub; `check-secrets` vẫn chạy trước mỗi commit.
+- Kiểm chứng local: vitest **325/325**; nghiệm thu **49/49** với Gemini + Gemma thật (AC01, AC24, AC44 PASS); scenarios **11/11**.
+- Codex: không dùng, nên không ghi vào bài nộp.
+- Đang chạy: review Opus cho commit Gemma. Deploy cả hai phần chờ quyền Hyperdrive (mục đầu file).
 
