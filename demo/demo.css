@@ -512,6 +512,8 @@ body.kiosk .try-panel { display: none; }
 .try-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
 .try-chip { font: 500 13px/1.3 var(--sans); color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 7px 12px; cursor: pointer; text-align: left; }
 .try-chip:hover { border-color: var(--brand); }
+.try-chips[data-highlight] .try-chip { border-color: var(--brand); background: rgb(214 92 132 / .14); }
+.try-cached { margin: 10px 0 0; font-size: 13px; color: var(--ink-dim); }
 .try-result { margin-top: 18px; }
 .try-empty { margin: 0; padding: 14px 16px; border-radius: var(--radius); border: 1px dashed var(--line); color: var(--ink-dim); font-size: 14px; }
 .try-box { border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius); padding: 14px 16px; background: var(--surface-2); }

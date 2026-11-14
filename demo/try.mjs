@@ -38,16 +38,32 @@ const reasonLine = (r, codes) => {
 /** Net and gross of an order as one line. */
 const money = (o) => [Number.isFinite(o?.netCents) ? `Net ${euro(o.netCents)}` : "", Number.isFinite(o?.grossCents) ? `Gross ${euro(o.grossCents)}` : ""].filter(Boolean).join(" · ");
 
+/** The line under an answer whose readings were recorded (the example chips are served from recorded readings). */
+export const CACHED_NOTE = "Example: readings recorded from Gemini and Gemma";
+
 /**
  * What the panel shows for one reply of /v1/try or /v1/try/decision (or an error), as a view model:
- * { kind, tone, title, lines, choices?, actions? }. kind "hide" means the door has no sandbox (not a demo door). `byManager`
- * marks a /v1/try/decision reply, where REJECTED is the manager's own decision.
+ * { kind, tone, title, lines, choices?, actions?, wait?, examples?, cached? }. kind "hide" means Try it is off on this door
+ * (not a demo door, or switched off). `wait` is the seconds Send stays off; `examples` asks the panel to point at the
+ * example chips; `cached` marks recorded readings. `byManager` marks a /v1/try/decision reply, where REJECTED is the
+ * manager's own decision.
  */
-export function viewOf({ status, body, retryAfter }, codes = {}, byManager = false) {
+export function viewOf(res, codes = {}, byManager = false) {
+  const view = replyView(res, codes, byManager);
+  return res.status === 200 && res.body?.draft?.cached === true ? { ...view, cached: true } : view;
+}
+
+/** The view for one reply, before the recorded-readings mark. */
+function replyView({ status, body, retryAfter }, codes, byManager) {
   if (status === 404) return { kind: "hide" };
-  if (status === 429) return { kind: "error", tone: "hold", title: `Busy: try again in ${retryAfter ?? body?.retryAfter ?? 30} s`, lines: [] };
+  if (status === 429 && body?.error === "TRY_SANDBOXES_FULL") return { kind: "error", tone: "hold", title: "Too many visitors right now, try again in a minute.", lines: [] };
+  if (status === 429) {
+    const wait = Math.max(1, Math.round(retryAfter ?? body?.retryAfter ?? 30));
+    return { kind: "error", tone: "hold", title: `Busy: try again in ${wait} s`, lines: [], wait };
+  }
+  if (status === 503 && body?.error === "MODELS_BUSY") return { kind: "error", tone: "hold", title: "The models are busy right now. Try one of the examples, they work instantly.", lines: [], examples: true };
   if (status === 400) return { kind: "error", tone: "reject", title: "Type a request of 1 to 200 characters.", lines: body?.detail ? [String(body.detail)] : [] };
-  if (status === 0) return { kind: "error", tone: "reject", title: "The door is not answering. Try again in a moment.", lines: [] };
+  if (status === 0 || status === 502 || status === 503) return { kind: "error", tone: "reject", title: "The door did not answer. Try again.", lines: [] };
   if (status !== 200 || !body) return { kind: "error", tone: "reject", title: `The door answered HTTP ${status}.`, lines: [] };
 
   if (body.step === "needs_input" && body.question) {

@@ -267,6 +267,12 @@ Vấn đề tìm thấy:
 - Hình thật ở mọi slide: khung Story lúc 16:30 (hook), ảnh NO MILK (problem), ảnh HELD với điện thoại (solution), đường ray 7 bước + ảnh từ chối (flow), 4 dòng Compare chụp từ door (guardrails), Live + thẻ điện thoại của Try it (demo), sơ đồ kiến trúc với logo Simple Icons (built), số 60/60, 11/11, 390 + ô "Chain valid" và khoá ký chụp trực tiếp (proof), ảnh giao hàng thứ Hai + URL (next). Ảnh chụp ở 2x từ https://lazydoor.lazydoor.workers.dev/demo/ bằng `deck/capture.mjs`, mỗi lần một context mới.
 - Kane duyệt deck; chỉnh slide 1 (khung Story thành ảnh chính, 57% bề ngang, sát mép phải, tiêu đề 3 dòng, cả khối căn giữa theo chiều dọc) và slide 9 (ảnh giao hàng lớn hơn, chữ căn giữa bên cạnh, URL demo thành dòng kết lớn màu hồng).
 
+### 35. Try it và Live khi có nhiều người thử cùng lúc
+- Khung Try it xử lý các trạng thái mới của door: 429 TRY_RATE_LIMITED → "Busy: try again in N s", đếm ngược từng giây, nút Send tắt tới khi hết giờ rồi "You can send again." (đọc màn hình chỉ báo một lần); 503 MODELS_BUSY → "The models are busy right now. Try one of the examples, they work instantly." và các chip mẫu được tô hồng; 429 TRY_SANDBOXES_FULL → "Too many visitors right now, try again in a minute."; 404 (Try it bị tắt) → ẩn khung, không báo gì; mất mạng, 502 hoặc 503 khác → "The door did not answer. Try again."; draft có `cached: true` → dòng nhỏ "Example: readings recorded from Gemini and Gemma".
+- Live: sự kiện của bếp khác (các sandbox của khách, hoặc Hotel Aurora khi đang theo sandbox của mình) chỉ là dòng ticker: không caption, không chớp đỏ, không đổi kệ; lá thư "another hotel" chạy tối đa một lần mỗi 6 s; các sự kiện đó không chiếm lượt 0,45 s nên bếp đang theo không bị chậm. Story không đổi (cờ `quietRivals` chỉ có trong `liveState`).
+- Kiểm `/v1/audit/verify` tối đa một lần mỗi 10 s (thêm một lần cuối đợt), để hàng chục trang Live mở cùng lúc không nhân số lần gọi lên door.
+- Test: 64 pass với Playwright (từng file một), gồm từng trạng thái Try it trong trình duyệt và 40 bếp đặt hàng cùng lúc trong model; `label overlaps: 0`. `dev/fake-gateway.mjs` không đổi.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

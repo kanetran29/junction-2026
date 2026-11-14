@@ -93,9 +93,10 @@ export function clockText(iso) {
 /**
  * Live mode's starting scene: the door standing with every kitchen's signed rules in its rack, Hotel Aurora's rule board,
  * and accepted orders waiting on the pallet for delivery day; the scene follows `buyer`, other buyers are "another hotel".
+ * `quietRivals`: with many visitors ordering at once, other buyers' events stay ticker lines (no caption, no flash).
  */
 export function liveState(buyer) {
-  return { ...initialState(), buyer, hold: true, rules: true, rulesSince: -60, mandates: { since: -60 } };
+  return { ...initialState(), buyer, hold: true, rules: true, rulesSince: -60, mandates: { since: -60 }, quietRivals: true };
 }
 
 /**
@@ -210,18 +211,27 @@ function shelfStatus(code) {
 const orderEntry = (s, id) => s.day.find((o) => id && o.orderId === id) ?? s.day.findLast((o) => o.status === "pending" && !o.orderId);
 
 /**
- * Another buyer's event (a second hotel's agent at the same door): it only shows in the ticker, as a red flash when the
- * door refuses that buyer, and on the shelf when it learns the stock left. Our own state stays untouched.
+ * Another buyer's event (a second hotel's agent at the same door): it shows in the ticker and starts the "another hotel"
+ * letter at most once every 6 s. In Story it also flashes red when the door refuses that buyer and shows the stock left
+ * on the shelf; in Live (`quietRivals`) it stays a ticker line. Returns false when the event is applied as our own.
  */
 function rivalEvent(s, ev, d, t) {
   if ((ev.type === "search.done" || ev.type === "quote.created") && !(s.rival && t - s.rival.since < 6)) s.rival = { since: t, outcome: null, reasons: [] };
   if (ev.type === "policy.decided" && d.outcome === "REJECT") {
     s.rival = { ...s.rival, since: s.rival?.since ?? t, outcome: d.outcome, reasons: codesOf(d.reasons) };
-    s.flash = { tone: "reject", since: t };
+    if (!s.quietRivals) s.flash = { tone: "reject", since: t };
   }
-  if (ev.type === "stock.denied") return false;
-  return true;
+  return !(ev.type === "stock.denied" && !s.quietRivals);
 }
+
+/** The buyer an event belongs to, or null for the door's own events (admin, clock, Story beats). */
+const buyerOf = (ev) => (ev.buyerId && ev.buyerId !== "admin" && !ev.type.startsWith("story.") ? ev.buyerId : null);
+
+/** True when `ev` is another buyer's event for a scene that follows `state.buyer`. */
+export const otherBuyer = (state, ev) => {
+  const buyer = ev && typeof ev.type === "string" ? buyerOf(ev) : null;
+  return Boolean(buyer && state.buyer && buyer !== state.buyer);
+};
 
 /** Applies one event at scene time t. Returns the same object for a duplicate seq, a new one otherwise. */
 export function reduce(state, ev, t) {
@@ -232,10 +242,11 @@ export function reduce(state, ev, t) {
   if (typeof ev.seq === "number") s.seq = ev.seq;
   if (ev.ts && !s.clockSet) s.now = ev.ts;
   const goAgent = (at, carry = s.agent.carry) => (s.agent = { at, carry, since: t });
-  const buyer = ev.buyerId && ev.buyerId !== "admin" && !ev.type.startsWith("story.") ? ev.buyerId : null;
+  const buyer = buyerOf(ev);
   if (buyer && !s.buyer) s.buyer = buyer;
   if (buyer && buyer !== s.buyer && rivalEvent(s, ev, d, t)) {
-    s.log = [...s.log, logEntry(ev, true)].slice(-LOG_KEEP);
+    const entry = logEntry(ev, true);
+    s.log = [...s.log, s.quietRivals ? { ...entry, plain: null } : entry].slice(-LOG_KEEP);
     return s;
   }
 

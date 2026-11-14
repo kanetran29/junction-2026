@@ -1,6 +1,6 @@
 // The "Try it: you are the chef" panel under Live: input, example chips, Send, and one result area that shows the door's
 // question, offer refusal, decision or the manager's phone card. Built with DOM calls only (text, never markup).
-import { EXAMPLES, MAX_TEXT, postTry, viewOf } from "./try.mjs";
+import { EXAMPLES, MAX_TEXT, CACHED_NOTE, postTry, viewOf } from "./try.mjs";
 import { ICONS } from "./icons.mjs";
 
 const STORE_KEY = "lazydoor.try";
@@ -64,6 +64,7 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
   let lastText = "";
   let draftId = null;
   let busy = false;
+  let waitTimer = null;
 
   const label = el("label", "try-label", "Your request, as the chef");
   label.htmlFor = "try-text";
@@ -92,12 +93,34 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
     })
     .catch(() => {});
 
+  /** Keeps Send off for `seconds` after a 429, counting down in the message's title (announced once, not every second). */
+  const holdSend = (title, seconds) => {
+    clearInterval(waitTimer);
+    let left = seconds;
+    send.disabled = true;
+    title.setAttribute("aria-live", "off");
+    waitTimer = setInterval(() => {
+      left -= 1;
+      if (left > 0) {
+        title.textContent = `Busy: try again in ${left} s`;
+        return;
+      }
+      clearInterval(waitTimer);
+      waitTimer = null;
+      send.disabled = false;
+      title.removeAttribute("aria-live");
+      title.textContent = "You can send again.";
+    }, 1000);
+  };
+
   /** Shows one view model in the result area, with its choice or decision buttons. */
   const show = (view) => {
     if (view.kind === "hide") {
+      clearInterval(waitTimer);
       root.dataset.off = "";
       return;
     }
+    chips.toggleAttribute("data-highlight", Boolean(view.examples));
     const box = el("div", view.kind === "held" ? "try-box phone-card" : "try-box");
     box.dataset.kind = view.kind;
     box.dataset.tone = view.tone ?? "";
@@ -107,17 +130,19 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
       box.append(bar);
     }
     box.append(el("p", "try-title", view.title), ...view.lines.map((line) => el("p", "try-line", line)));
+    if (view.cached) box.append(el("p", "try-cached", CACHED_NOTE));
     const row = el("div", "try-actions");
     for (const c of view.choices ?? []) row.append(button(c.label, "btn btn-ghost try-choice", () => run({ answer: { field: c.field, value: c.value } })));
     for (const a of view.actions ?? []) row.append(button(a.label, `btn ${a.decision === "approve" ? "btn-primary" : "btn-ghost"} try-decide ${a.decision}`, () => decide(view.token, a.decision)));
     if (row.children.length) box.append(row);
     result.removeAttribute("aria-busy");
     result.replaceChildren(box);
+    if (view.wait) holdSend(box.querySelector(".try-title"), view.wait);
   };
 
   /** Sends the typed request (or the answer to the door's question) and shows the reply; the scene follows the sandbox buyer. */
   const run = async (extra = {}) => {
-    if (busy) return;
+    if (busy || waitTimer) return;
     const text = extra.answer ? lastText : input.value.trim();
     if (!text) {
       input.focus();
@@ -130,6 +155,7 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
     loading.append(el("p", "try-title", "Sending to the door"), el("p", "try-line", "Reading, searching and quoting takes a few seconds."), el("span", "skeleton"));
     result.setAttribute("aria-busy", "true");
     result.replaceChildren(loading);
+    chips.removeAttribute("data-highlight");
     started();
     if (sandbox?.buyerId) follow(sandbox.buyerId);
     const res = await postTry(base, "/v1/try", { text, visitor: sandbox?.visitor, ...(extra.answer ? { draftId, answer: extra.answer } : {}) }, fetchImpl);

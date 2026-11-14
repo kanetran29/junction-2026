@@ -1,5 +1,5 @@
 // Wires the scene to its two sources: the story timeline and the live gateway (or a recorded file).
-import { initialState, liveState, reduce, countdown, shownNow, clockText, closingFades } from "./model.mjs";
+import { initialState, liveState, reduce, otherBuyer, countdown, shownNow, clockText, closingFades } from "./model.mjs";
 import { STORY, DURATION, VOICE, SFX, stateAt } from "./story.mjs";
 
 /** Everything on the narration track, in time order: the voice lines and the rewind sound. */
@@ -250,17 +250,26 @@ function status(s) {
 /** Queues a live event: the door often sends several in the same instant, and the scene shows them one after another. */
 /** Events after which Live re-checks the door's hash chain. */
 const ORDER_EVENTS = new Set(["policy.decided", "order.accepted", "approval.approved", "approval.rejected", "approval.expired"]);
-let auditBusy = false;
+const AUDIT_GAP_MS = 10000;
+let auditAt = -Infinity;
+let auditTimer = null;
 
 /**
  * Re-checks the door's hash-chained log (/v1/audit/verify) and shows the result as a chip in the ticker's header; the chip
- * stays hidden while the route is not deployed or not reachable.
+ * stays hidden while the route is not deployed or not reachable. At most one check every 10 s, with one more at the end
+ * of a burst, so dozens of kitchens ordering at once do not multiply the calls from every open page.
  */
 async function checkAudit() {
-  if (auditBusy) return;
-  auditBusy = true;
+  const wait = auditAt + AUDIT_GAP_MS - Date.now();
+  if (wait > 0) {
+    auditTimer ??= setTimeout(() => {
+      auditTimer = null;
+      checkAudit();
+    }, wait);
+    return;
+  }
+  auditAt = Date.now();
   const out = await runCheck(GATEWAY, CHECKS.find((c) => c.id === "audit"));
-  auditBusy = false;
   const chip = $("audit-chip");
   chip.dataset.state = out.state;
   chip.textContent = out.state === "bad" ? "Audit chain ✕" : "Audit chain ✓";
@@ -278,14 +287,16 @@ const onLive = (ev) => {
 /**
  * Applies queued live events at most one every 0.45 s (faster when many wait), and keeps each plain-words caption up for
  * at least 2.5 s and long enough to read at 17 characters a second; when captions pile up, only the newest two are kept.
+ * Other kitchens' events are ticker lines only and take no turn, so a crowd of visitors never delays the followed kitchen.
  */
 function paceLive(t) {
   while (live.queue.length && t >= live.nextAt) {
     const ev = live.queue.shift();
+    const quiet = otherBuyer(live.state, ev);
     live.state = reduce(live.state, ev, t);
     const line = live.state.seq === ev.seq ? live.state.log.at(-1)?.plain : null;
     if (line) live.lines = [...live.lines, line].slice(-2);
-    live.nextAt = t + (live.queue.length > 12 ? 0.08 : 0.45);
+    if (!quiet) live.nextAt = t + (live.queue.length > 12 ? 0.08 : 0.45);
   }
   if (live.lines.length && t >= live.captionUntil) {
     live.caption = live.lines.shift();

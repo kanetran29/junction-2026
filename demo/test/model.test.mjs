@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { initialState, liveState, reduce, plain, euro, countdown, SHELVES } from "../model.mjs";
+import { initialState, liveState, reduce, otherBuyer, plain, euro, countdown, SHELVES } from "../model.mjs";
 
 const B = "hotel-1";
 let seq = 0;
@@ -172,16 +172,44 @@ test("reduce: the naive steps move the one agent: take at the chef, enter at the
   assert.deepEqual([s.agent.at, s.agent.carry], ["home", null]);
 });
 
-test("live: the scene follows its own buyer; another hotel's events only reach the ticker, the caption and the shelf", () => {
+test("live: the scene follows its own buyer; another hotel's events stay ticker lines and one letter (Story keeps its flash)", () => {
   const ev2 = (type, data, buyerId, extra = {}) => ({ seq: ++seq, ts: "2026-11-13T21:10:00+02:00", type, buyerId, data, ...extra });
+  const theirs = () => [ev2("search.done", { count: 1 }, "hotel-b", { draftId: "d9" }), ev2("policy.decided", { outcome: "REJECT", reasons: ["STOCK_TAKEN"] }, "hotel-b"), ev2("stock.denied", { productId: "470746", remaining: 2 }, "hotel-b")];
   let s = liveState("hotel-a");
   assert.deepEqual([s.hold, s.rules, s.gate.built], [true, true, true]);
-  s = run([ev2("search.done", { count: 1 }, "hotel-b", { draftId: "d9" }), ev2("policy.decided", { outcome: "REJECT", reasons: ["STOCK_TAKEN"] }, "hotel-b"), ev2("stock.denied", { productId: "470746", remaining: 2 }, "hotel-b")], s);
+  assert.equal(otherBuyer(s, { type: "search.done", buyerId: "hotel-b" }), true);
+  assert.equal(otherBuyer(s, { type: "search.done", buyerId: "hotel-a" }), false);
+  assert.equal(otherBuyer(s, { type: "clock.set", buyerId: "admin" }), false);
+  s = run(theirs(), s);
   assert.equal(s.agent.at, "home");
   assert.equal(s.door.stamp, null);
-  assert.ok(s.rival && s.flash);
-  assert.equal(s.shelves.find((x) => x.productId === "470746").remaining, 2);
-  assert.match(s.log.at(-2).plain, /^Another hotel: refused, STOCK_TAKEN/);
+  assert.ok(s.rival);
+  assert.equal(s.flash, null, "no red flash in Live for another kitchen");
+  assert.equal(s.shelves.find((x) => x.productId === "470746"), undefined);
+  assert.deepEqual(s.log.slice(-3).map((l) => [l.text.startsWith("another hotel · "), l.plain]), [[true, null], [true, null], [true, null]]);
+
+  let story = run(theirs(), { ...liveState("hotel-a"), quietRivals: false });
+  assert.ok(story.rival && story.flash);
+  assert.equal(story.shelves.find((x) => x.productId === "470746").remaining, 2);
+  assert.match(story.log.at(-2).plain, /^Another hotel: refused, STOCK_TAKEN/);
+});
+
+test("live: dozens of visitor kitchens ordering at once leave our kitchen alone, start at most one letter per 6 s and keep the ticker short", () => {
+  let s = liveState("hotel-a");
+  const starts = new Set();
+  let t = 0;
+  for (let k = 0; k < 40; k++) {
+    const buyerId = `visitor-${String(k).padStart(8, "0")}`;
+    for (const [type, data] of [["search.done", { count: 3 }], ["quote.created", { offers: [{ netCents: 1000 }], rejections: [] }], ["policy.decided", { outcome: k % 3 ? "AUTO" : "REJECT", reasons: k % 3 ? [] : ["OVER_ORDER_HARD"] }], ["order.accepted", { netCents: 1000 }]]) {
+      s = reduce(s, { seq: ++seq, ts: "2026-11-13T21:10:00+02:00", type, buyerId, data }, (t += 0.05));
+      if (s.rival) starts.add(s.rival.since);
+    }
+  }
+  const [first, second, ...more] = [...starts];
+  assert.ok(first === 0.05 && second - first >= 6 && more.length === 0, `letters started at ${[...starts].join(", ")} s`);
+  assert.equal(s.flash, null);
+  assert.deepEqual([s.agent.at, s.door.stamp, s.draft, s.quote], ["home", null, null, null]);
+  assert.ok(s.log.length <= 9 && s.log.every((l) => l.plain === null));
 });
 
 test("plain: Live captions are plain words, never raw event text", () => {
