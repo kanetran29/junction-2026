@@ -4,27 +4,23 @@ Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 
 ## Ready for Kane's review
 
-Story mới theo `demo/SCRIPT.md` (Kane duyệt "như đề xuất"), có giọng đọc. Mở http://localhost:8790/, bấm Play (nút "Sound on/off" cạnh thanh thời gian). Chưa quay `demo/story.mp4`: Kane xem trên trình duyệt trước.
+Story v2.1 theo `demo/SCRIPT.md` mục 14–15 (Kane duyệt 14/11): một câu chuyện liền, một bếp, một agent, Thứ Sáu → Thứ Hai, có giọng đọc mới. Mở http://localhost:8790/, bấm Play ("Sound on/off" cạnh thanh thời gian). Chưa quay `demo/story.mp4`: Kane xem trên trình duyệt trước.
 
-- Dài **1:48,8** (108,8 s), 9 cảnh: 0:00 yêu cầu · 0:07 không có door · 0:23,8 tua lại, dựng cổng · 0:28,8 cùng câu qua Lazydoor · 0:45,8 giữ chờ duyệt, duyệt, giao hàng · 1:02,8 guardrail (AC13, AC30, AC29) · 1:16,3 ngoại lệ (AC17, AC31, AC20) · 1:31,3 giỏ hàng AC36 và "Which Friday?" · 1:41,8 màn kết.
-- Giọng: Gemini TTS, giọng Charon (`voice.js` của skill hackathon-pitch), 9 đoạn `demo/assets/voice/01–09.mp3` (95,8 s lời). Mỗi đoạn bắt đầu 0,3 s sau đầu cảnh; cảnh = độ dài đoạn + nghỉ (cảnh 5 giữ thêm cho xe giao hàng). Story phát đúng đoạn theo thời gian, tua vẫn khớp.
-- Chữ chỉ ở các vùng của mục 3: Z1 sự kiện, Z2 đồng hồ, Z3 thẻ trên trời phía bếp (chữ chef gõ, yêu cầu có kiểu, phiếu báo giá, hộp duyệt của Kitchen manager, thẻ case; đường mảnh nối tới robot hoặc màn hình), Z4 danh sách trên trời phía phải (reply thô, hàng bị từ chối; đường mảnh nối tới kệ), Z5 con dấu, Z6 biên nhận, Z7 phụ đề. Không còn nhãn nổi, bong bóng hay chip trong cảnh.
-- Agent là robot đưa thư nhỏ (bốn bánh, thân san hô, đầu vàng có màn hình mặt hai mắt, ăng-ten có đèn, phong thư trong túi trước ngực), cỡ vừa dock; đỗ khít trên dock sạc liền chân màn hình bếp, đèn dock xanh khi đỗ, tắt khi đi vắng. Cổng quyết định xong là robot về dock, không chờ xe.
-- Điện thoại dọc: lớp phủ "Rotate for the full scene" che sân khấu và giữ Story lại; xoay ngang thì tự bỏ, hoặc bấm "Watch anyway".
-- Số và chữ theo mục 12–13: câu chef "…in 10-litre boxes if you can.", 7 offer / 28 bị từ chối (20 CUTOFF_PASSED), "+18 more", "Stock unknown: Valio does not stock this product", "CO₂e 1,100 kg (product-group average)", biên nhận "Net 1,010.00 € · Gross 1,146.35 € · Approved by Kitchen manager · Accepted (simulated)", "gluten (AW)" thay "wheat".
+- Dài **1:50** (110,0 s), 11 cảnh theo 11 đoạn lời: 0:00 Thứ Sáu 16:30 không có door · 0:15,6 tối Thứ Sáu dựng cổng · 0:21,8 21:10 cùng câu qua door · 0:38,4 giữ đơn, thư Lazydoor tới điện thoại manager, agent tự duyệt 403 · 0:51,6 gà 190,92 € AUTO, khách sạn kia STOCK_TAKEN · 1:04,4 "Which Friday?" · 1:12,4 Thứ Bảy 10:15 manager duyệt · 1:17,6 sữa yến mạch NEW_ALLERGEN · 1:24,4 Chủ nhật: chia đơn, giỏ 666,00 €, duyệt lúc 17:05 hết hạn · 1:37,4 Thứ Hai giao hàng, biên nhận · 1:44,4 màn kết.
+- Event gateway lấy từ **lần chạy thật** chuỗi 14.6 trên door (52 event, cả 8 bước khớp): `demo/fixtures/story-v2.json`, chỉ giữ thứ hiện trên màn hình (loại event, id, trạng thái, mã lý do, số tiền, số đếm); không có tên sản phẩm, danh sách id ứng viên hay reply thô của Valio. `demo/dev/story-fixture.mjs` tạo lại file này từ `~/junction-2026/.data/story-v2.1-run.json`. `story.mjs` chỉ hẹn giờ cho từng event; đổi fixture mà lệch thứ tự thì test báo ngay.
+- Giọng: Gemini TTS Charon, 11 đoạn `demo/assets/voice/01–11.mp3`, 98,7 s lời (khoảng lặng dài hơn 0,42 s được rút còn 0,42 s để vừa 1:50 mà không phải cắt cảnh 6). Trong input TTS viết "Vah-lee-oh"; Gemini nghe lại là "Valio" (đoạn 1, 3, 8) và "Valeo" (đoạn 4), không còn "Volio".
+- Hình mới: điện thoại của manager trên quầy bếp (đứng trên đế sạc, cờ tên "Kitchen manager", rung và có vòng sáng khi có yêu cầu, ngón tay chạm khi duyệt); phong thư bay vòng qua robot: thẻ luật có chữ ký điện thoại → cổng, "from Lazydoor" cổng → điện thoại, "approved" điện thoại → cổng; bảng luật của bếp với thanh đo tổng ngày tới 1.500 € (vạch 500 € "per order", đơn chờ duyệt kẻ sọc, phần chia đơn 303 € đỏ); pallet "MON 16 NOV" ở bến, thùng được nhận nằm đó tới Thứ Hai; phong thư khách sạn kia bay từ mép trái. Robot đưa thư và dock giữ nguyên từ 956ad2f.
+- Model: event của buyer khác (hotel-b) chỉ vào ticker, dấu ✕ ở khe và kệ "2 left", không kéo robot; tổng ngày suy từ quyết định của door (giỏ hàng = các báo giá từ quyết định trước); duyệt/hết hạn hiện lại thẻ quyết định của đúng đơn đó, kèm "Approved by Kitchen manager" hoặc "Approval expired · APPROVAL_EXPIRED".
 
-Lệch so với kịch bản (lý do):
-1. Z4 đặt trên trời phía trên xe tải đang đỗ (khung 1920×1080: x 1392–1894, y 187–322) thay vì x 1490–1890, y 215–600, vì vùng cũ đè lên xe ở bến (vùng cấm).
-2. Z2 chỉ đổi giờ ở case có giờ thật: AC20 (CN 16:55 → 17:05), "Which Friday?" (T6 13/11 21:10); các case khác giữ T7 10:15.
-3. Đơn trong montage (AC13, AC30, AC31, AC36) không cho xe chạy: thẻ ghi ACCEPTED / một lần duyệt. Nếu cho chạy, xe sẽ nhảy về bến giữa các chuyến chồng nhau và lịch lật sai.
-4. "6 left", "403" và "another hotel" nằm trong thẻ Z3/Z4 (luật chữ chỉ ở vùng); ở khe cổng chỉ có dấu ✕ đỏ, phong thư của khách sạn kia bay vào từ mép trái.
-5. Hộp duyệt "Approver inbox · Kitchen manager" là thẻ Z3 nối tới màn hình bếp (màn hình quá nhỏ để đọc chữ); màn hình rung chuông rồi ✓.
-6. Cảnh 3 "tua ngược": đồng hồ và lịch nhảy về T7 14, kèm phụ đề; không có hiệu ứng tua riêng.
-7. Bản ghi Live mẫu (`fixtures/sample-events.json`) chưa đổi, vẫn là đơn cũ ("bulk boxes preferred", 2 bị từ chối).
+Lệch so với 14.3 (lý do):
+1. Bảng luật của bếp và thanh đo ở góc dưới trái (Z6) thay vì Z2: Z2 trên phải không đủ chỗ cho hai bảng + thanh đo mà Z4 vẫn nằm trên mui xe tải. Z2 giữ bảng luật của Valio ("Valio's rule · cut-off Sun 17:00", đếm ngược, giờ hiện tại); cảnh 1 Z2 chỉ có giờ. Thứ Hai biên nhận thay chỗ bảng luật.
+2. Chữ trên phong thư ("from Lazydoor", "approve", "another hotel", "303.00 €") không vẽ trên phong thư bay (nó bay qua cổng và robot, vùng cấm); tên của từng thư nằm ở Z3/Z7, phong thư khác màu dấu niêm. Ba phong thư chia đơn là ba chip trong bảng luật, chip 303 € rơi vào thanh đo.
+3. Dòng "Approve order · Net 1,010.00 € · Gross 1,146.35 € · Decide within 43 h" là thẻ Z3 nối tới điện thoại (màn hình điện thoại quá nhỏ để đọc); ghi "43 h 50 min" như trang duyệt thật đếm.
+4. "6 left", "STOCK_TAKEN · 2 left" và "403 AGENT_CANNOT_APPROVE" nằm trong thẻ Z3/Z4; ở khe cổng chỉ có dấu ✕.
+5. Lịch bếp dời sang trái (trên đầu chef) và kệ đĩa còn 2 đĩa, nhường đầu phải quầy cho điện thoại manager.
+6. Bản ghi Live mẫu (`fixtures/sample-events.json`) chưa đổi.
 
-Cần Kane nghe: Gemini đọc lại thành "Volio" ở đoạn 2 và 4 (cả hai lần thu), có thể là cách Charon phát âm "Valio"; đoạn 5 câu "The manager approves" lên giọng hơi như câu hỏi (lần thu 2 đọc sai thành "500 dollar" nên giữ lần 1).
-
-Kiểm tra: 37 test pass; `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 s, Live phát hết file mẫu; vật cấm: chef, robot, dock, xe, rào/cột/khung/cánh cổng, biển LAZYDOOR). Đã xem 375×812 (lớp phủ), 812×375 (cả cảnh vừa màn hình), và từng cảnh ở 1080p.
+Kiểm tra: 40 test pass; `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 s và Live; thêm bảng luật, cờ tên điện thoại, biển pallet vào danh sách chữ, điện thoại manager vào vật cấm). Live phát file mẫu không lỗi console.
 
 ## Nhật ký
 
@@ -180,6 +176,12 @@ Vấn đề tìm thấy:
 - Thay robot hút bụi bằng robot đưa thư nhỏ: khung gầm trên bốn bánh, thân san hô có đường ghép và khe thông gió, cổ, đầu vàng có màn hình mặt tối với hai mắt sáng, ăng-ten có đèn tín hiệu; phong thư (màu theo thứ nó mang: nháp, báo giá, biên nhận, bị từ chối, câu hỏi) nằm trong túi trước ngực, thư bay vào khe cổng từ đó.
 - Giữ bề ngang cũ để vừa dock; cao tới đỉnh ăng-ten khoảng 34 đơn vị, thấp hơn đáy màn hình bếp nên khi đỗ không che màn hình (bản cao hơn bị test overlap bắt). Đèn dock dời ra mép trước tấm dock, thấy được khi robot đỗ.
 - Hành vi, timeline Story và giọng đọc không đổi. `label overlaps: 0`, 37 test pass.
+
+### 21. Story v2.1: một câu chuyện liền, event thật từ door, giọng mới
+- `story.mjs` viết lại theo 14.3: 11 cảnh, mốc từ độ dài 11 đoạn giọng; event gateway từ `fixtures/story-v2.json` (lần chạy thật 14.6), timeline gọi `["gw", type]` để lấy event kế tiếp tới loại đó.
+- `model.mjs`: buyer đầu tiên là "của mình", buyer khác chỉ vào ticker/kệ/dấu ✕; tổng ngày (`dayTotal`); `story.hold` + pallet + `story.ship` (đơn nhận nằm pallet tới Thứ Hai); `story.clock`, `story.rules`, `story.mail`, `story.split`, `story.receipt`; draft có `crossCheck: disagreed` thì robot mang câu hỏi về; lệnh gọi Valio kiểm lại đơn (không có draftId) không kéo robot ra cổng.
+- `scene.mjs`: điện thoại manager + cờ tên, phong thư điện thoại ↔ cổng, bảng luật + thanh đo, pallet và biển, thẻ quyết định rộng 470, biên nhận 5 dòng, tối đa 3 thùng bay qua máy quét mỗi báo giá, rào cổng hiện tại chỗ.
+- Test Story viết lại (fixture đặt đủ và đúng thứ tự, thứ tự 14.1, tổng ngày, buyer khác, phong thư, số và chữ, phụ đề ≥ 3 s).
 
 ## Còn lại / cần làm sau
 - Quay `demo/story.mp4` khi Kane duyệt Story mới (ghép giọng từ `VOICE`).

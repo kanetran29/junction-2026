@@ -40,7 +40,10 @@ const collect = () => {
   one("zone4", ".zone-box", "Z4 list");
   one("receipt", ".receipt-box", "receipt");
   one("stampfx", ".banner-box", "decision card");
+  one("rules", ".zone-box", "kitchen's rule board");
   add("logo sign", scene.querySelector('image[href*="valio-aimo-logo"]'));
+  add("manager name flag", scene.querySelector(".nametag"));
+  add("pallet sign", scene.querySelector(".pallet-label"));
   const solid = (id, name) => {
     const before = items.length;
     add(name, scene.querySelector(`[data-id="${id}"]`));
@@ -48,6 +51,7 @@ const collect = () => {
   };
   solid("chef", "chef");
   solid("dock", "robot dock");
+  solid("mphone", "manager phone");
   solid("agent", "agent");
   solid("truck", "truck");
   solid("gate-fence", "gate fence");

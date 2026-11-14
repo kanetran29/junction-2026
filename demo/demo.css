@@ -142,6 +142,7 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .m-garnet { --c: #93395a; }
 .m-petrol { --c: #0f4c5c; }
 .m-phone { --c: #1b2f38; }
+.m-wood { --c: #b07a44; }
 .m-crate0 { --c: #ff9a62; }
 .m-crate1 { --c: #ffe066; }
 .m-crate2 { --c: #8ab4ff; }
@@ -271,17 +272,35 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .confetti[data-hue="3"] { fill: #54e0b0; }
 .confetti[data-hue="4"] { fill: #ffcc33; }
 
-/* Phone: the screen glows in the colour of its state. */
+/* Kitchen terminal (the chef types here) and the kitchen manager's phone (approvals land here): screens glow by state. */
 .phone-screen { fill: #1d4d5c; }
 .phone-notch { fill: #0a1a20; }
-.phone-icon { color: #0a1a20; }
-[data-id="phone"][data-status="idle"] .phone-icon { color: var(--ink-dim); }
-[data-id="phone"][data-status="buzzing"] .phone-screen { fill: var(--hold); }
-[data-id="phone"][data-status="approved"] .phone-screen { fill: var(--auto); }
-[data-id="phone"][data-status="rejected"] .phone-screen { fill: var(--reject); }
-[data-id="phone"][data-status="expired"] .phone-screen { fill: #4a5a62; }
 .ph-buttons { display: none; }
-[data-id="phone"][data-status="buzzing"] .ph-buttons { display: inline; }
+.mphone-screen { fill: #1d4d5c; }
+.mphone-icon { color: #0a1a20; }
+[data-id="mphone"][data-status="buzzing"] .mphone-screen { fill: var(--hold); }
+[data-id="mphone"][data-status="approved"] .mphone-screen { fill: var(--auto); }
+[data-id="mphone"][data-status="rejected"] .mphone-screen { fill: var(--reject); }
+[data-id="mphone"][data-status="expired"] .mphone-screen { fill: #4a5a62; }
+.nametag-box { fill: rgb(3 20 25 / .92); stroke: #5ff4ff; stroke-width: 1.4px; }
+.nametag-text { fill: #fff; font: 700 13px var(--sans); }
+.pallet-label { fill: #13262e; font-family: var(--sans); font-weight: 800; letter-spacing: .04em; }
+.letter[data-kind="signed"] .letter-seal { fill: #13262e; }
+.letter[data-kind="approved"] .letter-seal { fill: var(--auto); }
+
+/* The kitchen's rule board (Z6) with the day-total gauge: accepted solid, held hatched, the Sunday split part in red. */
+.gauge-track { fill: rgb(255 255 255 / .07); stroke: rgb(255 255 255 / .3); stroke-width: 1px; }
+.gauge-accepted { fill: var(--auto); }
+.gauge-pending { fill: url(#hatch-hold); }
+.gauge-ghost { fill: url(#hatch-reject); }
+.gauge-tick { stroke: #fff; stroke-width: 2px; }
+.gauge-label { fill: var(--ink-dim); font: 600 12.5px var(--sans); }
+.gauge-value { fill: #fff; font: 700 14px var(--sans); }
+.rules[data-over] .gauge-value { fill: #ff8f85; }
+.rules[data-over] .zone-box { stroke: var(--reject); }
+.split-text { fill: #fff; font: 600 14px var(--sans); }
+.env-body { fill: #fffaf0; }
+.env-flap { fill: none; stroke: #3a2a1a; stroke-width: 1px; }
 .btn-ok { fill: #0f7a3e; }
 .btn-no { fill: #b01e1e; }
 .pulse-ring { fill: none; stroke: var(--hold); stroke-width: 4px; }

@@ -69,6 +69,8 @@ function overlays(state) {
   }
   const left = countdown(state.now);
   const big = $("hud-countdown");
+  $("hud-rule").hidden = !state.gate.built;
+  big.hidden = !state.gate.built;
   const remaining = !state.now ? "-" : left === "closed" ? "Closed" : left;
   if (big.textContent !== remaining) big.textContent = remaining;
   big.toggleAttribute("data-closed", left === "closed");
