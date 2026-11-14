@@ -41,7 +41,8 @@ const APPROVAL_CHANGES: ReasonCode[] = ['PACK_SIZE_CHANGED', 'SUBSTITUTE', 'SHOR
 /**
  * The policy: weighs the basket (all chosen offers together) against the buyer's signed mandate. Reasons accumulate;
  * any hard limit, lost claim, new allergen (when the mandate forbids it) or expired mandate makes the outcome REJECT,
- * else any approval reason makes it NEEDS_APPROVAL, else AUTO. Pure: the caller supplies the day's committed and held totals.
+ * else any approval reason makes it NEEDS_APPROVAL, else AUTO. The NEW_ALLERGEN branch is defence in depth: the quote
+ * already rejects a substitute that adds an allergen, so it only fires for an offer built elsewhere. Pure: the caller supplies the day's committed and held totals.
  */
 export function decide(i: DecideInput): Decision {
   const { mandate: m } = i;

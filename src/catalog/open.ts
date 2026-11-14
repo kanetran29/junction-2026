@@ -16,8 +16,11 @@ export interface ResolveReply {
 }
 
 const MAX_CANDIDATES = 20;
+/** A product's display name: English, else Finnish, else its first name, else null. */
 const nameOf = (p: CatalogProduct) => (p.names.find((n) => n.language === 'en') ?? p.names.find((n) => n.language === 'fi') ?? p.names[0])?.value ?? null;
+/** The product facts a resolve reply shows: id, sales unit, content, name and brand. */
 const toProduct = (p: CatalogProduct) => ({ id: p.id, salesUnit: p.salesUnit, content: p.nameContent, name: nameOf(p), brand: p.brand });
+/** The short form of a product listed as one of several candidates for an ambiguous input. */
 const toCandidate = (p: CatalogProduct) => ({ id: p.id, salesUnit: p.salesUnit, name: nameOf(p) });
 
 /** True when `a` and `b` are at most one insertion, deletion or substitution apart (Levenshtein distance 1). */

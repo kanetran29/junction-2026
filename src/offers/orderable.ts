@@ -12,6 +12,7 @@ export type Orderable =
   | { ok: true; limit: number | null; closingTime: string; deliveryDate: string }
   | { ok: false; code: ReasonCode; detail: string };
 
+/** A failed orderability check with its reason code and a human detail. */
 const no = (code: ReasonCode, detail: string): Orderable => ({ ok: false, code, detail });
 
 /**

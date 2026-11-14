@@ -59,7 +59,9 @@ async function approve(s: Session, orderId: string): Promise<Json> {
   return http(`/approve/${await tokenOf(s, orderId)}`, { method: 'POST' });
 }
 
+/** The reason codes of an order reply's decision, in order. */
 const codes = (r: Json): string[] => (r.decision?.reasons ?? []).map((x: Json) => x.code);
+/** The rejection code a quote gave one product, or undefined when it did not reject it. */
 const rejection = (q: Json, productId: string) => (q.rejections ?? []).find((x: Json) => x.productId === productId)?.code;
 
 /** A scenario: its name, what the gateway must do, and a run that returns the failed expectations (none = PASS). */

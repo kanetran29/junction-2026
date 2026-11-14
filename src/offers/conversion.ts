@@ -10,7 +10,9 @@ export interface Quantity {
 
 type ContentSource = { nameContent: NameContent | null; unitsPerSales: number | null };
 
+/** Rounds `x` to `dp` decimal places (`Math.round`). */
 const round = (x: number, dp: number) => Math.round(x * 10 ** dp) / 10 ** dp;
+/** Whether `a` is within 2 % of `b` (relative to `b`). */
 const within2 = (a: number, b: number) => Math.abs(a - b) / b < 0.02;
 
 /**

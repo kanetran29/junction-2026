@@ -53,7 +53,9 @@ export function normBrand(s: string | null | undefined): string {
     .join('');
 }
 
+/** Parses a JSON column read from D1 as text, or returns `fallback` when the column is NULL. */
 const json = <T>(v: string | number | null, fallback: T): T => (v === null ? fallback : (JSON.parse(String(v)) as T));
+/** A numeric D1 column (which may arrive as text) as a number, or null when the column is NULL. */
 const num = (v: string | number | null): number | null => (v === null ? null : Number(v));
 
 /** Turns one D1 `products` row (JSON columns as text) back into a CatalogProduct. */

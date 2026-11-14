@@ -162,6 +162,7 @@ export const limitKey = (l: Pick<OfferLine, 'productId' | 'deliveryDate'>) => `$
 
 /** Sums needed units per product and delivery day, with the limit Valio showed at commit. */
 function toChecks(lines: OfferLine[], limits: Map<string, number | null>): Check[] {
+  /** Valio's limit for a line's product and day; 0 when it was not read (not orderable). */
   const limitOf = (l: OfferLine) => (limits.has(limitKey(l)) ? limits.get(limitKey(l))! : 0);
   const m = new Map<string, Check>();
   for (const l of lines) {

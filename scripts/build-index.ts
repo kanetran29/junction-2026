@@ -28,6 +28,7 @@ interface RawProduct {
 }
 
 const UNIT_FACTORS: Record<string, [number, 'l' | 'kg']> = { l: [1, 'l'], dl: [0.1, 'l'], cl: [0.01, 'l'], ml: [0.001, 'l'], kg: [1, 'kg'], g: [0.001, 'kg'] };
+/** Rounds to 6 decimals (tames float noise in name-derived totals). */
 const round6 = (x: number) => Math.round(x * 1e6) / 1e6;
 
 /** Parses the first content statement in a product name ("1 l", "2,5 dl", "100x2 cl", "10 kg") into size, count and a litre/kilo total. */
@@ -51,6 +52,7 @@ function csvMap(csv: string): Map<string, number> {
   return out;
 }
 
+/** The ids of a raw product's classification group `name` (optionally only values with `unit`), as stored in the index. */
 const groupIds = (p: RawProduct, name: string, unit?: string): string[] =>
   (p.synkkaData.classifications ?? []).filter((g) => g.name === name).flatMap((g) => g.values.filter((v) => !unit || v.unit === unit).map((v) => v.id));
 
@@ -123,6 +125,7 @@ export function buildRows(products: RawProduct[], reliabilityCsv: string, carbon
   });
 }
 
+/** One SQL literal: NULL, a number, a boolean as 0/1, or a quoted string (objects as JSON text). */
 const lit = (v: string | number | boolean | null | object): string => {
   if (v === null) return 'NULL';
   if (typeof v === 'number') return String(v);
@@ -135,6 +138,7 @@ const lit = (v: string | number | boolean | null | object): string => {
  * statement size limit: one for `products` (INSERT OR REPLACE) and one set for the per-packaging-level `product_gtins`.
  */
 export function insertStatements(rows: CatalogProduct[], maxChars = 60_000): string[] {
+  /** Splits `tuples` into INSERT statements under `head`, each at most `maxChars` long. */
   const pack = (head: string, tuples: string[]): string[] => {
     const out: string[] = [];
     let cur: string[] = [];

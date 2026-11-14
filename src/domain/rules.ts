@@ -10,6 +10,7 @@ export interface Decision {
   constants: Record<string, unknown>;
 }
 
+/** One decision-register entry owned by the seller (the gateway), with no model involved. */
 const seller = (id: string, rule: string, constants: Record<string, unknown> = {}): Decision => ({ id, rule, owner: 'seller', model: false, constants });
 
 /**

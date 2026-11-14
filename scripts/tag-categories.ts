@@ -40,6 +40,7 @@ export function parseCategoriesSql(sql: string): (CategoryTag & { tagSource: 're
   return [...sql.matchAll(/\('(\d+)','((?:[^']|'')*)','(reviewed|model)'\)/g)].map((m) => ({ category: m[1], name: m[2].replaceAll("''", "'"), tagSource: m[3] as 'reviewed' | 'model' }));
 }
 
+/** A SQL string literal with single quotes doubled. */
 const sqlStr = (s: string): string => `'${s.replaceAll("'", "''")}'`;
 
 /** Renders the rows as one DELETE plus one multi-row INSERT for `category_names`. */
