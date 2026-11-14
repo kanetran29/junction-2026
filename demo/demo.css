@@ -419,11 +419,11 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .inside-section h2 { font: 800 clamp(20px, 2.4vw, 28px)/1.2 var(--sans); color: #fff; margin: 0 0 12px; letter-spacing: -.01em; }
 .inside-page .punchline { font: 800 clamp(24px, 3.4vw, 40px)/1.15 var(--sans); color: var(--brand); margin: 0 0 10px; letter-spacing: -.02em; }
 .inside-page .lede { margin: 0 0 8px; max-width: 70ch; }
-.flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; counter-reset: step; }
+.flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 22px; counter-reset: step; }
 .flow li { position: relative; padding: 12px; border: 1px solid #1d5e6c; border-radius: var(--radius); background: rgb(6 34 42 / .7); font-size: 14px; color: var(--ink-dim); counter-increment: step; }
 .flow li b { display: block; color: #fff; font-size: 15px; margin-bottom: 4px; }
 .flow li b::before { content: counter(step) ". "; color: var(--brand-soft); }
-.flow li:not(:last-child)::after { content: "→"; position: absolute; right: -10px; top: 50%; transform: translate(50%, -50%); color: var(--brand-soft); font-weight: 800; }
+.flow li:not(:last-child)::after { content: "→"; position: absolute; z-index: 1; right: -11px; top: 50%; transform: translate(50%, -50%); color: var(--brand-soft); font-size: 18px; font-weight: 800; line-height: 1; }
 .flow-note { margin: 12px 0 0; color: var(--ink); font-weight: 600; }
 .guard-table { width: 100%; border-collapse: collapse; font-size: 15px; }
 .guard-table th, .guard-table td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid #1d5e6c; overflow-wrap: anywhere; }
@@ -458,7 +458,7 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .inside-page a { color: var(--brand-soft); }
 @media (max-width: 900px) {
   .flow { grid-template-columns: 1fr; }
-  .flow li:not(:last-child)::after { content: "↓"; right: auto; left: 50%; top: auto; bottom: -10px; transform: translate(-50%, 50%); }
+  .flow li:not(:last-child)::after { content: "↓"; right: auto; left: 50%; top: auto; bottom: -11px; transform: translate(-50%, 50%); }
   .live-checks > li { grid-template-columns: 1fr; }
   .endpoint-list { padding-left: 0; }
   .inside-rows { grid-template-columns: 1fr; gap: 2px; }
