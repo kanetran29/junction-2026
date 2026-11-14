@@ -14,6 +14,8 @@ fi
 for f in .dev.vars "$HOME"/.config/junction2026/*.env; do
   [ -f "$f" ] || continue
   while IFS='=' read -r name value; do
+    name="${name#export}"
+    name="${name#"${name%%[![:space:]]*}"}"
     [ "$name" = "ADMIN_KEY" ] && [ "$f" = ".dev.vars" ] && continue
     value="${value%\"}"
     value="${value#\"}"
@@ -22,7 +24,7 @@ for f in .dev.vars "$HOME"/.config/junction2026/*.env; do
       echo "check-secrets: the value of $name is in: $files" >&2
       fail=1
     fi
-  done < <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$f")
+  done < <(grep -E '^(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*=' "$f")
 done
 
 exit "$fail"
