@@ -469,3 +469,35 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
   .guard-table td { border-bottom: 0; padding-top: 0; }
   .guard-table td::before { content: attr(data-label) ": "; color: var(--ink-dim); font-family: var(--sans); font-weight: 700; }
 }
+
+/* "Try it" under Live: you are the chef; when the door holds the order, you are the kitchen manager. */
+.try-panel { border: 1px solid #1d5e6c; border-radius: var(--radius); padding: 16px; background: rgb(3 20 25 / .6); color: var(--ink); }
+.try-panel[hidden], .try-panel[data-off] { display: none; }
+body.kiosk .try-panel { display: none; }
+.try-panel h2 { font: 800 20px/1.2 var(--sans); color: #fff; margin: 0 0 6px; }
+.try-note { margin: 0 0 12px; color: var(--ink-dim); font-size: 14px; }
+.try-form { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: end; }
+.try-label { grid-column: 1 / -1; font-size: 13px; color: var(--ink-dim); }
+.try-input { min-width: 0; font: 15px var(--sans); color: var(--ink); background: var(--petrol-900); border: 1px solid #1d5e6c; border-radius: var(--radius); padding: 10px 12px; }
+.try-send, .try-choice, .try-decide, .try-back, .try-chip { font: 600 14px var(--sans); color: var(--ink); background: var(--petrol-900); border: 1px solid #1d5e6c; border-radius: var(--radius); padding: 10px 16px; cursor: pointer; }
+.try-send { background: var(--brand-strong); border-color: var(--brand-strong); color: #fff; }
+.try-send:disabled, .try-decide:disabled { opacity: .55; cursor: default; }
+.try-input:focus-visible, .try-panel button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.try-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+.try-chip { font-weight: 500; font-size: 13px; padding: 6px 12px; border-radius: 999px; text-align: left; }
+.try-result { margin-top: 14px; }
+.try-box { border: 1px solid #1d5e6c; border-left-width: 4px; border-radius: var(--radius); padding: 12px 14px; }
+.try-box[data-tone="auto"] { border-left-color: var(--auto); }
+.try-box[data-tone="hold"] { border-left-color: var(--hold); }
+.try-box[data-tone="reject"] { border-left-color: var(--reject); }
+.try-box[data-kind="held"] { background: rgb(255 176 46 / .08); }
+.try-title { margin: 0 0 4px; font-weight: 700; color: #fff; }
+.try-box[data-tone="auto"] .try-title { color: #7dffb0; }
+.try-box[data-tone="reject"] .try-title { color: #ff8f85; }
+.try-line { margin: 2px 0; font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
+.try-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.try-decide.approve { background: #0f7a3e; border-color: #0f7a3e; color: #fff; }
+.try-decide.reject { background: #8c1d1d; border-color: #8c1d1d; color: #fff; }
+.try-back { margin-top: 10px; background: transparent; }
+.try-back[hidden] { display: none; }
+@media (max-width: 480px) { .try-form { grid-template-columns: 1fr; } .try-send { width: 100%; } }

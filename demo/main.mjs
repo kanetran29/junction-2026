@@ -9,6 +9,7 @@ import { buildScene } from "./scene.mjs";
 import { STRENGTHS, PAGE_ONLY, CONNECT_LINE } from "./compare.mjs";
 import { mountInside } from "./inside-view.mjs";
 import { runCheck, CHECKS } from "./inside.mjs";
+import { mountTry } from "./try-view.mjs";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -32,7 +33,8 @@ const story = { t: 0, next: 0, state: initialState(), playing: false, snap: true
 /** Live watches the door at ?gateway= (a local preview against the deployed door) or the page's own origin, and follows ?buyer=. */
 const GATEWAY = params.get("gateway") || location.origin;
 const BUYER = params.get("buyer") || "hotel-a";
-const live = { state: liveState(BUYER), t0: performance.now() / 1000, abort: null, queue: [], nextAt: 0, lines: [], caption: "", captionUntil: 0, snap: false };
+const live = { state: liveState(BUYER), t0: performance.now() / 1000, abort: null, queue: [], nextAt: 0, lines: [], caption: "", captionUntil: 0, snap: false, following: BUYER, recent: [], lastSeq: 0, tryFrom: 0 };
+let tryMounted = false;
 const voice = { audio: new Audio(), seg: -1, muted: store.get("muted") === "1" };
 
 /** An element with a class and text (never markup), for the comparison built from compare.mjs. */
@@ -249,6 +251,8 @@ async function checkAudit() {
 /** Queues a live event (the door often sends several in the same instant) and re-checks the audit chain after order events. */
 const onLive = (ev) => {
   live.queue.push(ev);
+  live.recent = [...live.recent.slice(-299), ev];
+  if (typeof ev.seq === "number") live.lastSeq = Math.max(live.lastSeq, ev.seq);
   if (ORDER_EVENTS.has(ev.type)) checkAudit();
 };
 
@@ -271,13 +275,28 @@ function paceLive(t) {
 }
 
 /**
+ * Points the scene at another buyer: a visitor's sandbox during "Try it" (its events since the try started are played
+ * again for it), or back to the kitchen (null). The door's clock carries over; the kitchen's rule board shows only for it.
+ */
+function followBuyer(buyerId) {
+  const target = buyerId ?? BUYER;
+  if (target === live.following && buyerId !== null) return;
+  const clock = { now: live.state.now, clockSet: live.state.clockSet };
+  live.following = target;
+  document.body.dataset.follow = target;
+  live.state = { ...liveState(target), ...clock, rules: target === BUYER };
+  live.queue = buyerId === null ? [] : live.recent.filter((ev) => ev.seq > live.tryFrom);
+  Object.assign(live, { snap: true, lines: [], caption: buyerId === null ? "Watching Hotel Aurora's kitchen again." : "Your order, as the door sees it.", captionUntil: 0 });
+}
+
+/**
  * (Re)connects to the door: reads its event log once and starts after the newest event, keeping only the door's clock
  * from the past (no burst of old animations), then follows new events as they come. Retries while the door is down.
  */
 async function connect() {
   live.abort?.abort();
   const ctl = (live.abort = new AbortController());
-  Object.assign(live, { state: liveState(BUYER), t0: performance.now() / 1000, queue: [], nextAt: 0, lines: [], caption: "Watching the door. Waiting for an agent…", captionUntil: 0, snap: true });
+  Object.assign(live, { state: liveState(BUYER), t0: performance.now() / 1000, queue: [], nextAt: 0, lines: [], caption: "Watching the door. Waiting for an agent…", captionUntil: 0, snap: true, following: BUYER, recent: [] });
   status("connecting");
   let since = 0;
   for (;;) {
@@ -302,6 +321,11 @@ function setMode(next) {
   document.querySelectorAll(".modes button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
   $("story-controls").hidden = mode !== "story";
   $("live-note").hidden = mode !== "live";
+  $("try-panel").hidden = mode !== "live" || kiosk;
+  if (mode === "live" && !kiosk && !tryMounted) {
+    tryMounted = true;
+    mountTry({ root: $("try-panel"), base: GATEWAY, follow: followBuyer, started: () => (live.tryFrom = live.lastSeq) });
+  }
   $("stage").hidden = PAGES.includes(mode);
   $("compare-page").hidden = mode !== "compare";
   $("inside-page").hidden = mode !== "inside";

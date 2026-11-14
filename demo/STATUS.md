@@ -244,6 +244,13 @@ Vấn đề tìm thấy:
 - `dev/fake-gateway.mjs --door URL` chuyển các route công khai đó sang door thật (phía server), để xem kết quả thật ở máy. Story không đổi.
 - Test: 58 pass với Playwright (từng file một), 55 + 3 bỏ qua khi không có; `label overlaps: 0`. Trên door đang chạy lúc này: rules (14: 11 seller, 2 buyer, 1 approver) và reason codes (35) có kết quả; audit (401), jwks và discovery (404) hiện "Coming with the next deploy" tới lần deploy tới.
 
+### 32. "Try it" trong Live: khách là chef, rồi là kitchen manager
+- Dưới sân khấu Live (ẩn trong kiosk): "Try it: you are the chef", ô nhập có nhãn (tối đa 200 ký tự), nút Send, 4 chip mẫu điền vào ô, vùng kết quả `aria-live`. Gọi `POST /v1/try` (theo hợp đồng của session build) và `POST /v1/try/decision`, không key.
+- Kết quả (`try.mjs` `viewOf`): needs_input → câu hỏi "Gemini read Fri 13 Nov, Gemma read Fri 20 Nov" với hai nút gửi `answer`; no_offer → "No offer: every candidate was refused." với các mã từ chối nhiều nhất; ACCEPTED → dòng xanh có giá net và "On the pallet for delivery day"; REJECTED → dòng đỏ, mỗi mã kèm câu của nó từ `/v1/reason-codes`; HELD → thẻ "You are the kitchen manager" (net, gross, lý do giữ, hạn), nút Approve/Reject, rồi trạng thái cuối (ACCEPTED, REJECTED, EXPIRED, PRICE_CHANGED nếu có). 400 → "Type a request of 1 to 200 characters."; 429 → "Busy: try again in N s"; 404 → ẩn cả khung.
+- Trong lúc thử, cảnh đi theo buyer sandbox của khách (`visitor-…`): event của lần thử được phát lại cho buyer đó, Aurora thành "another hotel", bảng luật của Aurora ẩn; nút "Back to Hotel Aurora" trả cảnh về `hotel-a`. Visitor và buyerId giữ trong `sessionStorage` (bọc try/catch).
+- `dev/fake-gateway.mjs`: hai route đó, trả lời cố định theo câu (Friday → needs_input rồi ACCEPTED, oat → no_offer, milk → HELD 1.010,00 € rồi duyệt/từ chối, còn lại → AUTO), giới hạn 8 lần/phút → 429, `--no-try` → 404; event ghi dưới buyer sandbox.
+- Test: 63 pass với Playwright (từng file một), 58 + 5 bỏ qua khi không có; `label overlaps: 0`; 375 px không cuộn ngang.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).
