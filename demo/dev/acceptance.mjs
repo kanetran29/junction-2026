@@ -1,6 +1,6 @@
 // Writes demo/acceptance.json from research/acceptance/cases.json, for the site's AC chips and Inside's "Acceptance cases":
-// per case its id, title, rubric, the API calls it makes and how many checks it runs; plus the last run on the deployed
-// door (passed, total, version, date) when a run file is given. Nothing else from the cases (no inputs, no product data).
+// per case its id, title, rubric, the API calls it makes and how many checks it runs (as the run counted them, when it
+// did); plus the last run on the deployed door (passed, total, version, date) when a run file is given. Nothing else from the cases (no inputs, no product data).
 // Usage: node demo/dev/acceptance.mjs [last-run.json]   (default ~/junction-2026/.data/acceptance-last-run.json when it exists)
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
@@ -12,6 +12,12 @@ const OUT = `${ROOT}demo/acceptance.json`;
 
 /** "controls 20" (a rubric key and its judging weight) as "controls". */
 const rubricKey = (r) => String(r).split(/\s+/)[0];
+
+/** Case `id`'s own entry in `run` (an array of { id, ... } under results or cases), or null. */
+function runCase(run, id) {
+  const results = run?.results ?? run?.cases;
+  return Array.isArray(results) ? results.find((x) => x?.id === id) ?? null : null;
+}
 
 /**
  * Whether case `id` passed in `run`: from its per-case results when the run lists them (an array of { id, ok|pass|passed }
@@ -39,7 +45,7 @@ export function buildAcceptance(source, run = null) {
       title: c.title,
       rubric: (c.rubric ?? []).map(rubricKey),
       calls: [...new Set(steps.map((s) => s.call).filter(Boolean))],
-      checks: steps.reduce((n, s) => n + (s.expect?.length ?? 0), 0),
+      checks: Number.isFinite(runCase(run, c.id)?.checks) ? runCase(run, c.id).checks : steps.reduce((n, s) => n + (s.expect?.length ?? 0), 0),
       ...(pass === null ? {} : { pass }),
     };
   });

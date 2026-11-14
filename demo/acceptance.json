@@ -1,6 +1,11 @@
 {
   "source": "research/acceptance/cases.json",
-  "run": null,
+  "run": {
+    "passed": 63,
+    "total": 63,
+    "version": "e48a8c55-f64f-471f-a52f-4681cd8973e4",
+    "date": "2026-11-15"
+  },
   "cases": [
     {
       "id": "AC01",
@@ -18,7 +23,8 @@
         "approve",
         "get_receipt"
       ],
-      "checks": 22
+      "checks": 22,
+      "pass": true
     },
     {
       "id": "AC02",
@@ -30,7 +36,8 @@
       "calls": [
         "search_products"
       ],
-      "checks": 5
+      "checks": 5,
+      "pass": true
     },
     {
       "id": "AC03",
@@ -43,7 +50,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 9
+      "checks": 9,
+      "pass": true
     },
     {
       "id": "AC04",
@@ -55,7 +63,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 6
+      "checks": 6,
+      "pass": true
     },
     {
       "id": "AC05",
@@ -69,7 +78,8 @@
         "quote",
         "place_order"
       ],
-      "checks": 7
+      "checks": 7,
+      "pass": true
     },
     {
       "id": "AC06",
@@ -82,7 +92,8 @@
         "quote",
         "place_order"
       ],
-      "checks": 10
+      "checks": 10,
+      "pass": true
     },
     {
       "id": "AC07",
@@ -93,7 +104,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC08",
@@ -104,7 +116,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC09",
@@ -117,7 +130,8 @@
         "quote",
         "place_order"
       ],
-      "checks": 9
+      "checks": 9,
+      "pass": true
     },
     {
       "id": "AC10",
@@ -129,7 +143,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC11",
@@ -141,7 +156,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC12",
@@ -152,7 +168,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC13",
@@ -165,7 +182,8 @@
         "quote",
         "place_order"
       ],
-      "checks": 3
+      "checks": 3,
+      "pass": true
     },
     {
       "id": "AC14",
@@ -176,7 +194,8 @@
       "calls": [
         "quote_and_place"
       ],
-      "checks": 4
+      "checks": 4,
+      "pass": true
     },
     {
       "id": "AC15",
@@ -188,7 +207,8 @@
       "calls": [
         "quote_and_place_concurrently"
       ],
-      "checks": 3
+      "checks": 3,
+      "pass": true
     },
     {
       "id": "AC16",
@@ -200,7 +220,8 @@
         "quote",
         "place_order"
       ],
-      "checks": 3
+      "checks": 3,
+      "pass": true
     },
     {
       "id": "AC17",
@@ -212,7 +233,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 3
+      "checks": 3,
+      "pass": true
     },
     {
       "id": "AC18",
@@ -224,7 +246,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC19",
@@ -237,7 +260,8 @@
         "quote",
         "place_order"
       ],
-      "checks": 5
+      "checks": 5,
+      "pass": true
     },
     {
       "id": "AC20",
@@ -253,7 +277,8 @@
         "approve",
         "get_order"
       ],
-      "checks": 4
+      "checks": 4,
+      "pass": true
     },
     {
       "id": "AC21",
@@ -266,7 +291,8 @@
         "quote",
         "place_order_twice"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC22",
@@ -279,7 +305,8 @@
         "place_order",
         "approve"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC23",
@@ -292,7 +319,8 @@
         "quote",
         "place_order"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC24",
@@ -306,7 +334,8 @@
         "quote",
         "place_order"
       ],
-      "checks": 4
+      "checks": 4,
+      "pass": true
     },
     {
       "id": "AC25",
@@ -318,7 +347,8 @@
         "quote",
         "get_quote_as"
       ],
-      "checks": 1
+      "checks": 1,
+      "pass": true
     },
     {
       "id": "AC26",
@@ -330,7 +360,8 @@
         "http_get",
         "mcp_list_tools"
       ],
-      "checks": 15
+      "checks": 15,
+      "pass": true
     },
     {
       "id": "AC27",
@@ -342,7 +373,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 3
+      "checks": 3,
+      "pass": true
     },
     {
       "id": "AC28",
@@ -353,7 +385,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 4
+      "checks": 4,
+      "pass": true
     },
     {
       "id": "AC29",
@@ -367,7 +400,8 @@
         "approve_as_agent",
         "get_order"
       ],
-      "checks": 5
+      "checks": 5,
+      "pass": true
     },
     {
       "id": "AC30",
@@ -378,7 +412,8 @@
       "calls": [
         "quote_and_place"
       ],
-      "checks": 5
+      "checks": 5,
+      "pass": true
     },
     {
       "id": "AC31",
@@ -390,7 +425,8 @@
       "calls": [
         "quote_and_place_concurrently"
       ],
-      "checks": 7
+      "checks": 7,
+      "pass": true
     },
     {
       "id": "AC32",
@@ -402,7 +438,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 6
+      "checks": 6,
+      "pass": true
     },
     {
       "id": "AC33",
@@ -416,7 +453,8 @@
         "quote_and_place",
         "place_order"
       ],
-      "checks": 5
+      "checks": 5,
+      "pass": true
     },
     {
       "id": "AC34",
@@ -429,7 +467,8 @@
         "quote_and_place",
         "approve"
       ],
-      "checks": 7
+      "checks": 7,
+      "pass": true
     },
     {
       "id": "AC35",
@@ -444,7 +483,8 @@
         "set_replay_variant",
         "approve"
       ],
-      "checks": 3
+      "checks": 3,
+      "pass": true
     },
     {
       "id": "AC36",
@@ -460,7 +500,8 @@
         "approve",
         "get_receipt"
       ],
-      "checks": 16
+      "checks": 16,
+      "pass": true
     },
     {
       "id": "AC37",
@@ -473,7 +514,8 @@
         "quote_basket",
         "place_basket"
       ],
-      "checks": 5
+      "checks": 5,
+      "pass": true
     },
     {
       "id": "AC38",
@@ -486,7 +528,8 @@
         "quote_basket",
         "place_basket"
       ],
-      "checks": 6
+      "checks": 6,
+      "pass": true
     },
     {
       "id": "AC39",
@@ -500,7 +543,8 @@
         "quote_and_place",
         "place_basket"
       ],
-      "checks": 6
+      "checks": 6,
+      "pass": true
     },
     {
       "id": "AC40",
@@ -512,7 +556,8 @@
         "quote_basket",
         "place_basket"
       ],
-      "checks": 4
+      "checks": 4,
+      "pass": true
     },
     {
       "id": "AC41",
@@ -524,7 +569,8 @@
       "calls": [
         "resolve"
       ],
-      "checks": 4
+      "checks": 4,
+      "pass": true
     },
     {
       "id": "AC42",
@@ -536,7 +582,8 @@
       "calls": [
         "resolve"
       ],
-      "checks": 4
+      "checks": 4,
+      "pass": true
     },
     {
       "id": "AC43",
@@ -548,7 +595,8 @@
         "resolve",
         "quote"
       ],
-      "checks": 10
+      "checks": 10,
+      "pass": true
     },
     {
       "id": "AC44",
@@ -560,7 +608,8 @@
       "calls": [
         "interpret"
       ],
-      "checks": 3
+      "checks": 3,
+      "pass": true
     },
     {
       "id": "AC45",
@@ -572,7 +621,8 @@
       "calls": [
         "list_families"
       ],
-      "checks": 7
+      "checks": 7,
+      "pass": true
     },
     {
       "id": "AC46",
@@ -584,7 +634,8 @@
       "calls": [
         "quote"
       ],
-      "checks": 3
+      "checks": 3,
+      "pass": true
     },
     {
       "id": "AC47",
@@ -596,7 +647,8 @@
       "calls": [
         "http_get"
       ],
-      "checks": 5
+      "checks": 5,
+      "pass": true
     },
     {
       "id": "AC48",
@@ -610,7 +662,8 @@
         "place_order_without_key",
         "place_order_same_key_other_body"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC49",
@@ -622,7 +675,8 @@
         "quote",
         "place_order"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC50",
@@ -636,7 +690,8 @@
         "verify_offer_jws",
         "http_get"
       ],
-      "checks": 8
+      "checks": 8,
+      "pass": true
     },
     {
       "id": "AC51",
@@ -649,7 +704,8 @@
         "quote",
         "place_order_with_jws"
       ],
-      "checks": 5
+      "checks": 5,
+      "pass": true
     },
     {
       "id": "AC52",
@@ -664,7 +720,8 @@
         "approve",
         "verify_receipt_jws"
       ],
-      "checks": 8
+      "checks": 8,
+      "pass": true
     },
     {
       "id": "AC53",
@@ -678,7 +735,8 @@
         "audit_verify",
         "all_events"
       ],
-      "checks": 7
+      "checks": 7,
+      "pass": true
     },
     {
       "id": "AC54",
@@ -691,7 +749,8 @@
         "tamper_and_verify",
         "reset_and_verify"
       ],
-      "checks": 6
+      "checks": 6,
+      "pass": true
     },
     {
       "id": "AC55",
@@ -702,7 +761,8 @@
       "calls": [
         "http_get"
       ],
-      "checks": 9
+      "checks": 9,
+      "pass": true
     },
     {
       "id": "AC56",
@@ -714,7 +774,8 @@
       "calls": [
         "try"
       ],
-      "checks": 5
+      "checks": 5,
+      "pass": true
     },
     {
       "id": "AC57",
@@ -727,7 +788,8 @@
         "try",
         "try_decision"
       ],
-      "checks": 4
+      "checks": 4,
+      "pass": true
     },
     {
       "id": "AC58",
@@ -739,7 +801,8 @@
         "try",
         "try_decision"
       ],
-      "checks": 2
+      "checks": 2,
+      "pass": true
     },
     {
       "id": "AC59",
@@ -753,7 +816,8 @@
         "try_decision",
         "try_decision_as_agent"
       ],
-      "checks": 6
+      "checks": 6,
+      "pass": true
     },
     {
       "id": "AC60",
@@ -764,7 +828,8 @@
       "calls": [
         "try_raw"
       ],
-      "checks": 3
+      "checks": 3,
+      "pass": true
     },
     {
       "id": "AC61",
@@ -776,7 +841,8 @@
       "calls": [
         "try"
       ],
-      "checks": 4
+      "checks": 4,
+      "pass": true
     },
     {
       "id": "AC62",
@@ -789,7 +855,8 @@
         "try_raw",
         "try"
       ],
-      "checks": 6
+      "checks": 6,
+      "pass": true
     },
     {
       "id": "AC63",
@@ -801,7 +868,8 @@
       "calls": [
         "try"
       ],
-      "checks": 7
+      "checks": 7,
+      "pass": true
     }
   ]
 }

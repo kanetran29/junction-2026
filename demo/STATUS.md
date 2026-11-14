@@ -304,6 +304,11 @@ Vấn đề tìm thấy:
 - Inside có mục "Acceptance cases" sau Proof: 5 nhóm theo rubric đầu tiên của case (End-to-end demo 3, The user's need 11, Controls 25, Exceptions 17, Openness 7), mỗi nhóm là disclosure đóng sẵn; mỗi case có id, tiêu đề, chip lệnh gọi, số check, dấu pass khi đã đo. `#ac-AC05` mở đúng nhóm, tô sáng case và cuộn tới. Link nguồn research/acceptance/cases.json trên GitHub.
 - Test: 73 pass với Playwright (đồng bộ acceptance.json với cases.json, dấu pass theo run, chip có title và link, 63 case, anchor mở đúng nhóm, 375 px); `label overlaps: 0`.
 
+### 41. Logo Junction; acceptance cases đã đo
+- Logo Junction (Kane: "junction 2026 cũng cần logo"): wordmark trắng mà trang 2026.hackjunction.com tự phục vụ với alt "Junction 2026" (`/logos/junction_wordmark_logo_-_white_no_background.webp`; trang không có bản SVG), giữ nguyên file, ghi vào `NOTICE.md`. Header: thay chữ "Junction 2026" bằng logo (alt "Junction 2026"), cao ngang huy hiệu Valio Aimo (chữ chỉ chiếm một phần ba chiều cao ảnh nên ảnh vẽ cao hơn và lề trong suốt chồng vào khoảng trống). Deck slide 1: dòng cuối là "Valio Aimo, Trusted Trade Agents" + logo; render lại `pitch/out` và tab Deck (`--site`).
+- `demo/acceptance.json` tạo lại từ `~/junction-2026/.data/acceptance-last-run.json`: 63/63 passed ngày 2026-11-15, door version e48a8c55; mỗi case có dấu "✓ passed" và số check theo lần chạy (tổng 333, khớp số expect trong cases.json). Không còn "not yet measured".
+- Test: 73 pass với Playwright; `label overlaps: 0`.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

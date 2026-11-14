@@ -100,11 +100,14 @@ const LAYOUTS = {
   },
 };
 
-const challenge = pitch.challenge.split(" · ").join(", ");
+const parts = pitch.challenge.split(" · ");
+const junction = parts.find((p) => /^Junction\b/.test(p));
+/** Slide 1's footer: the challenge in words, with Junction's own wordmark (demo/assets/logos, see NOTICE.md) for its name. */
+const challenge = `${esc(parts.filter((p) => p !== junction).join(", "))}${junction ? `<img class="junction" src="../demo/assets/logos/junction-wordmark-white.webp" alt="${esc(junction)}">` : ""}`;
 const slides = pitch.slides.map((s, i) => {
   if (!LAYOUTS[s.id]) throw new Error(`no layout for slide ${s.id}`);
   const n = String(i + 1).padStart(2, "0");
-  const left = i === 0 ? `<span>${esc(challenge)}</span>` : "<span></span>";
+  const left = i === 0 ? `<span class="challenge">${challenge}</span>` : "<span></span>";
   return `<section class="slide s-${s.id}" data-id="${s.id}">${LAYOUTS[s.id]()}<footer>${left}<span>${n}</span></footer></section>`;
 });
 

@@ -11,7 +11,7 @@ const SERVER = fileURLToPath(new URL("../dev/fake-gateway.mjs", import.meta.url)
 const PORT = 8774;
 /** playwright-core from PLAYWRIGHT_CORE (or the default resolution); the browser test is skipped when it is not installed. */
 const pw = await import(process.env.PLAYWRIGHT_CORE ?? "playwright-core").catch(() => null);
-const withoutPass = (cases) => cases.map(({ pass, ...c }) => c);
+const withoutPass = (cases) => cases.map(({ pass, checks, ...c }) => c);
 
 test("acceptance.json matches research/acceptance/cases.json (run node demo/dev/acceptance.mjs after editing the cases) and carries no inputs", () => {
   assert.deepEqual(withoutPass(buildAcceptance(source).cases), withoutPass(published.cases));
@@ -31,6 +31,9 @@ test("buildAcceptance: the run's numbers, and pass marks only when the run says 
   assert.ok(all.cases.every((c) => c.pass === true));
   const some = buildAcceptance(source, { passed: 62, total: 63, results: [{ id: "AC05", ok: false }, { id: "AC01", ok: true }] });
   assert.deepEqual(some.cases.filter((c) => "pass" in c).map((c) => [c.id, c.pass]), [["AC01", true], ["AC05", false]]);
+  const counted = buildAcceptance(source, { passed: 63, total: 63, cases: [{ id: "AC01", passed: true, checks: 22 }] });
+  assert.deepEqual([counted.cases[0].checks, counted.cases[0].pass], [22, true], "the run's own check count wins");
+  assert.equal(published.cases.reduce((n, c) => n + c.checks, 0), buildAcceptance(source).cases.reduce((n, c) => n + c.checks, 0), "the published checks add up to the cases' expectations");
   const none = buildAcceptance(source);
   assert.equal(none.run, null);
   assert.ok(none.cases.every((c) => !("pass" in c)), "not yet measured: no pass marks");
