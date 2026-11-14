@@ -70,8 +70,8 @@ describe('interpret', () => {
 
   it('flags a claim the text asks for in words but the model dropped, and never adds it', async () => {
     const lost = { ...milk, claims: [] };
-    for (const text of [MILK, 'Tarvitsen 1000 litraa laktoositonta maitoa', 'gluten-free flour by Monday']) {
-      const d = await interpret(e, { buyerId: 'b1', text }, stub(text.startsWith('gluten') ? { ...lost, claims: [] } : lost).deps);
+    for (const text of [MILK, 'Tarvitsen 1000 litraa laktoositonta maitoa', 'gluten-free flour by Monday', 'laktoosittoman maidon', 'gluteenittomia jauhoja', 'lactosefree milk']) {
+      const d = await interpret(e, { buyerId: 'b1', text }, stub(lost).deps);
       expect(d.claims).toEqual([]);
       expect(d.unclear).toContain('claims');
     }
@@ -84,6 +84,14 @@ describe('interpret', () => {
     expect(plain.unclear).toEqual([]);
     const kept = await interpret(e, { buyerId: 'b1', text: MILK }, stub(milk).deps);
     expect(kept.unclear).toEqual([]);
+  });
+
+  it('does not fire for a claim id absent from the index, and treats an empty category as no product type', async () => {
+    await e.DB.prepare("DELETE FROM products").run();
+    const d = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, claims: [] }).deps);
+    expect(d.unclear).not.toContain('claims');
+    const v = await interpret(e, { buyerId: 'b1', text: 'party' }, stub({ unclear: [], needs: [], category: '' }).deps);
+    expect(v.status).toBe('needs_input');
   });
 
   it('rejects impossible dates, unreviewed subtypes and a non-object model reply', async () => {
@@ -159,6 +167,14 @@ describe('confirmDraft', () => {
     await expect(confirmDraft(e, { buyerId: 'b1', draftId: m.id, fill: {} })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
     const ok = await confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: { claims: ['FREE_FROM_LACTOSE'] } });
     expect(ok.status).toBe('confirmed');
+  });
+
+  it('re-runs the claim guard on confirm', async () => {
+    const d = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, claims: [] }).deps);
+    for (const claims of [[], null, ['VEGAN']]) {
+      await expect(confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: { claims } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
+    }
+    expect((await confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: { claims: ['FREE_FROM_LACTOSE'] } })).status).toBe('confirmed');
   });
 
   it('hides other buyers drafts, refuses a second confirm without a second event', async () => {
