@@ -31,7 +31,7 @@ export function bearerOf(header: string | undefined): string | null {
 }
 
 /** Compares two secrets in constant time by comparing their fixed-length sha256 digests. */
-async function sameSecret(a: string, b: string): Promise<boolean> {
+export async function sameSecret(a: string, b: string): Promise<boolean> {
   const enc = new TextEncoder();
   const [da, db] = await Promise.all([crypto.subtle.digest('SHA-256', enc.encode(a)), crypto.subtle.digest('SHA-256', enc.encode(b))]);
   return crypto.subtle.timingSafeEqual(da, db);

@@ -4,6 +4,7 @@
 //                                         mandate 500 €/order and 1,500 €/day, Try it on; wipes orders, events, sandboxes)
 //   node scripts/demo-admin.mjs try-off   switch Try it off at once (both routes 404, the page hides the panel)
 //   node scripts/demo-admin.mjs try-on    switch it back on
+//   node scripts/demo-admin.mjs demo-open open /demo before its open time (09:45 Helsinki on 15 Nov); demo-hide undoes it
 // Key file: LAZYDOOR_ADMIN_KEY_FILE, default .data/valio/keys/deploy-admin.key. Door: GATEWAY_URL, default the deployed door.
 import { readFileSync } from 'node:fs';
 
@@ -29,9 +30,11 @@ if (command === 'reset') {
   console.log(`health: ${JSON.stringify(await (await fetch(`${door}/health`)).json())}`);
   const { jws: _jws, ...verify } = await (await fetch(`${door}/v1/audit/verify`)).json();
   console.log(`audit: ${JSON.stringify(verify)}`);
+} else if (command === 'demo-open' || command === 'demo-hide') {
+  console.log(`/demo ${command === 'demo-open' ? 'opened' : 'hidden until its open time'}: ${await admin('/admin/demo-open', { open: command === 'demo-open' })}`);
 } else if (command === 'try-off' || command === 'try-on') {
   console.log(`Try it ${command === 'try-on' ? 'on' : 'off'}: ${await admin('/admin/try', { enabled: command === 'try-on' })}`);
 } else {
-  console.error('usage: node scripts/demo-admin.mjs reset | try-off | try-on');
+  console.error('usage: node scripts/demo-admin.mjs reset | try-off | try-on | demo-open | demo-hide');
   process.exit(1);
 }

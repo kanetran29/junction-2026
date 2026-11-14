@@ -14,6 +14,10 @@ export interface Bindings {
   VALIO_API_KEY: string;
   ADMIN_KEY: string;
   GEMINI_API_KEY?: string;
+  /** When `/demo` opens to everyone (ISO time, compared with real time, never the demo clock); before it, 404 unless previewed or opened early. */
+  DEMO_OPENS_AT?: string;
+  /** The secret preview token for `/demo` before it opens (`?preview=` sets a cookie). */
+  DEMO_PREVIEW_TOKEN?: string;
   /** The door's private Ed25519 JWK (JSON); signs quote offers, receipts and the audit head. Public half at `/.well-known/jwks.json`. */
   DOOR_SIGNING_JWK: string;
 }

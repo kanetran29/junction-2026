@@ -138,6 +138,14 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
     return c.json({ tampered: row.id });
   });
 
+  /** Opens `/demo` before its open time (or hides it again until then); kept across resets. */
+  admin.post('/admin/demo-open', async (c) => {
+    const parsed = z.object({ open: z.boolean() }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) throw parsed.error;
+    await setSetting(c.env, 'demo_open', parsed.data.open ? '1' : null);
+    return c.json({ demoOpen: parsed.data.open });
+  });
+
   /** Switches Try it on or off at once (off: both Try it routes answer 404, so the demo page hides the panel); a reset switches it on. */
   admin.post('/admin/try', async (c) => {
     const parsed = z.object({ enabled: z.boolean() }).safeParse(await c.req.json().catch(() => null));

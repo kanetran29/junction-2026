@@ -4,7 +4,7 @@ import type { Env } from '../src/env';
 import { createApp } from '../src/http/routes';
 import { mcpRoutes } from '../src/mcp/tools';
 
-const e = { ...(env as unknown as Env), DEMO_MODE: '1', ADMIN_KEY: 'adm' };
+const e = { ...(env as unknown as Env), DEMO_MODE: '1', ADMIN_KEY: 'adm', DEMO_OPENS_AT: '2000-01-01T00:00:00Z' };
 const app = createApp(async () => {
   throw new Error('discovery makes no outside call');
 });

@@ -27,6 +27,7 @@
     "VALIO_API_BASE": "https://junction26.valioaimo.fi",
     "DEMO_MODE": "1",
     "GEMINI_MODEL": "gemini-3.8-flash",
-    "GEMMA_MODEL": "gemma-4-31b-it"
+    "GEMMA_MODEL": "gemma-4-31b-it",
+    "DEMO_OPENS_AT": "2026-11-15T07:45:00Z"
   }
 }

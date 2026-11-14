@@ -17,7 +17,8 @@ import { productName } from '../receipt/render';
 import { ValioRateLimited } from '../valio/client';
 import { uiRoutes, receiptText } from '../ui/approve';
 import { adminRoutes } from './admin';
-import { HttpError, authenticate, rateLimit, requireBuyer } from './auth';
+import { HttpError, authenticate, rateLimit, requireBuyer, sameSecret } from './auth';
+import { getCookie } from 'hono/cookie';
 import { readEvents, streamEvents } from './events';
 import * as S from './schemas';
 import { storeKind } from '../db';
@@ -150,6 +151,26 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
 
   app.notFound((c) => c.json({ error: 'NOT_FOUND', detail: 'no such route' }, 404));
 
+  /**
+   * The demo page is hidden (the same 404 as any unknown route) until DEMO_OPENS_AT by real time, unless opened early with the
+   * admin key. Before then the preview token (`?preview=`, compared in constant time) shows it and sets an HttpOnly cookie for
+   * /demo until the open time, and that cookie opens every file. The Worker runs before every asset, so this covers them all.
+   */
+  const demoGate: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+    const opensAt = Date.parse(c.env.DEMO_OPENS_AT ?? '');
+    if (!Number.isFinite(opensAt) || Date.now() >= opensAt || (await getSetting(c.env, 'demo_open')) === '1') return next();
+    const token = c.env.DEMO_PREVIEW_TOKEN;
+    const fromQuery = c.req.query('preview');
+    const given = fromQuery ?? getCookie(c, 'lazydoor_preview');
+    if (!token || !given || !(await sameSecret(given, token))) throw new HttpError(404, 'NOT_FOUND', 'no such route');
+    await next();
+    if (fromQuery) {
+      c.res = new Response(c.res.body, c.res);
+      c.res.headers.append('Set-Cookie', `lazydoor_preview=${token}; Path=/demo; HttpOnly; Secure; SameSite=Lax; Expires=${new Date(opensAt).toUTCString()}`);
+    }
+  };
+  app.use('/demo', demoGate);
+  app.use('/demo/*', demoGate);
   app.get('/demo', (c) => c.redirect('/demo/', 301));
   app.get('/demo/*', (c) => demoFile(c.req.raw, c.env.ASSETS));
 
