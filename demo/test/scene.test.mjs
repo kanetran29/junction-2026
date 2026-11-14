@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { truckRun, boomOpen, BARRIER } from "../scene.mjs";
+import { truckRun, boomOpen, deliveryStops, BARRIER, GATE_X } from "../scene.mjs";
 
 /** Counts how often the dock boom starts to rise over a run sampled every 50 ms. */
 function raises(tr, until) {
@@ -36,4 +36,14 @@ test("dock boom: a refused naive load, a stuck truck and a parked truck keep it 
   assert.equal(raises({ status: "loading", crates: 3, naive: true, since: 0 }, 20), 0);
   assert.equal(raises({ status: "stuck", crates: 3, naive: true, since: 0 }, 20), 0);
   assert.equal(raises({ status: "parked", crates: 0, naive: false, since: 0 }, 20), 0);
+});
+
+test("delivery: boxes go pallet → truck at Valio's dock → kitchen beside the chef; no box path starts or ends at the door", () => {
+  for (const n of [1, 4, 8]) {
+    for (const { pick, dock, bay, drop } of deliveryStops(n)) {
+      for (const p of [pick, dock, bay, drop]) assert.ok(Math.abs(p[0] - GATE_X) > 40, `a box stop at x ${p[0]} is at the door (x ${GATE_X})`);
+      assert.ok(pick[0] > GATE_X && dock[0] > GATE_X, "loading happens on Valio's side");
+      assert.ok(drop[0] < GATE_X - 60 && drop[1] < 48 && drop[2] < 30, "unloading ends on the kitchen floor, low, beside the chef");
+    }
+  }
 });

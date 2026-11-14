@@ -264,11 +264,6 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .cloud-edge { fill: #3a464c; stroke: #3a464c; stroke-width: 6px; stroke-linejoin: round; }
 .cloud { fill: #66757d; }
 .rain { fill: none; stroke: #6fb7ff; stroke-width: 3px; stroke-linecap: round; }
-.confetti { fill: var(--brand); }
-.confetti[data-hue="1"] { fill: var(--hold); }
-.confetti[data-hue="2"] { fill: #2557f0; }
-.confetti[data-hue="3"] { fill: #54e0b0; }
-.confetti[data-hue="4"] { fill: #ffcc33; }
 
 /* Kitchen terminal (the chef types here) and the kitchen manager's phone (approvals land here): screens glow by state. */
 .phone-screen { fill: #1d4d5c; }

@@ -12,7 +12,7 @@ const CAPTION_BAND = 120;
 
 const PLATE = { x: -312, y: -122, w: 624, d: 244, r: 12 };
 const LANE = 12;
-const GATE_X = -70;
+export const GATE_X = -70;
 const HINGE = [GATE_X, -14];
 const LEAF_LEN = 50;
 const RACK_X = [-8, 62, 132, 202];
@@ -21,7 +21,8 @@ const WALL = { x: -50, y: -120, w: 352, d: 7, r: 1, h: 132 };
 const SPLASH = { x: -304, y: -120, w: 192, d: 7, r: 1, h: 78 };
 const WALL_Y = WALL.y + WALL.d;
 const COUNTER = { x: -300, y: -112, w: 150, d: 34, r: 2, h: 32 };
-const SLOTS = [-246, -226, -206, -186];
+/** Where Monday's delivery is stacked in the kitchen: on the floor beside the chef, in front of the counter's end, two by two. */
+const KITCHEN_DROP = [[-176, -76, 0], [-158, -76, 0], [-176, -76, 13], [-158, -76, 13]];
 const CHEF = [-226, -36];
 const PHONE = { x: -306, y: -32, w: 44, d: 4, z: 30, h: 62 };
 const CAL = { x: -200, w: 30, z: 46, h: 32 };
@@ -189,7 +190,7 @@ function kitchen() {
     out.push(M("dark", L(k.ring(x, -95, r + 3, 35, P, 28), { tone: "mid" })));
     out.push(M("copper", cyl(x, -95, r, 35, h, { tone: "hi" }, 28) + L(k.sideArc(x, -95, r, 35 + h - 2.5, P, 20), { tone: "faint" }) + slab({ x: x + r - 1, y: -96.5, w: 7, d: 3, r: 1 }, 35 + h - 4, 2, { tone: "mid" }, 2, 0)));
   }
-  const crates = SLOTS.map((x, i) => `<g class="ccrate" data-i="${i}" style="opacity:0">${M("crate2", slab({ x: x - 8, y: -105, w: 16, d: 20, r: 1 }, 35, 13, { tone: "hi" }, 2, 0.5) + L(k.sideSeam({ x: x - 8, y: -105, w: 16, d: 20, r: 1 }, 44, P, 2), { tone: "mid" }))}</g>`).join("");
+  const crates = KITCHEN_DROP.map(([x, y, z], i) => `<g class="ccrate" data-i="${i}" style="opacity:0">${M("crate2", slab({ x, y, w: 16, d: 18, r: 1 }, z, 13, { tone: "hi" }, 2, 0.5) + L(k.sideSeam({ x, y, w: 16, d: 18, r: 1 }, z + 9, P, 2), { tone: "mid" }))}</g>`).join("");
   return out.join("") + `<g data-id="counter">${crates}</g>`;
 }
 
@@ -575,7 +576,7 @@ const SKY = {
 const mix3 = (a, b, u) => a.map((c, i) => c.map((v, j) => v + (b[i][j] - v) * u));
 const rgb = (c) => `rgb(${c.map((v) => Math.round(v)).join(",")})`;
 
-/** Seeded pseudo-random numbers, so confetti and rain land the same way on every run. */
+/** Seeded pseudo-random numbers, so the rain lands the same way on every run. */
 function seeded(seed) {
   let a = seed >>> 0;
   return () => {
@@ -586,8 +587,22 @@ function seeded(seed) {
   };
 }
 const RNG = seeded(16112026);
-const CONFETTI = Array.from({ length: 64 }, () => ({ vx: (RNG() - 0.5) * 460, vy: -280 - RNG() * 320, spin: 6 + RNG() * 14, hue: Math.floor(RNG() * 5), w: 9 + RNG() * 7 }));
 const RAIN = Array.from({ length: 18 }, () => ({ x: (RNG() - 0.5) * 2, phase: RNG(), speed: 0.9 + RNG() * 0.5 }));
+
+/**
+ * The path of each delivered crate, in world points: picked from its place on Valio's dock pallet (or a rack shelf),
+ * into its slot in the truck at the dock, out of that slot at the kitchen bay, onto the stack beside the chef. Goods
+ * never pass the door: the door handles orders, not boxes.
+ */
+export function deliveryStops(n, rackX = RACK_X[2]) {
+  const slot = (i, front) => [front + 46 + 6 + (i % 4) * 21.5 + 9, TRUCK_Y + 19, 17 + Math.floor(i / 4) * 16 + 7];
+  return Array.from({ length: Math.min(n, 8) }, (_, i) => ({
+    pick: n <= 4 ? [PALLET.x + 2 + (i % 2) * 18 + 8, PALLET.y + 2 + Math.floor(i / 2) * 12.5 + 5.75, PALLET.h + 13] : [rackX + RACK.w / 2, RACK.y + RACK.d + 4, 36],
+    dock: slot(i, DOCK_X),
+    bay: slot(i, BAY_X),
+    drop: KITCHEN_DROP[i % KITCHEN_DROP.length].map((v, j) => v + [8, 9, 13][j]),
+  }));
+}
 
 /**
  * Where the truck is and what it is doing at age seconds into its current state: for an accepted order it loads,
@@ -655,7 +670,6 @@ ${dockFlag()}
 <g data-id="doorfly"></g>
 <g data-id="bursts"></g>
 <g data-id="rings"></g>
-<g data-id="confetti"></g>
 <g data-id="letter2" class="letter" style="opacity:0">${LETTER}</g>
 <g data-id="mail" class="letter" style="opacity:0">${LETTER}</g>
 <g data-id="mandfly">${[0, 1, 2].map((i) => `<g class="letter" data-kind="kitchen${i}" style="opacity:0">${LETTER}</g>`).join("")}</g>
@@ -672,7 +686,7 @@ ${dockFlag()}
   const root = host.querySelector(".scene-front");
   const stage = host.closest(".stage") ?? host;
   const q = (id) => root.querySelector(`[data-id="${id}"]`);
-  const ids = ["agent", "gate-fence", "gate-post", "gate-front", "gate-sign", "stopline", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "zone3", "zone4", "link3", "link4", "letter2", "exhaust", "doorfly", "bursts", "rings", "confetti", "stampfx", "gateshock", "receipt", "flying", "counter", "chef", "letter", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "dockled", "mphone", "mphonei", "tap", "mail", "rules", "pcrates", "palletsign", "nomilk", "mrack", "mandfly", "dockflag", "dockflagtext"];
+  const ids = ["agent", "gate-fence", "gate-post", "gate-front", "gate-sign", "stopline", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "zone3", "zone4", "link3", "link4", "letter2", "exhaust", "doorfly", "bursts", "rings", "stampfx", "gateshock", "receipt", "flying", "counter", "chef", "letter", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "dockled", "mphone", "mphonei", "tap", "mail", "rules", "pcrates", "palletsign", "nomilk", "mrack", "mandfly", "dockflag", "dockflagtext"];
   const el = Object.fromEntries(ids.map((id) => [id, q(id)]));
   const racks = [...root.querySelectorAll(".rack")].sort((a, b) => a.dataset.rack - b.dataset.rack);
   const counterCrates = [...el.counter.querySelectorAll(".ccrate")];
@@ -1278,7 +1292,10 @@ ${dockFlag()}
     setAttr(el.dockflag, "style", state.hold && state.gate.built ? null : "opacity:0");
     setText(el.dockflagtext, state.truck.fromPallet ? "Delivery day · Mon 16 Nov" : "Next delivery Mon 16 Nov");
     const added = p.added ?? 0;
+    const leaving = state.truck.fromPallet ? Math.min(4, state.truck.crates) : 0;
     palletCrates.forEach((node, i) => {
+      // On delivery day each crate stays on the pallet until its hop into the truck starts.
+      if (i < leaving && !calm && t - state.truck.since < i * 0.22) return setAttr(node, "style", null);
       if (i >= p.crates) return setAttr(node, "style", "opacity:0");
       const late = i - (p.crates - added);
       const u = calm || late < 0 ? 1 : clamp01((t - p.since - late * 0.25) / 0.45);
@@ -1300,7 +1317,7 @@ ${dockFlag()}
     live.today = [parts.weekday.toUpperCase(), parts.day];
   }
 
-  /** Truck run: crates fly in, confetti, barrier lifts, drive to the kitchen with exhaust and trail, unload, thumbs-up, drive back. */
+  /** Truck run: crates hop from the pallet into the truck, barrier lifts, drive to the kitchen with exhaust and trail, unload beside the chef, thumbs-up, drive back. */
   function drawTruck(state, t, dt, snap, calm) {
     const tr = state.truck;
     const age = t - tr.since;
@@ -1321,20 +1338,19 @@ ${dockFlag()}
     const flying = pool(el.flying, 8, () => `<g class="fly" style="opacity:0">${flyingCrate("crate2")}</g>`).slice(0, 5);
     const origin = at([0, 0, 0]);
     const okRack = racks.findIndex((r) => r.dataset.status === "ok");
-    const source = okRack >= 0 ? okRack : 2;
-    const from = tr.fromPallet ? at([PALLET.x + PALLET.w / 2, PALLET.y + PALLET.d / 2, PALLET.h + 8]) : at([RACK_X[source] + RACK.w / 2, RACK.y + RACK.d + 4, 36]);
-    const slotAt = (i, front) => at([front + 46 + 6 + (i % 4) * 21.5 + 9, TRUCK_Y + 19, 17 + Math.floor(i / 4) * 16 + 7]);
     const n = Math.min(run.n, 8);
+    const stops = deliveryStops(tr.fromPallet ? Math.min(n, 4) : 8, RACK_X[okRack >= 0 ? okRack : 2]).slice(0, n);
     const flights = [];
-    if (run.accepted) for (let i = 0; i < n; i++) flights.push({ start: i * 0.22, dur: 0.45, a: from, b: slotAt(i, DOCK_X), fadeEnd: false });
-    if (run.accepted) for (let i = 0; i < n; i++) flights.push({ start: run.arrive + i * 0.16, dur: 0.42, a: slotAt(i, BAY_X), b: at([SLOTS[i % SLOTS.length], -95, 48]), fadeEnd: i >= SLOTS.length });
+    // Low hops only: pallet to truck at Valio's dock, truck to the kitchen stack at the bay; nothing comes from the sky or nears the door.
+    if (run.accepted) stops.forEach((st, i) => flights.push({ start: i * 0.22, dur: 0.45, a: at(st.pick), b: at(st.dock), hop: 16, fadeEnd: false }));
+    if (run.accepted) stops.forEach((st, i) => flights.push({ start: run.arrive + i * 0.16, dur: 0.42, a: at(st.bay), b: at(st.drop), hop: 20, fadeEnd: i >= KITCHEN_DROP.length }));
     flying.forEach((node, i) => {
       const f = flights.find((fl, j) => j % 5 === i && age >= fl.start && age < fl.start + fl.dur) ?? null;
       if (!f || calm) return setAttr(node, "style", "opacity:0");
       const u = (age - f.start) / f.dur;
       const e = easeOut(u);
       const x = f.a[0] + (f.b[0] - f.a[0]) * e - origin[0];
-      const y = f.a[1] + (f.b[1] - f.a[1]) * e - Math.sin(Math.PI * u) * 56 * KS - origin[1];
+      const y = f.a[1] + (f.b[1] - f.a[1]) * e - Math.sin(Math.PI * u) * f.hop * KS - origin[1];
       setAttr(node, "transform", `translate(${f1(x)} ${f1(y)})`);
       setAttr(node, "style", `opacity:${(f.fadeEnd ? 1 - clamp01((u - 0.75) / 0.25) : 1).toFixed(3)}`);
     });
@@ -1343,9 +1359,9 @@ ${dockFlag()}
       setAttr(node, "style", on ? null : "opacity:0");
     });
     counterCrates.forEach((node, i) => {
-      const on = run.accepted && i < Math.min(n, SLOTS.length) && age >= run.arrive + i * 0.16 + 0.42;
-      // Monday without the door: the milk's place on the counter stays a pale, empty crate.
-      setAttr(node, "style", on ? null : state.nomilk && i === SLOTS.length - 1 ? "opacity:.3" : "opacity:0");
+      const on = run.accepted && i < Math.min(n, KITCHEN_DROP.length) && age >= run.arrive + i * 0.16 + 0.42;
+      // Monday without the door: the milk's place beside the chef stays a pale, empty crate.
+      setAttr(node, "style", on ? null : state.nomilk && i === 0 ? "opacity:.3" : "opacity:0");
     });
     live.happy = run.accepted && age >= run.unloadDone - 0.2 && age < run.unloadDone + 3.4;
     const delivered = run.accepted && age >= run.arrive && age < run.home + 1.5;
@@ -1365,7 +1381,6 @@ ${dockFlag()}
       setAttr(el.receipt, "style", `opacity:${(calm ? 1 : clamp01((age - run.arrive - 0.2) / 0.3)).toFixed(3)}`);
     } else setAttr(el.receipt, "style", "opacity:0");
 
-    drawConfetti(tr, age, calm);
     drawExhaust(tr, run, age, calm);
     const trail = pool(el.trail, 3, () => svgNode("path", "trail-line"));
     trail.forEach((line, j) => {
@@ -1376,24 +1391,6 @@ ${dockFlag()}
       const len = Math.min(110, speed * 0.6) * -Math.sign(run.v);
       setAttr(line, "d", k.pathOf([at([tail, TRUCK_Y + 36, z]), at([tail + len, TRUCK_Y + 36, z])]));
       setAttr(line, "style", `opacity:${(Math.min(1, speed / 120) * 0.85).toFixed(3)}`);
-    });
-  }
-
-  /** A short confetti burst from the truck when an order is accepted. */
-  function drawConfetti(tr, age, calm) {
-    const pieces = pool(el.confetti, CONFETTI.length, () => svgNode("rect", "confetti"));
-    const on = !calm && tr.status === "loading" && !tr.naive && age < 2.2;
-    const [ox, oy] = at([DOCK_X + 90, TRUCK_Y + 19, 80]);
-    pieces.forEach((node, i) => {
-      if (!on) return setAttr(node, "style", "opacity:0");
-      const p = CONFETTI[i];
-      const a = Math.max(0, age - (i % 4) * 0.05);
-      const flip = Math.cos(a * p.spin);
-      setAttr(node, "data-hue", p.hue);
-      setAttr(node, "width", f1(p.w));
-      setAttr(node, "height", f1(Math.max(0.8, Math.abs(flip) * 6.5)));
-      setAttr(node, "transform", `translate(${f1(ox + p.vx * a)} ${f1(oy + p.vy * a + 280 * a * a)}) rotate(${f1(a * p.spin * 40)})`);
-      setAttr(node, "style", `opacity:${clamp01((2.2 - age) / 0.6).toFixed(3)}`);
     });
   }
 

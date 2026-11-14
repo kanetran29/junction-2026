@@ -217,6 +217,10 @@ Vấn đề tìm thấy:
 - `VOICE` giờ ghi rõ giờ phát và file của từng đoạn (12 đoạn); `SFX` là tiếng tua; `main.mjs` phát cả hai trên một kênh (`CLIPS`), nên tắt tiếng, tạm dừng, tua đều áp dụng. Caption "Nobody checked. Nobody approved." và "So on Monday morning, there is no milk.".
 - Mười một đoạn giọng cũ không đổi (`git diff ca42bc7 -- 'demo/assets/voice/0*.mp3' 'demo/assets/voice/1[01].mp3'` rỗng). 47 test pass (thêm test lời mới và tiếng tua nằm trong cảnh 1, không chồng lời khác); `label overlaps: 0`. Trình duyệt tải 12.mp3 ở 0:15,2, rewind.mp3 ở 0:18,4, 02.mp3 ở 0:20,7.
 
+### 27. Hàng không đi qua cổng (SCRIPT.md 16.7)
+- Thứ Hai: thùng trên pallet "MON 16 NOV" nhảy thấp vào xe từng cái một ở bến Valio (thùng ở trên pallet tới lúc được nhấc); bỏ pháo giấy (xoá hẳn hiệu ứng). Ở bếp: thùng nhảy thấp từ thùng xe xuống chồng 2 × 2 trên sàn bếp cạnh chef (thay chỗ trên quầy cũ); chỗ "thùng sữa trống" ở cảnh 1 cũng dời về đó.
+- `deliveryStops(n)` (scene.mjs) là đường đi duy nhất của thùng, dùng cho cả Story và Live; test mới: không điểm nào ở gần cổng, xếp lên xe ở phía Valio, dỡ xuống sàn bếp. 48 test pass, `label overlaps: 0`.
+
 ## Còn lại / cần làm sau
 - Quay `demo/story.mp4` khi Kane duyệt Story mới (ghép giọng từ `VOICE`).
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.

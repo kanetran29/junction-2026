@@ -539,3 +539,8 @@ Giọng đọc (11 đoạn đã duyệt) và mốc `VOICE` giữ nguyên; Story 
    - Caption 0:12,5 "Nobody checked. Nobody approved." (đoạn 1 nói câu này từ 0:13,0); caption 0:15,5 "So on Monday morning, there is no milk."; dấu NO MILK, lịch MON 16, bến và pallet trống giữ nguyên.
    - Tiếng tua băng `demo/assets/sfx/rewind.mp3`, làm bằng ffmpeg: tiếng rít tăng dần cộng tiếng ồn lọc có rung, 1,7 s. Độ to trung bình −34,4 dB, tức thấp hơn giọng khoảng 14,5 dB. Phát cùng nhãn "◀◀ Rewind" ở 0:18,4–0:20,1, trên cùng kênh với lời đọc nên nút Sound on/off, tạm dừng và tua đều áp dụng.
    - Cảnh 2 bắt đầu ở 0:20,4, đoạn 2 phát ở 0:20,7; caption "One door at Valio…" ở 0:21,5.
+7. **Hàng không bao giờ đi qua cổng**: door chỉ xử lý đơn, không cầm thùng hàng.
+   - **Thứ Hai ở bến Valio:** từng thùng trên pallet "MON 16 NOV" nhảy thấp lên xe, cách nhau 0,22 s. Thùng nằm trên pallet tới đúng lúc nó được nhấc nên pallet trống dần. Không còn thùng rơi từ trời, không pháo giấy.
+   - **Ở bếp:** xe dừng ở chỗ đỗ trước bếp. Thùng nhảy thấp từ thùng xe xuống thành chồng 2 × 2 trên sàn bếp, cạnh chef, trước đầu quầy. Rồi chef giơ ngón cái và biên nhận hiện ra.
+   - **Live dùng cùng đường đi:** `deliveryStops()` trong `scene.mjs`; test kiểm không có điểm nào của đường đi thùng ở gần cổng.
+   - Mốc thời gian, caption, giọng và biên nhận giữ nguyên.
