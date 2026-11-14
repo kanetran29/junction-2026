@@ -452,3 +452,74 @@ Kane duyệt cả 3 phần ("làm cả 3, k cần lo thời gian, làm cho tốt
   - 4 ảnh tĩnh, 3 logo, poster, `try*.mjs` và `proof.json` đều 200. Vài giây đầu sau deploy có hai file trả 404, sau đó 200.
   - `/v1/try` cho ra `decided` / ACCEPTED.
 - Đã reset demo chuẩn.
+
+### C11. Sẵn sàng cho nhiều người thử cùng lúc (xong, **chưa push**)
+
+**Reset cho vòng tiếp theo (một dòng, chạy ở thư mục repo):** `node scripts/demo-admin.mjs reset`. Lệnh này đưa door về
+trạng thái chuẩn: Thứ Sáu 21:10, replay, mandate 500 €/1.500 €, Try it bật; đồng thời xoá đơn, event và sandbox.
+Tắt Try it ngay lập tức: `node scripts/demo-admin.mjs try-off`. Bật lại: `try-on`.
+
+**Thay đổi**
+- Try it giới hạn theo token của khách: 3 lần/phút. Theo địa chỉ chỉ còn để chống flood: 60 lần/phút (IPv6 tính theo /64).
+  Free text (có gọi model) tối đa 6 lần/phút cho mọi khách gộp lại. Tất cả lời gọi tối đa 240 lần/phút.
+- Không bao giờ từ chối khách mới vì hết chỗ. Sandbox để yên 20 phút bị xoá cùng đơn, quote và draft; event vẫn giữ để
+  chuỗi hash còn nguyên. Quá 500 sandbox, hoặc quá 200 cho một địa chỉ, thì sandbox ít dùng gần đây nhất bị thu hồi.
+- 4 câu ví dụ trên trang dùng bản đọc thật đã ghi sẵn của Gemini và Gemma (`src/try/recorded.ts`), gắn `cached: true`,
+  nên không gọi model. Câu "for Friday" vẫn giữ chỗ hai model đọc khác nhau (13/11 và 20/11).
+- Gemini hết quota thì trả 503 `MODELS_BUSY` kèm retryAfter và gợi ý dùng câu ví dụ.
+- Khách trả lời bằng chữ (`answer: { text }`) thì door đọc lại "<câu đầu>. <câu trả lời>" và gộp vào draft đang chờ.
+  Mọi câu hỏi `needs_input` có `question.text`.
+- Kill switch `/admin/try`; reset bật lại Try it.
+- Event có một "tail" chung cho mỗi isolate (làm mới tối đa mỗi 1,5 s). SSE đọc tail mỗi 2 s.
+- Đã merge demo `fc907ef` và `e855ed6`.
+
+**Gói Cloudflare**
+- Trước khi Kane nâng cấp, tài khoản đang ở **Workers Free**: tối đa 10 ms CPU cho mỗi request.
+  - Bằng chứng: `wrangler tail` ghi nhận 28 request `exceededCpu` ở mức 10–13 ms CPU.
+  - Hậu quả: lần chạy nghiệm thu đầu trên `99f64397` chỉ được 32/63; cả 31 ca hỏng đều là 503 do CPU, không phải sai logic.
+- Kane đã nâng lên **Workers Paid**. `wrangler.jsonc` giờ đặt `limits.cpu_ms: 30000`; tài khoản Free sẽ từ chối deploy có
+  trường này, nên việc deploy được đã chứng minh gói Paid. Settings của script đọc lại đúng giá trị này.
+- Sau nâng cấp, tail cho thấy 0 `exceededCpu` trong toàn bộ lần chạy nghiệm thu, scenarios và load test.
+
+**Bảng giới hạn**
+
+| Thứ | Giới hạn | Mình dùng (đo được) | Dư khi 100 người xem + 30 lần thử/phút |
+|---|---|---|---|
+| Workers Paid: CPU mỗi request | 30 s (tối đa 5 phút) | Try p50 64 ms, max 147 ms; quote ~30 ms | rất dư |
+| Workers Paid: request mỗi ngày | không giới hạn | 1 load test ~1k request | rất dư |
+| Subrequest mỗi request | 10.000 | vài chục | rất dư |
+| Kết nối đồng thời mỗi request | 6 | postgres max 3 | đủ |
+| Hyperdrive → Aiven | config 10 (Paid cho tới ~100) | 10 lúc tải | đủ; có thể nâng nếu cần |
+| Aiven `max_connections` | 100 (không phải 15) | 12 lúc tải | dư |
+| Aiven giao dịch/giây | — | trước: 95 tps với 100 người xem; sau: p50 32, max 42 tps cho cả tải | giảm khoảng 3 lần |
+| Gemma | khoảng 4 lần gọi đầy đủ/phút | free text bị giới hạn 6/phút | câu ví dụ không gọi model |
+| Gemini | API không cho đọc quota | — | 503 `MODELS_BUSY` khi hết |
+
+**Load test** (`scripts/load-test.mjs`: 100 người xem SSE, 30 lần thử câu ví dụ/phút từ một IP, 5 free text,
+20 lần duyệt/từ chối, 3 phút; trên `32795cea`, gói Paid)
+
+| route | n | p50 | p95 | lỗi |
+|---|---|---|---|---|
+| GET /v1/events (backlog) | 100 | 416 ms | 667 ms | 0 |
+| mở GET /v1/events/stream | 300 | 25 ms | 98 ms | 0 |
+| POST /v1/try (câu ví dụ) | 90 | 6,0 s | 7,5 s | 0 |
+| POST /v1/try (free text) | 4 | 12,6 s | 14,6 s | 0 |
+| POST /v1/try/decision | 20 | 2,8 s | 4,0 s | 0 |
+
+**Kiểm**
+- Test 406/406. Nghiệm thu **63/63**, scenarios **11/11** trên `32795cea`.
+- Ca beans live:
+  - "200 cans of beans" → câu hỏi "When should it arrive?";
+  - trả lời "next tuesday" → cùng draft, giữ sản phẩm (21594) và 200 pcs, `deliverBy` 2026-11-17;
+  - kết quả `no_offer` (54 lời từ chối). Đó là câu trả lời của catalogue cho 200 lon, không phải do mất trí nhớ.
+- `proof.json` ghi 63/63, 11/11, 406 trên `32795cea`, ngày 2026-11-15; đã deploy assets thành `e48a8c55`. Đã reset chuẩn.
+
+**Còn lo**
+- Một lần Try it mất khoảng 6 s, phần lớn là chờ khoảng 40 lượt đi-về tới Aiven qua Hyperdrive và hai advisory lock, chứ
+  không phải CPU. Trang nên hiện tiến trình.
+- Gemma chỉ khoảng 4 lần/phút. Khi đông người, draft của hotel cũng có thể chỉ có Gemini đọc (`unavailable`).
+- Quota của Gemini chưa rõ (API không cho đọc).
+
+**Sơ suất của mình**
+- Trong lúc chẩn đoán 503, mình đã lỡ in ra một lần phản hồi reset, gồm các agent key và approver key demo vừa tạo.
+- Mình đã reset ngay để thu hồi chúng. Đó chỉ là key demo tạm, không phải secret của Worker.
