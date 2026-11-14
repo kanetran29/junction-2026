@@ -121,3 +121,10 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
   kèm header `Authorization` (EventSource không gửi được header); thêm `POST /admin/judge-key` để trang demo/giám khảo không cần admin key.
   Schema event không đổi.
 - D1 trên account Cloudflare hackathon đã tạo và nạp dữ liệu (17.546 sản phẩm, 1.078 dòng replay, 349 tên nhóm). Worker deploy sau đợt sửa.
+
+### B11. Deploy (Task 14b)
+- Đợt sửa cuối (`eb4ba96`..`40aee70`, 9 commit) qua re-review Opus: "ready to deploy". vitest 297/297, nghiệm thu 49/49, scenarios 11/11
+  (local). `docs/events.md` thêm: CORS chỉ cho `GET /v1/events*`, trình duyệt dùng `fetch()` + header; `since` sai → 400.
+- Worker `lazydoor` đã deploy lên account Cloudflare hackathon (token trong `cf.env`, không dùng login mặc định):
+  **https://lazydoor.lazydoor.workers.dev** — subdomain workers.dev mới tạo nên đang chờ chứng chỉ TLS (vài phút). Secrets
+  `VALIO_API_KEY`, `GEMINI_API_KEY`, `ADMIN_KEY` (ngẫu nhiên, chỉ lưu ở `.data/valio/keys/deploy-admin.key`) đã đặt.
