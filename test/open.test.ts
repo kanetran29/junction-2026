@@ -129,8 +129,22 @@ describe('events', () => {
     await logEvent(e, { type: 'search.done', buyerId: 'hotel-a', data: { count: 1, categories: ['10400'] } });
   });
 
-  it('needs a key; an agent sees only its buyer, a judge and the admin see all', async () => {
-    expect((await call('/v1/events')).status).toBe(401);
+  it('on a demo door reads every buyer without a key; off demo, or with a wrong key, it is 401', async () => {
+    expect((await json(await call('/v1/events'))).events.map((x: { buyerId: string }) => x.buyerId)).toEqual(['hotel-a', 'hotel-b', 'hotel-a']);
+    expect((await json(await call('/v1/events?buyer=hotel-b'))).events).toHaveLength(1);
+    const keyless = await app.request('/v1/events/stream', {}, e);
+    expect(keyless.status).toBe(200);
+    expect(keyless.headers.get('Content-Type')).toContain('text/event-stream');
+    await keyless.body!.cancel();
+    const live = { ...e, DEMO_MODE: '0' };
+    for (const path of ['/v1/events', '/v1/events/stream']) expect((await app.request(path, {}, live)).status).toBe(401);
+    expect((await call('/v1/events', 'no-such-key')).status).toBe(401);
+    expect((await call('/v1/events/stream', 'no-such-key')).status).toBe(401);
+    expect((await app.request('/v1/events', { headers: { Authorization: '' } }, e)).status).toBe(401);
+    expect((await call('/v1/quotes/q1')).status).toBe(401);
+  });
+
+  it('with a key: an agent sees only its buyer, a judge and the admin see all', async () => {
     const mine = await json(await call('/v1/events', 'adm-agent'));
     expect(mine.events.map((x: { buyerId: string }) => x.buyerId)).toEqual(['hotel-a', 'hotel-a']);
     expect((await json(await call('/v1/events', 'the-judge'))).events).toHaveLength(3);
@@ -178,5 +192,6 @@ describe('/openapi.json', () => {
   it('lists the open routes', async () => {
     const doc = await json(await call('/openapi.json'));
     for (const p of ['/v1/resolve', '/v1/families', '/v1/rules', '/v1/reason-codes', '/v1/events', '/v1/events/stream']) expect(doc.paths).toHaveProperty([p]);
+    for (const p of ['/v1/events', '/v1/events/stream']) expect(doc.paths[p].get.summary).toContain('DEMO_MODE=1');
   });
 });

@@ -111,7 +111,10 @@ describe('structural auth and error shapes', () => {
     const ok = await call('/v1/events', { key: keys.agentKeys['hotel-a'], headers: { Origin: 'https://demo.example', 'Last-Event-ID': 'garbage' } });
     expect(ok.status).toBe(200);
     expect(ok.headers.get('access-control-allow-origin')).toBe('*');
-    const denied = await call('/v1/events', { headers: { Origin: 'https://demo.example' } });
+    const keyless = await call('/v1/events', { headers: { Origin: 'https://demo.example' } });
+    expect(keyless.status).toBe(200);
+    expect(keyless.headers.get('access-control-allow-origin')).toBe('*');
+    const denied = await call('/v1/events', { headers: { Origin: 'https://demo.example' }, env: { ...e, DEMO_MODE: '0' } });
     expect(denied.status).toBe(401);
     expect(denied.headers.get('access-control-allow-origin')).toBe('*');
     expect((await call('/v1/quotes/q1', { key: keys.agentKeys['hotel-a'], headers: { Origin: 'https://demo.example' } })).headers.get('access-control-allow-origin')).toBeNull();

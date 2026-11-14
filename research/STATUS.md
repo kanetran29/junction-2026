@@ -260,3 +260,19 @@ Hiện không có gì. (Quyền Hyperdrive đã được thêm; Aiven + Gemma đ
   8. Chủ nhật 17:05 duyệt giỏ: `EXPIRED`, `APPROVAL_EXPIRED` (lần đầu đo trên giỏ).
 - Mọi request, response và 52 event lưu ở `.data/story-v2.1-run.json` (gitignore, quyền 600, đã thay mọi key và token bằng nhãn).
 - Sau đó reset về trạng thái demo chuẩn; `/health`: Thứ Sáu 21:10, replay, `aiven-postgres`. Judge key vẫn dùng được.
+
+### C5. Event log đọc được không cần key trên door demo (xong)
+- Kane duyệt: khi `DEMO_MODE=1`, `GET /v1/events` và `GET /v1/events/stream` trả lời cả request **không có header
+  Authorization**, như judge key (mọi buyer, chỉ đọc), để chế độ Live của trang demo xem được door. Có key thì như cũ (agent key
+  chỉ buyer của mình, hỏi buyer khác 403). Key sai hoặc header rỗng vẫn 401, không lùi về chế độ không key. `DEMO_MODE` tắt thì
+  không key vẫn 401. Các route `/v1` khác không đổi.
+- Code: `keylessDemo` trong `src/http/auth.ts`, dùng ở middleware `authenticate` và `scope` của `src/http/events.ts`. Đã cập nhật
+  OpenAPI summary của hai route, README và `docs/events.md`.
+- Đã kiểm mọi chỗ gọi `logEvent` (18 chỗ) và 52 event thật của lần chạy v2.1: không event nào mang approval token hay link, API
+  key hay chữ ký mandate. Ai cũng đọc được: câu yêu cầu của buyer (`draft.created.text`), mã sản phẩm, số lượng, giá Valio
+  (`netCents`, `netCentsPerSalesUnit`) và mã lý do.
+- Giới hạn đã biết: đọc không key chưa có rate limit (mỗi request một query có index; mỗi stream đang mở một query mỗi giây trong
+  khoảng 60 s). Nếu trang công khai có nhiều người xem thì thêm giới hạn theo IP.
+- Test: 329/329 (thêm case không key; cập nhật hai case cũ). Deploy phiên bản **`88244083-c195-487c-8a17-65c2fc37ac9a`**. Kiểm trên URL
+  thật: không key → 200 kèm event, stream không key → 200 `text/event-stream`, key sai → 401. Nghiệm thu **49/49**, scenarios
+  **11/11**. Đã reset demo về trạng thái chuẩn (Thứ Sáu 21:10, replay, mandate mặc định); judge key vẫn dùng được.

@@ -52,12 +52,22 @@ export async function identify(env: Env, header: string | undefined): Promise<Ca
 const CALLER = 'caller';
 
 /**
- * Structural auth for `/v1/*`: resolves the caller from the bearer key before any validation (no key or an unknown one is
- * 401) and keeps it in the request context for `requireBuyer`; the public `exempt` paths skip it.
+ * A keyless read on a demo door: `DEMO_MODE=1` and no Authorization header at all. A header that is present but wrong is not
+ * keyless, so a bad key stays 401 instead of falling back to the open read.
  */
-export function authenticate(exempt: string[]): MiddlewareHandler<{ Bindings: Env }> {
+export function keylessDemo(env: Env, header: string | undefined): boolean {
+  return env.DEMO_MODE === '1' && header === undefined;
+}
+
+/**
+ * Structural auth for `/v1/*`: resolves the caller from the bearer key before any validation (no key or an unknown one is
+ * 401) and keeps it in the request context for `requireBuyer`; the public `exempt` paths skip it, and the `demoOpen` paths
+ * skip it for a keyless request on a demo door (their handler then reads every buyer, read-only).
+ */
+export function authenticate(exempt: string[], demoOpen: string[]): MiddlewareHandler<{ Bindings: Env }> {
   return async (c, next) => {
-    if (!exempt.includes(c.req.path)) {
+    const open = exempt.includes(c.req.path) || (demoOpen.includes(c.req.path) && keylessDemo(c.env, c.req.header('Authorization')));
+    if (!open) {
       const who = await identify(c.env, c.req.header('Authorization'));
       if (!who) throw new HttpError(401, 'UNAUTHORIZED', 'a valid Bearer API key is required');
       c.set(CALLER as never, who as never);

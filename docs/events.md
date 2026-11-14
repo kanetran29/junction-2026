@@ -12,8 +12,9 @@ exactly this schema; a change here is announced in `research/STATUS.md`.
 
 - `since` is exclusive (events with `seq > since`); default 0. `buyer` is optional (all buyers).
 - Auth: `Authorization: Bearer <key>`. A judge or admin key reads every buyer; an agent key reads only its own buyer's events. Keys are never accepted in the query string.
+- Demo door (`DEMO_MODE=1`, as deployed): a request with no `Authorization` header at all reads every buyer, like a judge key, read-only. A header with a wrong or unknown key is still 401; with `DEMO_MODE` off, no key is 401. No event carries an approval token or link, an API key or a mandate signature; `draft.created` carries the buyer's own request text.
 - A `since` that is not a non-negative integer gets 400 `INVALID_REQUEST`; a `Last-Event-ID` that is not one is treated as 0.
-- Browsers: `EventSource` cannot send an `Authorization` header, so use `fetch(url, { headers: { Authorization: 'Bearer <key>' } })` and read the response body stream (parse the `id:`/`event:`/`data:` lines yourself), or poll `GET /v1/events?since=`. Both events routes answer cross-origin requests (`Access-Control-Allow-Origin: *`, `Authorization` allowed, `OPTIONS` preflight answered, no credentials or cookies); no other route does.
+- Browsers: on a demo door a plain `new EventSource(url)` works without a key. Elsewhere `EventSource` cannot send an `Authorization` header, so use `fetch(url, { headers: { Authorization: 'Bearer <key>' } })` and read the response body stream (parse the `id:`/`event:`/`data:` lines yourself), or poll `GET /v1/events?since=`. Both events routes answer cross-origin requests (`Access-Control-Allow-Origin: *`, `Authorization` allowed, `OPTIONS` preflight answered, no credentials or cookies); no other route does.
 
 ## Event
 

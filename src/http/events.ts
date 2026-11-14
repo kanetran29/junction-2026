@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import type { Env } from '../env';
 import { listEvents, type Event } from '../events/log';
-import { HttpError, identify } from './auth';
+import { HttpError, identify, keylessDemo } from './auth';
 
 type Ctx = Context<{ Bindings: Env }>;
 
@@ -10,16 +10,19 @@ const PING_MS = 15_000;
 const CLOSE_MS = 60_000;
 
 /**
- * The events a caller may read and from where: a judge or admin key may read any buyer (optionally filtered), an agent key
- * only its own. `since` comes from the query or, when absent, the `Last-Event-ID` header a reconnecting EventSource sends.
+ * The events a caller may read and from where: a judge or admin key, or no key at all on a demo door (`DEMO_MODE=1`, so the
+ * public demo page can watch), may read any buyer (optionally filtered); an agent key only its own. `since` comes from the
+ * query or, when absent, the `Last-Event-ID` header a reconnecting EventSource sends.
  */
 async function scope(c: Ctx): Promise<{ since: number; buyerId?: string }> {
-  const who = await identify(c.env, c.req.header('Authorization'));
-  if (!who) throw new HttpError(401, 'UNAUTHORIZED', 'a valid Bearer API key is required');
+  const header = c.req.header('Authorization');
   const asked = c.req.query('buyer') || undefined;
-  if (who.role === 'agent' && asked && asked !== who.buyerId) throw new HttpError(403, 'FORBIDDEN', 'an agent key reads only its own buyer');
   const raw = c.req.query('since') ?? c.req.header('Last-Event-ID');
   const since = raw !== undefined && /^\d+$/.test(raw) ? Number(raw) : 0;
+  if (keylessDemo(c.env, header)) return { since, buyerId: asked };
+  const who = await identify(c.env, header);
+  if (!who) throw new HttpError(401, 'UNAUTHORIZED', 'a valid Bearer API key is required');
+  if (who.role === 'agent' && asked && asked !== who.buyerId) throw new HttpError(403, 'FORBIDDEN', 'an agent key reads only its own buyer');
   return { since, buyerId: who.role === 'agent' ? (who.buyerId ?? undefined) : asked };
 }
 

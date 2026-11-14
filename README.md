@@ -103,7 +103,7 @@ The scenarios use the demo-only admin routes (reset, clock, replay), so they wor
 | Receipt | `GET /v1/orders/{id}/receipt` (plain text, buyer key); `GET /receipt/{orderId}` (plain text, no key: the order id is the capability URL, so share it only with whoever may see the receipt) |
 | Health | `GET /health` |
 
-The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/search`, `/v1/quotes`, `/v1/baskets`, `/v1/orders`, `/v1/resolve`, and `GET /v1/families`, `/v1/quotes/{id}` and `/v1/orders/{id}`. Every `/v1` route except `/v1/rules` and `/v1/reason-codes` needs `Authorization: Bearer <key>`, and so does `/mcp`. `/health` and `/openapi.json` are open. HTTP and MCP share one schema.
+The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/search`, `/v1/quotes`, `/v1/baskets`, `/v1/orders`, `/v1/resolve`, and `GET /v1/families`, `/v1/quotes/{id}` and `/v1/orders/{id}`. Every `/v1` route except `/v1/rules` and `/v1/reason-codes` needs `Authorization: Bearer <key>`, and so does `/mcp`. The one exception is the event log on a demo door: with `DEMO_MODE=1`, `GET /v1/events` and `/v1/events/stream` also answer a request with no key at all, read-only and for every buyer, so the public demo page can watch the door (a wrong key is still 401). `/health` and `/openapi.json` are open. HTTP and MCP share one schema.
 
 `POST /v1/orders` follows the ACP idempotency rules: a missing `Idempotency-Key` is 400, the same key in flight is 409, the same key with another body is 422. A retry with the same key and body returns the same order.
 

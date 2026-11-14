@@ -68,11 +68,11 @@ const resolveRoute = createRoute({ method: 'post', path: '/v1/resolve', summary:
 const familiesRoute = createRoute({ method: 'get', path: '/v1/families', summary: 'The catalogue map by category, or with terms the families that mention them, with evidence (no products, no Valio call)', request: { query: S.FamiliesQuery }, security: SECURITY, responses: ok(S.FamiliesReply) });
 const rulesRoute = createRoute({ method: 'get', path: '/v1/rules', summary: 'The published decision register: who decides what, and the constants behind it', responses: { 200: json(S.RulesReply, 'OK') } });
 const reasonCodesRoute = createRoute({ method: 'get', path: '/v1/reason-codes', summary: 'Every reason code with its text, resolution and whether a retry may help', responses: { 200: json(S.ReasonCodesReply, 'OK') } });
-const eventsRoute = createRoute({ method: 'get', path: '/v1/events', summary: 'Events after `since` (exclusive), oldest first, at most 500; judge and admin keys read every buyer, an agent key only its own', request: { query: S.EventsQuery }, security: SECURITY, responses: { ...ok(S.EventsReply), 403: json(S.ErrorBody, "An agent key asked for another buyer's events") } });
+const eventsRoute = createRoute({ method: 'get', path: '/v1/events', summary: 'Events after `since` (exclusive), oldest first, at most 500; judge and admin keys read every buyer, an agent key only its own; on a demo door (`DEMO_MODE=1`) no key at all also reads every buyer, read-only (a wrong key is still 401)', request: { query: S.EventsQuery }, security: SECURITY, responses: { ...ok(S.EventsReply), 403: json(S.ErrorBody, "An agent key asked for another buyer's events") } });
 const streamRoute = createRoute({
   method: 'get',
   path: '/v1/events/stream',
-  summary: 'The same events as Server-Sent Events (`id`, `event`, `data`), `: ping` every 15 s, closed after about 60 s; resume with `since` or `Last-Event-ID`',
+  summary: 'The same events as Server-Sent Events (`id`, `event`, `data`), `: ping` every 15 s, closed after about 60 s; resume with `since` or `Last-Event-ID`; same keys as `/v1/events`, keyless on a demo door (`DEMO_MODE=1`)',
   request: { query: S.EventsQuery },
   security: SECURITY,
   responses: { 200: { description: 'text/event-stream', content: { 'text/event-stream': { schema: S.EventStream } } }, 401: json(S.ErrorBody, 'Missing or unknown API key'), 403: json(S.ErrorBody, "Another buyer's events") },
@@ -94,7 +94,7 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   const eventsCors = cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'], allowHeaders: ['Authorization', 'Last-Event-ID'] });
   app.use('/v1/events', eventsCors);
   app.use('/v1/events/stream', eventsCors);
-  app.use('/v1/*', authenticate(PUBLIC_PATHS));
+  app.use('/v1/*', authenticate(PUBLIC_PATHS, ['/v1/events', '/v1/events/stream']));
 
   app.notFound((c) => c.json({ error: 'NOT_FOUND', detail: 'no such route' }, 404));
 
