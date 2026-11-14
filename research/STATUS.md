@@ -4,7 +4,21 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 
 ## Cần Kane quyết định
 
-(chưa có)
+**1. Deploy đang bị chặn bởi giới hạn ghi D1 miễn phí (quyết định mua là của Kane).**
+- Worker đã chạy ở **https://lazydoor.lazydoor.workers.dev** (`/health` OK), nhưng mọi thao tác ghi trả 500 với
+  `D1_ERROR: Your account has exceeded D1's free tier daily row write limit`. Nguyên nhân: nạp dữ liệu lên D1 từ xa (17.546 sản phẩm +
+  35.881 GTIN + replay + tên nhóm, cộng các dòng index) đã dùng hết hạn mức 100.000 dòng ghi/ngày của account hackathon (gói Free).
+- Hạn mức tự reset lúc **00:00 UTC = 02:00 sáng Chủ nhật 15/11 giờ Helsinki**. Sau đó demo chỉ ghi vài trăm–vài nghìn dòng mỗi lần, dư sức.
+- Lựa chọn: (a) **chờ tới 02:00 Chủ nhật** rồi chạy 3 lệnh dưới (khuyên dùng; miễn phí); (b) nâng account hackathon lên **Workers Paid
+  (5 USD/tháng)** để ghi được ngay — đây là mua hàng nên mình không tự làm.
+- Sau khi ghi được lại (từ thư mục repo; key chỉ đọc từ file, không in ra):
+  ```
+  export GATEWAY_URL=https://lazydoor.lazydoor.workers.dev ADMIN_KEY="$(cat .data/valio/keys/deploy-admin.key)"
+  pnpm acceptance && pnpm scenarios
+  curl -s -X POST $GATEWAY_URL/admin/reset -H "Authorization: Bearer $ADMIN_KEY" -H 'content-type: application/json' -d '{"clock":"2026-11-13T21:10:00+02:00","replay":"replies_2026-11-16"}' > /dev/null
+  curl -s -X POST $GATEWAY_URL/admin/judge-key -H "Authorization: Bearer $ADMIN_KEY"   # judge key cho giám khảo / trang demo
+  ```
+  Đừng chạy lại `index:load:remote` (chính nó tốn hạn mức). Bản local (`wrangler dev`) không bị ảnh hưởng: 49/49, scenarios 11/11.
 
 ## Nhật ký
 
