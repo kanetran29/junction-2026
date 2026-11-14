@@ -6,13 +6,13 @@ Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 
 Mở http://localhost:8790/ (dev server đang chạy, phục vụ thẳng thư mục `demo/`), bấm Play hoặc kéo thanh thời gian. Chưa quay video mới: `demo/story.mp4` vẫn là bản cũ, sẽ quay lại sau khi Kane duyệt.
 
-Cần xem (bản sửa theo nhận xét lúc 0:23):
-1. 0:01 đến 0:06: chef gõ yêu cầu vào màn hình bếp (màn hình sáng xanh, chữ hiện dần phía trên, tay chef gõ) ([ảnh](shots/after-chef-typing.png)).
-2. 0:10 đến 0:26: agent ngây thơ đi tới trước cổng rồi đứng ngoài; gọi API vòng qua cổng; thùng bị cổng bến từ chối ("Cut-off Thu 12 Nov 15:00"), thùng xe mở hông nhưng trống, chef nhún vai trước quầy trống ([ảnh](shots/after-dock-refusal.png), [xe trống](shots/after-truck-empty.png)).
-3. 0:33 đến 0:47: agent đi tới vạch quét trước cổng và đứng chờ ở đó, không vào kho; cổng từ chối hàng đóng và hàng thiếu ngay tại cổng ([ảnh](shots/after-door-refusal.png)).
-4. 0:53 đến 1:00: chef nhìn màn hình khi cần duyệt (màn hình vàng, chuông), rồi chạm để duyệt.
-5. 1:00 đến 1:13: thùng bay vào xe, nhìn thấy qua hông mở; xe chạy tới bếp, dỡ thùng, chef giơ ngón cái, hoá đơn, lịch MON 16; agent quay về chef ([xe có hàng](shots/after-truck.png), [giao hàng](shots/after-delivery.png)).
-6. 1:46 hết hạn duyệt: cổng bến đóng, chef nhún vai ([ảnh](shots/after-expired.png)).
+Cần xem (bản sửa: màn hình bếp bị chef che, thẻ quyết định đè nhãn bến):
+1. 0:01 đến 0:06: chef đứng bên phải màn hình bếp và gõ trên bàn phím gắn bên hông; màn hình lộ hoàn toàn, chữ gõ hiện ở ô phía trên bên trái ([ảnh](shots/after-chef-terminal.png)).
+2. 0:53 đến 1:00: màn hình vàng có chuông, chef chạm duyệt; nhãn màn hình nằm dưới màn hình, cạnh chân đế.
+3. 1:00 đến 1:13: thẻ quyết định ở góc dưới phải, hoá đơn ở góc dưới trái cạnh chỗ xe dỡ hàng ([ảnh](shots/after-delivery.png)).
+4. Live, phát file mẫu tới `approval.expired`: thẻ REJECT ở góc dưới phải, "Approval expired" dưới thanh chắn bến, không chữ nào đè nhau ([ảnh](shots/after-live-expired.png)).
+
+Kiểm tra chồng chữ tự động ở 1080p: `node demo/dev/label-overlap.mjs` (Story mỗi 0,25 giây, Live phát hết file mẫu) báo `label overlaps: 0`.
 
 ## Nhật ký
 
@@ -110,6 +110,19 @@ Vấn đề tìm thấy:
 - Chef hành động: gõ yêu cầu vào màn hình bếp (màn hình sáng, chữ gõ dần, tay gõ), nhìn màn hình khi có yêu cầu duyệt và chạm để duyệt, giơ ngón cái khi hàng tới, nhún vai (hai tay ngửa) khi bến từ chối hoặc phê duyệt hết hạn. Màn hình bếp là thiết bị duyệt (chef là người được ủy quyền duyệt), phụ đề đổi theo.
 - Thùng xe: bỏ mặt hông phía người xem, kiểu xe rèm cuốn (rèm cuộn dưới mái, có chữ VALIO AIMO), thấy được 8 chỗ thùng bên trong. Thùng hàng bay vào đúng chỗ khi được chấp nhận, đi cùng xe tới bếp rồi được dỡ ra; khi bến từ chối, xe trống. Vẫn là một xe, một khung gầm.
 - Agent: chỉ đi giữa chef và vạch quét (vạch magenta trước cổng), đứng chờ ở đó, không bao giờ vào phía kho; khi đơn được chấp nhận thì quay về chef. Cánh cổng chỉ mở khi quyết định cho hàng qua. Agent ngây thơ cũng đi tới trước cổng rồi đứng ngoài.
+
+### 13. Màn hình bếp lộ hoàn toàn, thẻ quyết định xuống góc, kiểm tra chồng chữ
+- Chef chuyển sang bên phải màn hình bếp (không còn đứng trước màn hình); màn hình quay về người xem, có bàn phím nhỏ gắn bên hông, tay chef gõ trên bàn phím nên không che màn hình. Thứ tự vẽ: màn hình trước, chef sau, hai bên không chồng lên nhau.
+- Thẻ quyết định (con dấu + lý do) neo vào góc dưới phải, đáy ngay trên chỗ phụ đề hai dòng bắt đầu. Ảnh Kane gửi là bản trước, khi nhãn bến còn nằm bên phải thanh chắn.
+- Kiểm tra chồng chữ: `demo/dev/label-overlap.mjs` lấy khung bao màn hình của mọi chữ đang hiện (nhãn agent, ô chữ gõ, hoá đơn, thẻ quyết định, nhãn cổng, nhãn kệ, nhãn bến, nhãn màn hình, biển LAZYDOOR, biển logo, lịch, màn hình bếp, chữ VALIO AIMO trên xe, khung sự kiện, đồng hồ hạn chót, phụ đề) ở 1080p, cả Story và Live. Lần chạy đầu tìm ra 20 cặp; đã sửa:
+  - Ô chữ gõ dời sang cột trái phía trên màn hình bếp (không đè lịch, biển LAZYDOOR).
+  - Hoá đơn dời xuống góc dưới trái, cạnh chỗ xe dỡ hàng (không đè ô chữ gõ).
+  - Nhãn màn hình nằm dưới màn hình, cạnh chân đế (không đè màn hình).
+  - Nhãn agent tự né lịch và màn hình bếp.
+  - Nhãn bến nằm dưới chân thanh chắn, chỉ hiện "Waiting for approval"/"Approval expired" khi xe đã đỗ ở bến (không đè chữ trên xe đang chạy).
+  - Nhãn "999999?" của agent ngây thơ nằm bên phải biển LAZYDOOR.
+  - Thẻ kết thúc phủ toàn khung nên không tính chồng.
+- Test 28 pass; 120 khung/giây ở 1080p.
 
 ## Còn lại / cần làm sau
 - Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).

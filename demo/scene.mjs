@@ -22,7 +22,7 @@ const SPLASH = { x: -304, y: -120, w: 192, d: 7, r: 1, h: 78 };
 const WALL_Y = WALL.y + WALL.d;
 const COUNTER = { x: -300, y: -112, w: 150, d: 34, r: 2, h: 32 };
 const SLOTS = [-222, -202, -182, -162];
-const CHEF = [-252, -54];
+const CHEF = [-226, -36];
 const PHONE = { x: -306, y: -32, w: 44, d: 4, z: 30, h: 62 };
 const CAL = { x: -150, w: 36, z: 30, h: 46 };
 const ROAD = { x: -306, y: 56, w: 612, d: 52, r: 3 };
@@ -37,6 +37,8 @@ const LAMPS = RACK_X.map((x) => x + RACK.w / 2);
 const WINDOWS = [[-46, 22], [104, 22], [134, 22], [272, 22]];
 const LOGO = { at: [18, WALL_Y, 124], width: 150, ratio: 179.06 / 537.17 };
 const CLOCK = [222, WALL_Y, 112, 15];
+/** Bottom edge for the corner cards (decision, receipt): just above where a two-line caption starts. */
+const CARD_BOTTOM = 748;
 
 const P = k.fitProjection(
   [...k.boxCorners(PLATE, -24, 0), [PLATE.x + 262, PLATE.y, WALL.h + 6], [PLATE.x + PLATE.w, PLATE.y, WALL.h + 6], [GATE_X, 0, 150]],
@@ -58,6 +60,16 @@ const f1 = (v) => Math.round(v * 10) / 10;
 const M = (material, svg) => `<g class="m m-${material}">${svg}</g>`;
 /** Local (u, v) on the plane y = const mapped to world (x0 + u, y, z0 − v): marks on faces that look at the viewer. */
 const face = (x0, y, z0) => k.sideMatrix([x0, y], z0, P, "left");
+/** Screen box [x0, y0, x1, y1] around world points. */
+const boxOf = (points) => {
+  const xy = points.map(at);
+  return [Math.min(...xy.map((p) => p[0])), Math.min(...xy.map((p) => p[1])), Math.max(...xy.map((p) => p[0])), Math.max(...xy.map((p) => p[1]))];
+};
+/** Words in the scene that a moving label must not cover, left to right: the terminal screen and the kitchen calendar. */
+const KEEP_CLEAR = [
+  boxOf([[PHONE.x, PHONE.y + PHONE.d, PHONE.z], [PHONE.x + PHONE.w, PHONE.y + PHONE.d, PHONE.z], [PHONE.x, PHONE.y + PHONE.d, PHONE.z + PHONE.h], [PHONE.x + PHONE.w, PHONE.y + PHONE.d, PHONE.z + PHONE.h]]),
+  boxOf([[CAL.x, WALL_Y, CAL.z], [CAL.x + CAL.w, WALL_Y, CAL.z], [CAL.x, WALL_Y, CAL.z + CAL.h], [CAL.x + CAL.w, WALL_Y, CAL.z + CAL.h]]),
+];
 /** Local (u, v) on the plane x = const mapped to world (x, y0 + u, z0 − v): marks on faces that look along −x. */
 function faceX(x, y0, z0) {
   const o = at([x, y0, z0]);
@@ -174,7 +186,7 @@ function chef() {
   const out = [`<path class="iso-halo" d="${k.haloOf({ x: x - 13, y: y - 11, w: 26, d: 22, r: 10 }, 0, 0.1, P)}" style="filter:blur(4px)"/>`];
   out.push(M("dark", slab({ x: x - 9, y: y - 3, w: 7, d: 11, r: 2 }, 0, 3, { tone: "mid" }, 2) + slab({ x: x + 2, y: y - 3, w: 7, d: 11, r: 2 }, 0, 3, { tone: "mid" }, 2) + cyl(x, y, 8, 3, 16, { tone: "mid" }, 28)));
   out.push(`<g class="arms-down arm-left">${M("sun", slab({ x: x - 16, y: y - 4, w: 5, d: 8, r: 2 }, 26, 20, { tone: "hi" }, 2))}${skin(x - 13.5, y, 24, 2.6)}</g>`);
-  out.push(`<g class="arm-type" style="opacity:0">${M("sun", slab({ x: x - 27, y: y + 1, w: 15, d: 6, r: 2 }, 38, 6, { tone: "hi" }, 2))}<g class="typing-hand">${skin(x - 28, y + 4, 41, 2.8)}</g></g>`);
+  out.push(`<g class="arm-type" style="opacity:0">${M("sun", slab({ x: x - 26, y: y + 2, w: 15, d: 6, r: 2 }, 43, 5, { tone: "hi" }, 2))}<g class="typing-hand">${skin(x - 26, y + 6, 50.5, 2.8)}</g></g>`);
   const jacket = cyl(x, y, 11, 19, 30, { tone: "hi" }, 36) + L(k.sideArc(x, y, 11, 30, P, 24), { tone: "lo" });
   out.push(M("sun", jacket + dots([[x - 3.5, y + 10.6, 46], [x - 3.5, y + 10.6, 41], [x + 3.5, y + 10.6, 46], [x + 3.5, y + 10.6, 41]], { size: 1.3, tone: "hi" })));
   const apron = { x: x - 8, y: y + 9.5, w: 16, d: 2.2, r: 1 };
@@ -328,12 +340,16 @@ function beam() {
   return out.join("");
 }
 
-/** The manager's phone on a pedestal by the kitchen: a glowing screen that shows an icon per state. */
+/** The kitchen terminal on a pedestal: a glowing screen facing the viewer with an icon per state, and a keypad on its right side where the chef types. */
 function phone() {
   const p = PHONE;
   const stand = M("dark", slab({ x: p.x + 14, y: p.y - 6, w: 16, d: 12, r: 2 }, 0, p.z - 2, { tone: "mid" }, 3, 0.4) + slab({ x: p.x + 4, y: p.y - 10, w: 36, d: 20, r: 3 }, 0, 3, { tone: "mid" }, 3, 0.4) + slab({ x: p.x + 8, y: p.y - 4, w: 28, d: 8, r: 2 }, p.z - 2, 2.4, { tone: "mid" }, 3, 0.4));
   const screen = `<g transform="${face(p.x, p.y + p.d + 0.1, p.z + p.h)}"><rect class="phone-screen" x="3" y="5" width="${p.w - 6}" height="${p.h - 10}" rx="3"/><rect class="phone-notch" x="${p.w / 2 - 5}" y="2" width="10" height="1.6" rx=".8"/><g class="phone-icon" data-id="phonei"></g><g class="ph-buttons"><rect class="btn-ok" x="6" y="${p.h - 18}" width="14" height="8" rx="3"/><rect class="btn-no" x="${p.w - 20}" y="${p.h - 18}" width="14" height="8" rx="3"/></g></g>`;
-  return stand + `<g data-id="phone">${M("phone", slab({ x: p.x, y: p.y, w: p.w, d: p.d, r: 3 }, p.z, p.h, { tone: "hi", crease: "lo" }, 4, 0.6))}${screen}</g>`;
+  const pad = { x: p.x + p.w, y: p.y - 4, w: 12, d: 10, r: 1.5 };
+  const keys = [];
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) keys.push([pad.x + 3 + i * 3, pad.y + 2.5 + j * 2.5, p.z + 22]);
+  const keypad = M("dark", slab({ x: p.x + p.w - 1, y: p.y - 2, w: 4, d: 6, r: 1 }, p.z + 16, 3, { tone: "mid" }, 2, 0) + slab(pad, p.z + 19, 3, { tone: "mid" }, 3, 0.4)) + dots(keys, { size: 0.9, tone: "hi" });
+  return stand + `<g data-id="phone">${M("phone", slab({ x: p.x, y: p.y, w: p.w, d: p.d, r: 3 }, p.z, p.h, { tone: "hi", crease: "lo" }, 4, 0.6))}${screen}${keypad}</g>`;
 }
 
 /**
@@ -731,7 +747,7 @@ ${truck()}
       const node = chips[i];
       if (status !== "naive" || !text) return setAttr(node, "style", "opacity:0");
       const [cx, cy] = at([RACK_X[i] + RACK.w / 2, RACK.y + RACK.d, RACK.h + 20]);
-      chip(node, { x: cx, y: cy - 4, text, iconName, tone: status, size: 23 });
+      chip(node, { x: cx + 6, y: cy - 4, text, iconName, tone: status, size: 23, anchor: "start" });
       setAttr(node, "style", `opacity:${(calm ? 1 : clamp01(age / 0.25)).toFixed(3)}`);
     });
   }
@@ -858,15 +874,16 @@ ${truck()}
       if (t > loadAt + 0.6) words = ["Cut-off Thu 12 Nov 15:00", "lock", "reject"];
     }
     else for (let i = 5; i < 8; i++) setAttr(tokens[i], "style", "opacity:0");
-    if (!words && state.phone.status === "buzzing") words = ["Waiting for approval", "clock", "hold"];
-    if (!words && state.phone.status === "expired") words = ["Approval expired", "clock", "reject"];
+    const parked = truckRun(tr, t - tr.since).front === DOCK_X;
+    if (!words && parked && state.phone.status === "buzzing") words = ["Waiting for approval", "clock", "hold"];
+    if (!words && parked && state.phone.status === "expired") words = ["Approval expired", "clock", "reject"];
     if (!words) return setAttr(el.dockchip, "style", "opacity:0");
-    const [px, py] = at([BARRIER.x, BARRIER.post, 30]);
+    const [px, py] = at([BARRIER.x, BARRIER.post, 0]);
     chip(el.dockchip, { x: px - 24, y: py + 4, text: words[0], iconName: words[1], tone: words[2], size: 23, anchor: "end" });
     setAttr(el.dockchip, "style", null);
   }
 
-  /** The door's decision: a shockwave at the gate beacon, and a banner at top centre where the stamp slams in with its reasons. */
+  /** The door's decision: a shockwave at the gate beacon, and a card in the bottom-right corner where the stamp slams in with its reasons. */
   function drawStamp(stamp, reasons, since, phoneStatus, t, calm) {
     const group = el.stampfx;
     if (!stamp) {
@@ -886,7 +903,6 @@ ${truck()}
     });
     setAttr(group, "data-stamp", stamp);
     setAttr(group, "style", null);
-    setAttr(group, "transform", "translate(1186 500)");
     const badge = group.querySelector(".badge-in");
     const scale = 1 + 0.9 * (1 - backOut(age / 0.26));
     setAttr(badge, "transform", scale !== 1 ? `scale(${scale.toFixed(3)})` : null);
@@ -898,7 +914,9 @@ ${truck()}
       const approved = w === "Approved on phone";
       items.push({ text: w, tone: approved ? "auto" : "plain", size: 23, x: 20, y: 150 + i * 50, iconName: approved ? "check" : null });
     });
-    setAttr(group.querySelector(".banner-box"), "height", 116 + Math.min(3, words.length) * 50);
+    const height = 116 + Math.min(3, words.length) * 50;
+    setAttr(group.querySelector(".banner-box"), "height", height);
+    setAttr(group, "transform", `translate(${W - 16 - 398} ${CARD_BOTTOM - height})`);
     const rows = pool(group.querySelector(".stamp-labels"), items.length, chipMarkup);
     rows.forEach((row, i) => {
       const item = items[i];
@@ -932,8 +950,8 @@ ${truck()}
       expired: ["Expired at cut-off", "clock", "muted"],
     }[ph.status];
     if (!words) return setAttr(el.phonechip, "style", "opacity:0");
-    const [px, py] = at([PHONE.x - 6, PHONE.y + PHONE.d, PHONE.z - 6]);
-    chip(el.phonechip, { x: px, y: py, text: words[0], iconName: words[1], tone: words[2], anchor: "end" });
+    const [px, py] = at([PHONE.x + PHONE.w, PHONE.y + PHONE.d, 0]);
+    chip(el.phonechip, { x: px, y: py + 18, text: words[0], iconName: words[1], tone: words[2], anchor: "end" });
     setAttr(el.phonechip, "style", null);
   }
 
@@ -1005,8 +1023,7 @@ ${truck()}
     setText(el.calday, day);
     setAttr(el.caldate, "data-flip", delivered ? "" : null);
     if (run.accepted && age >= run.unloadDone - 0.2 && age < run.home + 1.5) {
-      const [rx, ry] = at([-262, WALL_Y, SPLASH.h + 8]);
-      setAttr(el.receipt, "transform", `translate(${f1(rx - 125)} ${f1(ry - 112)})`);
+      setAttr(el.receipt, "transform", `translate(40 ${CARD_BOTTOM - 102})`);
       setText(el.receipt.querySelector(".receipt-amount"), state.receipt?.netCents != null ? euro(state.receipt.netCents) : "Delivered");
       setAttr(el.receipt, "style", `opacity:${(calm ? 1 : clamp01((age - run.unloadDone + 0.2) / 0.3)).toFixed(3)}`);
     } else setAttr(el.receipt, "style", "opacity:0");
@@ -1074,7 +1091,7 @@ ${truck()}
       setAttr(el.bubble, "style", "opacity:0");
       return { typing: false };
     }
-    const full = wrap(source.text, 26);
+    const full = wrap(source.text, 20);
     const shown = calm ? source.text.length : Math.floor((t - source.since) * 18);
     let left = shown;
     const lines = full.map((line) => {
@@ -1087,7 +1104,7 @@ ${truck()}
     const width = Math.max(...full.map((l) => l.length + 1)) * size * 0.62 + 40;
     const height = full.length * lineH + 26;
     const [tx, ty] = at([PHONE.x + PHONE.w / 2, PHONE.y + PHONE.d, PHONE.z + PHONE.h + 6]);
-    const x = Math.max(14, Math.min(W - 14 - width, tx - width / 2 + 60));
+    const x = Math.max(14, tx + 50 - width);
     const y = ty - height - 22;
     const rr = 12;
     const tipX = Math.min(Math.max(tx, x + 30), x + width - 30);
@@ -1136,8 +1153,11 @@ ${truck()}
     const size = 24;
     const width = Math.max(...lines.map((l) => l.length)) * size * 0.56 + 32;
     const height = lines.length * size * 1.3 + 18;
+    const top = head[1] - height - 8;
+    let left = head[0] - width / 2;
+    for (const [x0, y0, x1, y1] of KEEP_CLEAR) if (top < y1 + 2 && top + height > y0 - 2 && left < x1 + 8 && left + width > x0 - 8) left = x1 + 8;
     const box = el.label.querySelector(".label-box");
-    box.setAttribute("x", f1(head[0] - width / 2));
+    box.setAttribute("x", f1(left));
     box.setAttribute("y", f1(head[1] - height - 8));
     box.setAttribute("width", f1(width));
     box.setAttribute("height", f1(height));
@@ -1152,7 +1172,7 @@ ${truck()}
     }
     [...txt.children].forEach((span, i) => {
       span.textContent = lines[i];
-      span.setAttribute("x", f1(head[0]));
+      span.setAttribute("x", f1(left + width / 2));
       span.setAttribute("y", f1(head[1] - height - 8 + 9 + size + i * size * 1.3 - 3));
     });
     setAttr(el.label, "style", null);
