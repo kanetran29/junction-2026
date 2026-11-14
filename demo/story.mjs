@@ -5,17 +5,28 @@ import { initialState, reduce } from "./model.mjs";
 import fixture from "./fixtures/story-v2.json" with { type: "json" };
 
 /** Seconds per scene: each is its narration line plus a short pause (scene 10 also holds for the delivery and receipt). */
-const SCENES = [19.6, 6.2, 16.6, 13.2, 12.8, 8, 5.2, 6.8, 13, 7, 5.6];
+const SCENES = [20.4, 6.2, 16.6, 13.2, 12.8, 8, 5.2, 6.8, 13, 7, 5.6];
 /** Second at which each scene starts. */
 const START_OF = SCENES.reduce((acc, len, i) => [...acc, Math.round((acc[i] + len) * 100) / 100], [0]);
 export const DURATION = START_OF.at(-1);
 
-/** Narration: one Gemini TTS line (voice Charon) per scene, starting 0.3 s in; dur is the file's length in seconds. */
-export const VOICE = [14.61, 5.12, 15.53, 12.26, 11.83, 7.11, 4.34, 5.92, 12.07, 5.13, 4.79].map((dur, i) => ({
-  at: START_OF[i] + 0.3,
-  dur,
-  src: `assets/voice/${String(i + 1).padStart(2, "0")}.mp3`,
-}));
+/** Seconds into scene 1 where the flash-forward to Monday's line starts, and where the rewind (and its sound) starts. */
+const MONDAY_LINE = 15.2;
+const REWIND = 18.4;
+const at = (scene, offset) => Math.round((START_OF[scene] + offset) * 100) / 100;
+
+/**
+ * Narration: Gemini TTS lines (voice Charon), one per scene starting 0.3 s in, plus scene 1's consequence line "So on
+ * Monday morning, there is no milk." (file 12, added last, played right after line 1); dur is each file's length in seconds.
+ */
+export const VOICE = [
+  { at: at(0, 0.3), dur: 14.61, src: "assets/voice/01.mp3" },
+  { at: at(0, MONDAY_LINE), dur: 2.92, src: "assets/voice/12.mp3" },
+  ...[5.12, 15.53, 12.26, 11.83, 7.11, 4.34, 5.92, 12.07, 5.13, 4.79].map((dur, i) => ({ at: at(i + 1, 0.3), dur, src: `assets/voice/${String(i + 2).padStart(2, "0")}.mp3` })),
+];
+
+/** Sound effects on the same track as the narration: the tape-rewind whoosh under the "Rewind" in scene 1 (ffmpeg-made). */
+export const SFX = [{ at: at(0, REWIND), dur: 1.7, src: "assets/sfx/rewind.mp3" }];
 
 const ASK = "1,000 litres of lactose-free milk by Monday, in 10-litre boxes if you can.";
 const FRIDAY = "We need 40 kg of chicken breast fillet for Friday, Atria only.";
@@ -52,7 +63,7 @@ const SCRIPT = [
   [0, 9.5, ...caption("It orders 50 cases: 1,565.50 €. No one is asked.")],
   [0, 12.5, "story.naive", { step: "stuck" }],
   [0, 12.5, "story.list", RAW(true)],
-  [0, 12.5, ...caption("The same reply also said: closed Thu 15:00.")],
+  [0, 12.5, ...caption("Nobody checked. Nobody approved.")],
   [0, 12.5, "story.card", card("The agent's order · never ships", ["50 cases × 31.31 € = 1,565.50 €", "Past the Thu 15:00 cut-off"], { tone: "reject", link: "agent" })],
   [0, 13.2, "story.agent", { at: "home", carry: null }],
   // Flash-forward to Monday: no milk arrives. Then rewind to Friday, before the door goes up.
@@ -60,17 +71,17 @@ const SCRIPT = [
   [0, 15, "story.naive", { step: "gone" }],
   [0, 15, "story.list", {}],
   [0, 15.5, "story.nomilk", { on: true }],
-  [0, 15.5, ...caption("Monday 07:00: no milk for breakfast.")],
+  [0, 15.5, ...caption("So on Monday morning, there is no milk.")],
   [0, 15.5, "story.card", card("Monday 16 Nov · 07:00", ["No milk: the 50 cases never shipped", "Nobody checked, nobody approved"], { tone: "reject", link: "terminal" })],
-  [0, 17.6, "story.nomilk", { on: false }],
-  [0, 17.6, "story.card", {}],
-  [0, 17.6, "story.warp", { to: "2026-11-13T16:30:00+02:00", dur: 1.8 }],
+  [0, REWIND, "story.nomilk", { on: false }],
+  [0, REWIND, "story.card", {}],
+  [0, REWIND, "story.warp", { to: "2026-11-13T16:30:00+02:00", dur: 1.8 }],
   [0, 18.5, ...caption("Rewind to Friday. This time, there is a door.")],
 
   // 2 · Friday evening: the door goes up and the kitchen manager's phone sends it the kitchen's signed rules.
   [1, 0, "story.reset", { truck: true, agent: true }],
   [1, 0, "story.warp", { to: "2026-11-13T19:40:00+02:00", dur: 1.2 }],
-  [1, 1.9, ...caption("One door at Valio. Each kitchen brings its own signed rules.")],
+  [1, 1.1, ...caption("One door at Valio. Each kitchen brings its own signed rules.")],
   [1, 0.3, "story.gate", { built: true }],
   [1, 2.2, "story.mandates", {}],
   [1, 2.2, "story.card", card("One door, each kitchen's own rules", ["Hotel Aurora · signed by its kitchen", "Kitchen B · its own signed rules", "Kitchen C · its own signed rules"], { link: "rack" })],

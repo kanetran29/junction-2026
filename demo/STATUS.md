@@ -212,6 +212,11 @@ Vấn đề tìm thấy:
 - `dev/fake-gateway.mjs`: đọc log không cần key, trả mọi buyer; `--replay [file] [--pace n]` phát lại một lần chạy (mặc định `fixtures/story-v2.json`, hoặc `~/junction-2026/.data/story-v2.1-run.json`), bắt đầu khi có người xem đọc log; bỏ `--story`. Xoá `fixtures/sample-events.json`, `replayFile`, `sendRequest`.
 - Kiểm tra: 46 test pass (thêm test backlog không key, gateway `--replay` mọi buyer, caption chữ thường, buyer khác không kéo robot, pallet chờ ngày giao); `label-overlap.mjs` (Story + 95 s Live trên gateway giả phát lần chạy thật) báo `label overlaps: 0`. Door thật đã mở log không key: Live kết nối SSE, lấy giờ door (Fri 13 Nov 21:10) và đứng chờ agent, không lỗi console.
 
+### 26. Cảnh 1 nói ra hậu quả, có tiếng tua băng (SCRIPT.md 16.6)
+- Lời mới `assets/voice/12.mp3` "So on Monday morning, there is no milk." (Gemini TTS Charon, Gemini chép lại đúng từng chữ), phát 0:15,2–0:18,12 ngay sau đoạn 1 (hết 0:14,91). Tiếng tua `assets/sfx/rewind.mp3` (ffmpeg tự tạo, thấp hơn giọng khoảng 14,5 dB) phát 0:18,4–0:20,1 cùng nhãn Rewind. Cảnh 2 từ 0:20,4; Story 114,8 s.
+- `VOICE` giờ ghi rõ giờ phát và file của từng đoạn (12 đoạn); `SFX` là tiếng tua; `main.mjs` phát cả hai trên một kênh (`CLIPS`), nên tắt tiếng, tạm dừng, tua đều áp dụng. Caption "Nobody checked. Nobody approved." và "So on Monday morning, there is no milk.".
+- Mười một đoạn giọng cũ không đổi (`git diff ca42bc7 -- 'demo/assets/voice/0*.mp3' 'demo/assets/voice/1[01].mp3'` rỗng). 47 test pass (thêm test lời mới và tiếng tua nằm trong cảnh 1, không chồng lời khác); `label overlaps: 0`. Trình duyệt tải 12.mp3 ở 0:15,2, rewind.mp3 ở 0:18,4, 02.mp3 ở 0:20,7.
+
 ## Còn lại / cần làm sau
 - Quay `demo/story.mp4` khi Kane duyệt Story mới (ghép giọng từ `VOICE`).
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.

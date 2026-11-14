@@ -534,3 +534,8 @@ Giọng đọc (11 đoạn đã duyệt) và mốc `VOICE` giữ nguyên; Story 
    - "HTTP API · /openapi.json" và "MCP · /mcp (9 tools)"
 
    Theo README trên `main`: `/openapi.json` mở cho mọi người, `/mcp` là MCP qua streamable HTTP với 9 tool. Phần còn lại của màn kết giữ nguyên: câu chốt, "49 acceptance cases…", "Valio adds…". Chữ màn kết có cỡ tối thiểu nên vẫn đọc được trên điện thoại.
+6. **Cảnh 1 nói ra hậu quả, kèm tiếng tua băng**. Cảnh 1 dài 20,4 s (thêm 0,8 s); Story **1:54,8** (114,8 s). Mười một đoạn giọng cũ không đổi.
+   - Lời mới, file `demo/assets/voice/12.mp3` (thu sau cùng, phát ngay sau đoạn 1): "So on Monday morning, there is no milk." Gemini TTS Charon, cùng cài đặt `voice.js` như các đoạn v2.1. Gemini chép lại đúng từng chữ; độ to trung bình −19 dB, đoạn 1 là −19,9 dB. Phát ở 0:15,2, lúc bắt đầu nhảy tới Thứ Hai (đoạn 1 hết ở 0:14,91), dài 2,92 s, hết ở 0:18,12.
+   - Caption 0:12,5 "Nobody checked. Nobody approved." (đoạn 1 nói câu này từ 0:13,0); caption 0:15,5 "So on Monday morning, there is no milk."; dấu NO MILK, lịch MON 16, bến và pallet trống giữ nguyên.
+   - Tiếng tua băng `demo/assets/sfx/rewind.mp3`, làm bằng ffmpeg: tiếng rít tăng dần cộng tiếng ồn lọc có rung, 1,7 s. Độ to trung bình −34,4 dB, tức thấp hơn giọng khoảng 14,5 dB. Phát cùng nhãn "◀◀ Rewind" ở 0:18,4–0:20,1, trên cùng kênh với lời đọc nên nút Sound on/off, tạm dừng và tua đều áp dụng.
+   - Cảnh 2 bắt đầu ở 0:20,4, đoạn 2 phát ở 0:20,7; caption "One door at Valio…" ở 0:21,5.

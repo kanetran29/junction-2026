@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { STORY, DURATION, VOICE, stateAt, gatewayEvents } from "../story.mjs";
+import { STORY, DURATION, VOICE, SFX, stateAt, gatewayEvents } from "../story.mjs";
 import { dayTotal } from "../model.mjs";
 import fixture from "../fixtures/story-v2.json" with { type: "json" };
 
@@ -18,21 +18,38 @@ const words = () => STORY.flatMap(({ ev }) => {
   return [];
 }).join("\n");
 
-test("story: at most 1:54 so the pitch video stays under the hard 2:00 limit; sorted; seq strictly increasing", () => {
-  assert.ok(DURATION >= 100 && DURATION <= 114, `DURATION ${DURATION}`);
+test("story: at most 1:58 so the pitch video stays under the hard 2:00 limit; sorted; seq strictly increasing", () => {
+  assert.ok(DURATION >= 100 && DURATION <= 118, `DURATION ${DURATION}`);
   STORY.forEach((item, i) => i && assert.ok(item.at >= STORY[i - 1].at));
   assert.ok(STORY.at(-1).at <= DURATION);
   STORY.forEach((item, i) => i && assert.ok(item.ev.seq > STORY[i - 1].ev.seq));
 });
 
-test("story: eleven narration lines (SCRIPT.md 14.4), each inside its own scene with a pause before the next", () => {
-  assert.equal(VOICE.length, 11);
-  VOICE.forEach((v, i) => {
-    const end = v.at + v.dur;
-    const next = VOICE[i + 1]?.at ?? DURATION + 0.3;
-    assert.ok(end + 0.25 <= next, `line ${i + 1} ends at ${end.toFixed(2)}, next starts ${next.toFixed(2)}`);
-    assert.match(v.src, /^assets\/voice\/\d\d\.mp3$/);
+test("story: narration and sound share one track: twelve lines and the rewind sound, in order, never overlapping, each inside a scene", () => {
+  assert.equal(VOICE.length, 12);
+  const clips = [...VOICE, ...SFX].sort((a, b) => a.at - b.at);
+  const starts = [0, ...STORY.filter((item) => item.ev.type === "story.gate" && item.ev.data.built).map((item) => item.at - 0.3)];
+  clips.forEach((c, i) => {
+    const end = c.at + c.dur;
+    const next = clips[i + 1]?.at ?? DURATION + 0.3;
+    assert.ok(end + 0.25 <= next, `${c.src} ends at ${end.toFixed(2)}, next starts ${next.toFixed(2)}`);
+    assert.match(c.src, /^assets\/(voice\/\d\db?|sfx\/rewind)\.mp3$/);
   });
+  assert.ok(VOICE.at(-1).at + VOICE.at(-1).dur <= DURATION);
+  assert.ok(starts.length === 2 && clips.slice(0, 3).every((c) => c.at + c.dur <= starts[1]), "line 1, the Monday line and the rewind sound all end before the door goes up");
+});
+
+test("story: scene 1 says the consequence right after line 1, then the rewind sound plays with the Rewind label", () => {
+  const [one, monday] = VOICE;
+  const [rewind] = SFX;
+  const warpBack = STORY.find((item) => item.ev.type === "story.warp" && item.ev.data.to === "2026-11-13T16:30:00+02:00");
+  assert.equal(monday.src, "assets/voice/12.mp3");
+  assert.ok(monday.at >= one.at + one.dur + 0.25 && monday.at <= one.at + one.dur + 0.5);
+  assert.equal(rewind.at, warpBack.at);
+  assert.ok(rewind.at >= monday.at + monday.dur + 0.25);
+  const caption = (text) => STORY.find((item) => item.ev.type === "story.caption" && item.ev.data.text === text)?.at;
+  assert.ok(caption("Nobody checked. Nobody approved.") <= one.at + one.dur);
+  assert.ok(Math.abs(caption("So on Monday morning, there is no milk.") - monday.at) <= 0.5);
 });
 
 test("story: every event of the real door run is on the timeline once, in the door's order", () => {
@@ -150,7 +167,7 @@ test("story: every caption stays up at least 3 s and long enough to read at 17 c
 
 test("story: Kane's fixes (SCRIPT.md 16): no milk on Monday, one door for every kitchen, accepted orders ship Monday", () => {
   const all = words();
-  assert.ok(all.includes("Monday 07:00: no milk for breakfast."));
+  assert.ok(all.includes("So on Monday morning, there is no milk."));
   assert.equal(stateAt(16).nomilk, true);
   assert.equal(stateAt(START_OF_2 + 0.01).nomilk, false);
   assert.ok(all.includes("One door at Valio. Each kitchen brings its own signed rules."));

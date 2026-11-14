@@ -1,6 +1,9 @@
 // Wires the scene to its two sources: the story timeline and the live gateway (or a recorded file).
 import { initialState, liveState, reduce, countdown, shownNow, clockText } from "./model.mjs";
-import { STORY, DURATION, VOICE, stateAt } from "./story.mjs";
+import { STORY, DURATION, VOICE, SFX, stateAt } from "./story.mjs";
+
+/** Everything on the narration track, in time order: the voice lines and the rewind sound. */
+const CLIPS = [...VOICE, ...SFX].sort((a, b) => a.at - b.at);
 import { connectLive, readBacklog } from "./live.mjs";
 import { buildScene } from "./scene.mjs";
 
@@ -124,16 +127,16 @@ function frame(now) {
 function syncVoice() {
   const a = voice.audio;
   const on = mode === "story" && story.playing && !voice.muted && !manual;
-  const i = on ? VOICE.findIndex((v) => story.t >= v.at && story.t < v.at + v.dur) : -1;
+  const i = on ? CLIPS.findIndex((v) => story.t >= v.at && story.t < v.at + v.dur) : -1;
   if (i < 0) {
     if (!a.paused) a.pause();
     voice.seg = -1;
     return;
   }
-  const offset = story.t - VOICE[i].at;
+  const offset = story.t - CLIPS[i].at;
   if (voice.seg !== i) {
     voice.seg = i;
-    a.src = VOICE[i].src;
+    a.src = CLIPS[i].src;
     a.currentTime = offset;
   } else if (Math.abs(a.currentTime - offset) > 0.35) a.currentTime = offset;
   if (a.paused) a.play().catch(() => {});
