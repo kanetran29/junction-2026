@@ -4,31 +4,35 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lazydoor demo</title>
+<link rel="preload" href="assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="kit/iso.css">
 <link rel="stylesheet" href="demo.css">
 </head>
 <body class="iso" data-theme="dark">
 <main class="page">
   <header class="bar">
-    <div class="brand"><b>Lazydoor</b><span>a door where every decision is a published rule</span><span class="for">for <span class="logo-chip"><img src="assets/valio-aimo-logo.svg" alt="Valio Aimo"></span> Junction 2026</span></div>
+    <div class="brand"><b>Lazydoor</b><span class="for">for <span class="logo-chip"><img src="assets/valio-aimo-logo.svg" alt="Valio Aimo"></span> Junction 2026</span></div>
     <div class="modes" role="group" aria-label="Mode">
       <button type="button" data-mode="story" aria-pressed="true">Story</button>
       <button type="button" data-mode="live" aria-pressed="false">Live</button>
     </div>
     <div class="right">
       <span id="chip" class="chip" hidden></span>
-      <button type="button" id="theme" aria-label="Switch theme">Theme</button>
     </div>
   </header>
 
   <section class="stage" id="stage" aria-live="polite">
-    <div class="sun" aria-hidden="true"></div>
     <div class="ground" aria-hidden="true"></div>
     <div id="scene"></div>
-    <div class="dusk" aria-hidden="true"></div>
-    <div class="corner tl">Fig 1 · Lazydoor · Valio Aimo</div>
-    <div class="corner tr"><span id="replay" class="badge" hidden>Replay</span><span id="mode-tag">Story</span></div>
-    <ol id="ticker" class="ticker" aria-label="Gateway events"></ol>
+    <div class="hud-events">
+      <div class="hud-head"><span id="mode-tag">Story</span><span id="replay" class="badge" hidden>Replay</span></div>
+      <ol id="ticker" class="ticker" aria-label="Gateway events"></ol>
+    </div>
+    <div class="hud-clock" aria-label="Cut-off clock">
+      <div class="hud-small">Valio cut-off Sun 17:00</div>
+      <div class="hud-big" id="hud-countdown">30 h 45 min</div>
+      <div class="hud-small" id="hud-now"></div>
+    </div>
     <div id="caption" class="caption"></div>
     <div id="endcard" class="endcard" hidden>
       <div class="brands"><span class="lazy">Lazydoor</span><span class="x">for</span><span class="logo-plate"><img src="assets/valio-aimo-logo.svg" alt="Valio Aimo"></span></div>
@@ -57,8 +61,8 @@
       <button type="button" id="sample">Play recorded file</button>
     </form>
     <form id="ask">
-      <input type="text" id="ask-text" placeholder="Type a request, e.g. 1,000 l lactose-free milk by Monday" aria-label="Request to the gateway">
-      <button type="submit">Send to gateway</button>
+      <label class="ask-label">Request to the gateway<input type="text" id="ask-text" placeholder="1,000 l lactose-free milk by Monday"></label>
+      <button type="submit">Send</button>
     </form>
     <p id="ask-status" class="ask-status"></p>
     <p class="hint">The page acts as a minimal buyer agent: interpret, confirm, quote, order offer 0. The gateway decides; its events animate the scene.</p>

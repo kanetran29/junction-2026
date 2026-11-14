@@ -1,8 +1,8 @@
 // Wires the scene to its two sources: the story timeline and the live gateway (or a recorded file).
-import { initialState, reduce } from "./model.mjs";
+import { initialState, reduce, countdown } from "./model.mjs";
 import { STORY, DURATION, stateAt } from "./story.mjs";
 import { connectLive, replayFile, sendRequest } from "./live.mjs";
-import { buildScene } from "./scene.mjs";
+import { buildScene, clockText } from "./scene.mjs";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -11,7 +11,7 @@ const store = {
   set: (name, value) => { try { localStorage.setItem(`lazydoor.${name}`, value); } catch { /* storage blocked: keep the value for this page only */ } },
 };
 
-document.body.dataset.theme = params.get("theme") ?? store.get("theme") ?? "dark";
+document.body.dataset.theme = "dark";
 if (params.get("kiosk") === "1") document.body.classList.add("kiosk");
 const scene = buildScene($("scene"));
 const still = matchMedia("(prefers-reduced-motion: reduce)");
@@ -58,16 +58,19 @@ function overlays(state) {
   const ticker = $("ticker");
   if (ticker.dataset.key !== key) {
     ticker.dataset.key = key;
-    ticker.replaceChildren(...state.log.slice(-7).map((l) => {
+    ticker.replaceChildren(...state.log.slice(-3).map((l) => {
       const li = document.createElement("li");
-      const seq = document.createElement("b");
-      seq.textContent = l.seq ?? "";
-      const body = document.createElement("span");
-      body.textContent = l.text ? `${l.type} · ${l.text}` : l.type;
-      li.append(seq, body);
+      li.textContent = l.text ? `${l.seq ?? ""} ${l.type}: ${l.text}` : `${l.seq ?? ""} ${l.type}`;
       return li;
     }));
   }
+  const left = countdown(state.now);
+  const big = $("hud-countdown");
+  const remaining = !state.now ? "-" : left === "closed" ? "Closed" : left;
+  if (big.textContent !== remaining) big.textContent = remaining;
+  big.toggleAttribute("data-closed", left === "closed");
+  const now = state.now ? `Now ${clockText(state.now).replace(/ \d+ \w+ /, " ")}` : "";
+  if ($("hud-now").textContent !== now) $("hud-now").textContent = now;
   $("replay").hidden = !state.replay;
   $("endcard").hidden = !ending;
 }
@@ -139,10 +142,6 @@ function setMode(next) {
 }
 
 document.querySelectorAll(".modes button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
-$("theme").addEventListener("click", () => {
-  document.body.dataset.theme = document.body.dataset.theme === "light" ? "dark" : "light";
-  store.set("theme", document.body.dataset.theme);
-});
 $("play").addEventListener("click", () => {
   if (story.t >= DURATION) seek(0);
   setPlaying(!story.playing);

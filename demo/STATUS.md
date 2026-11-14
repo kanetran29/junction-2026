@@ -58,6 +58,33 @@ Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 - Logo Valio Aimo chính thức: `demo/assets/valio-aimo-logo.svg`, lấy từ logo đầu trang https://www.valioaimo.fi/ (liên kết "Valio Aimo" trỏ tới file SVG trên CDN của Valio; trang tải về không có `<svg>` nội tuyến mà dùng `<img>` tới file này, cùng viewBox `0 0 537.17 179.06`, 2.8 KB). Giữ nguyên từng byte, chỉ thêm một dòng chú thích nguồn và ngày ở đầu. Dùng không sửa (chỉ thu phóng, không nghiêng): biển trên tường kho (đặt trên tấm trắng, quay thẳng về người xem), màn kết "Lazydoor for [logo]", và chip nhỏ ở đầu trang "for [logo] Junction 2026".
 - Valio Aimo logo © Valio Ltd, used for the Junction 2026 Trusted Trade Agents challenge demo.
 
+### 9. Audit theo design-taste-frontend (trước khi sửa, phản hồi "truck looks ugly, colours half-hearted", "text too small")
+Design read: cảnh hoạt hình isometric cho video pitch 2 phút và màn chiếu trước giám khảo (doanh nghiệp, procurement), ngôn ngữ "diorama đồ chơi có ánh sáng", hướng tới một bảng màu thương hiệu có chủ đích thay vì giao diện giấy của kit anatomy. Skill này viết cho landing page; ở đây chỉ áp các phần màu, chữ, chất liệu, chuyển động, độ tương phản. Dial: VARIANCE 6, MOTION 7 (hoạt hình kể chuyện, có reduced-motion), DENSITY 4.
+
+Ảnh trước: [toàn cảnh](shots/before-scene.png), [xe tải](shots/before-truck.png), [bếp và cửa](shots/before-kitchen-door.png).
+
+Vấn đề tìm thấy:
+1. Màu: tím nền + tím thương hiệu + tím giao diện là đúng "AI purple" mà skill cấm làm mặc định (LILA rule). Bảy tám màu nhấn ngang nhau (tím, xanh ngọc, cam, vàng, đỏ, xanh lá, xanh dương) nên không màu nào dẫn mắt: "half-hearted".
+2. Màu vẫn là "giấy được tô": mặt khuất pha đen, sàn kho bị đèn phủ thành tím xám, nhiều mặt nhạt (tường lilac, rào lilac, đỉnh khối sáng gần trắng).
+3. Glow ngoài (con dấu, điện thoại, đèn báo) dùng khắp nơi; skill cấm neon/outer glow mặc định. Giữ lại một chỗ có chủ đích.
+4. Xe tải: một khối thùng hở có tấm bạt, bánh là hình elip phẳng, không vòm bánh, không kính chắn gió, không đèn, không cản; bảng "MON 16 NOV" lơ lửng trên nóc. Tỉ lệ cabin/thùng sai.
+5. Chef, robot, cửa, kho: ít chi tiết (chef là ống trụ, robot là hai hộp, cửa là cột + tấm, kho là một mặt tường).
+6. Chữ trong cảnh 10 đến 14 px ở 1080p (nhãn kệ, mã lý do trên bảng cửa, màn hình điện thoại, đồng hồ, biển đích). Không đọc được ở khoảng cách máy chiếu.
+7. Icon vẽ tay (đường SVG tự viết); skill yêu cầu thư viện icon. Font hệ thống + mono cho mọi thứ.
+8. Nhãn kiểu "FIG 1 · LAZYDOOR · VALIO AIMO" ở góc là eyebrow trang trí; dấu chấm giữa (·) dùng quá dày; còn dấu gạch dài "—" trên điện thoại và đồng hồ (skill cấm em-dash).
+9. Bán kính bo góc lẫn lộn (phụ đề, huy hiệu, bảng, chip) không theo một thang.
+10. Câu chuyện: xe tải chạy ra khỏi bàn thay vì giao tới bếp của chef (Kane hỏi "why does the truck drive away instead of to the chef?").
+
+### 10. Làm lại theo một hướng mỹ thuật: "Petrol night, signal colours"
+- Một bảng màu duy nhất cho cả cảnh và khung trang: màu petrol của logo Valio Aimo (`#005670`) làm nền đêm, một màu thương hiệu Lazydoor là magenta `#ff2e88` (cổng, rào, biển LAZYDOOR, nút), ánh sáng ấm amber là nguồn sáng duy nhất (đèn kho, cửa sổ, đèn xe), vật thể dùng một bộ màu cố định (gạch cho kho, cobalt cho xe Valio và kệ, vàng chanh cho chef và thùng xe, san hô cho robot, 4 màu thùng hàng theo nhóm). Bóng pha về petrol đậm, mặt trên pha về ánh vàng, nên bóng và sáng đều có màu. Không còn mặt trắng hay xám chiếm diện tích (tấm biển logo trắng là để logo đủ tương phản). Chỉ một ánh phát sáng có chủ đích (biển LAZYDOOR và đèn).
+- Font Geist và Geist Mono (OFL, `demo/assets/fonts/`), icon Phosphor (MIT, `demo/icons.mjs`), thay icon vẽ tay. Một thang bo góc 10 px. Bỏ nhãn góc kiểu "FIG 1 ·", bỏ dấu gạch dài.
+- Dựng lại có chi tiết theo cách của skill anatomy: xe tải cabin kiểu châu Âu (kính chắn gió, cần gạt, lưới tản nhiệt, đèn pha, đèn sương mù, biển số, cản, đèn nóc, cửa sổ hông, cửa, tay nắm, bậc lên, gương, ống xả đứng, bình nhiên liệu, thùng có gân, dải sơn VALIO AIMO, đèn hông, vòm bánh, lốp, mâm, ốc, chắn bùn); chef (giày, quần, áo vàng hai hàng cúc, tạp dề có túi, khăn quàng, mặt có ria và má hồng, mũ có nếp, tay xuống hoặc giơ ngón cái); robot (bánh xích, ngực có màn hình và đèn, khe thông gió, vai, đầu có tai và kính); cổng (đế bắt bu lông, cột, dầm, đầu quét, đèn hiệu, biển LAZYDOOR, cánh cửa có ô, cửa sổ, tấm đá chân, con dấu); kho (gạch có mạch so le, trụ gạch, gờ mái, 4 cửa sổ sáng, đồng hồ treo tường có kim chạy theo giờ của cổng, đèn tường, biển logo).
+- Vòng câu chuyện mới (Kane hỏi vì sao xe chạy đi mà không tới chef): đường từ bến kho tới bếp, có rào chắn Lazydoor ở hàng rào. Khi order.accepted: thùng hàng bay từ kệ lên xe, pháo giấy, rào nâng (đèn xanh), xe chạy tới bếp có khói và vệt tốc độ, dỡ thùng lên quầy, chef giơ ngón cái, thẻ hoá đơn hiện, lịch bếp lật sang MON 16, rồi xe quay về bến. Xe của agent ngây thơ chạy tới rào rồi đứng đó dưới mây mưa (rào đỏ, hết hạn chót), quầy bếp trống. REJECT hoặc phê duyệt hết hạn: xe không chạy.
+- Chữ: mọi chữ trong cảnh chuyển thành nhãn màn hình (không còn chữ nhỏ trên mặt vật thể). Nhỏ nhất 23 đơn vị viewBox = 27,6 px ở 1080p (1/40 chiều cao), phụ đề 2,5% chiều rộng = 48 px, số lớn (đếm ngược) 3,1% = 60 px, hoá đơn 30 đơn vị = 36 px. Vị trí cố định để không chồng nhau: sự kiện góc trên trái, đồng hồ hạn chót góc trên phải, quyết định của cổng (con dấu + lý do bằng lời) góc dưới phải, nhãn kệ ngay trên từng kệ, nhãn điện thoại bên trái điện thoại, hoá đơn trên tường bếp. Nhãn bị kẹp trong khung hình.
+- Kiểm tra: ảnh 1080p xem ở 50% (khoảng cách laptop/máy chiếu), đọc được mọi chữ: [toàn cảnh 50%](shots/after-scene-50pct.png).
+- Ảnh sau: [toàn cảnh](shots/after-scene.png), [xe tải](shots/after-truck.png), [bếp và chef](shots/after-kitchen-chef.png), [cổng và robot](shots/after-door-robot.png), [kho](shots/after-warehouse.png), [giao hàng tới bếp](shots/after-delivery.png).
+- Kịch bản dài 123 giây (thêm 4 giây cho xe tới bếp). Hiệu năng vẫn trên 60 khung/giây ở 1080p (đo lại trước khi quay).
+
 ## Còn lại / cần làm sau
 - Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).
