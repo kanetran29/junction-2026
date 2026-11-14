@@ -21,6 +21,8 @@ let gemini: Record<string, unknown>;
 let gemma: Record<string, unknown> | undefined;
 const draftFor = (litres: number) => ({ category: '10400', claims: ['FREE_FROM_LACTOSE'], quantity: { value: litres, unit: 'l' }, deliverBy: '2026-11-16', unclear: [], needs: ['lactose-free milk'] });
 let modelCalls = 0;
+/** The user text and system prompt of the last model call, to see what the door asked. */
+let lastAsked = { text: '', system: '' };
 let geminiDown = false;
 /** Gemini answers 429 with a RetryInfo of 17 s (its over-quota reply). */
 let geminiOverQuota = false;
@@ -30,6 +32,8 @@ const upstream = (async (url: string | URL | Request, init?: RequestInit) => {
   const u = String(url);
   if (!u.includes('generativelanguage')) return valio(url, init);
   modelCalls++;
+  const req = JSON.parse(String(init?.body ?? '{}'));
+  lastAsked = { text: req.contents?.[0]?.parts?.[0]?.text ?? '', system: req.systemInstruction?.parts?.[0]?.text ?? '' };
   if (geminiDown) return new Response('down', { status: 500 });
   if (geminiOverQuota) return new Response(JSON.stringify({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', details: [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '17s' }] } }), { status: 429 });
   const body = u.includes('gemma-test') && gemma ? gemma : gemini;
@@ -228,6 +232,63 @@ describe('POST /v1/try (demo door only, no key)', () => {
     for (const [path, body] of [['/v1/try', { text: 'milk' }], ['/v1/try', { text: 'x'.repeat(500) }], ['/v1/try/decision', { visitor: 'v', token: 't', decision: 'approve' }]] as const) {
       expect((await post(path, body, { env: off })).status).toBe(404);
     }
+  });
+});
+
+describe('Try it remembers the conversation: an answer in words continues the waiting draft', () => {
+  const undated = () => ({ ...draftFor(20), deliverBy: null, unclear: ['deliverBy'] });
+
+  it('asks in plain words, and "next tuesday" re-read with the first sentence ends in a dated order', async () => {
+    gemini = undated();
+    const first = await json(await tryIt({ text: '20 litres of lactose-free milk' }));
+    expect(first).toMatchObject({ step: 'needs_input', question: { field: 'deliverBy', text: 'When should it arrive?' } });
+    gemini = { ...draftFor(20), deliverBy: '2026-11-17' };
+    const next = await json(await tryIt({ visitor: first.visitor, draftId: first.draft.id, answer: { text: 'next tuesday' } }));
+    expect(lastAsked.text).toBe('20 litres of lactose-free milk. next tuesday');
+    expect(lastAsked.system).toContain('Today is 2026-11-13');
+    expect(next).toMatchObject({ step: 'decided', draft: { id: first.draft.id, status: 'confirmed', deliverBy: '2026-11-17', quantity: { value: 20, unit: 'l' } }, order: { state: 'ACCEPTED' } });
+  });
+
+  it('keeps what the first sentence settled when the new reading drops it, and asks again while the date is still missing', async () => {
+    gemini = undated();
+    const first = await json(await tryIt({ text: '20 litres of lactose-free milk' }));
+    gemini = { ...undated(), quantity: null, unclear: ['quantity', 'deliverBy'] };
+    const next = await json(await tryIt({ visitor: first.visitor, draftId: first.draft.id, answer: { text: 'soon please' } }));
+    expect(next).toMatchObject({ step: 'needs_input', draft: { quantity: { value: 20, unit: 'l' } }, question: { field: 'deliverBy', text: 'When should it arrive?' } });
+  });
+
+  it('asks rather than picks when the answer changes a field the first sentence settled', async () => {
+    gemini = undated();
+    const first = await json(await tryIt({ text: '20 litres of lactose-free milk' }));
+    gemini = { ...draftFor(30), deliverBy: '2026-11-17' };
+    const next = await json(await tryIt({ visitor: first.visitor, draftId: first.draft.id, answer: { text: 'make it 30 litres on tuesday' } }));
+    expect(next).toMatchObject({ step: 'needs_input', question: { field: 'quantity', text: 'How much?', readings: [{ value: { value: 20, unit: 'l' } }, { value: { value: 30, unit: 'l' } }] } });
+  });
+
+  it("works only on the visitor's own waiting draft", async () => {
+    gemini = undated();
+    const a = await json(await tryIt({ text: '20 litres of lactose-free milk' }, { ip: '198.51.100.90' }));
+    const b = await json(await tryIt({ text: '20 litres of lactose-free milk' }, { ip: '198.51.100.91' }));
+    const r = await tryIt({ visitor: b.visitor, draftId: a.draft.id, answer: { text: 'next tuesday' } }, { ip: '198.51.100.91' });
+    expect(r.status).toBe(404);
+    expect(await json(r)).toMatchObject({ error: 'DRAFT_NOT_FOUND' });
+  });
+
+  it('counts an answer in words against the visitor and the free-text (model) limits', async () => {
+    gemini = undated();
+    const visitors = [];
+    for (let i = 0; i < 5; i++) visitors.push(await json(await tryIt({ text: '20 litres of lactose-free milk' }, { ip: `198.51.100.${100 + i}` })));
+    expect((await tryIt({ visitor: visitors[0].visitor, draftId: visitors[0].draft.id, answer: { text: 'soon' } })).status).toBe(200);
+    const busy = await tryIt({ visitor: visitors[1].visitor, draftId: visitors[1].draft.id, answer: { text: 'soon' } });
+    expect(busy.status).toBe(429);
+    expect(await json(busy)).toMatchObject({ error: 'TRY_RATE_LIMITED', detail: expect.stringContaining('free-text') });
+    for (let i = 0; i < 2; i++) await tryIt({ visitor: visitors[2].visitor, text: RECORDED_TEXT });
+    expect(await json(await tryIt({ visitor: visitors[2].visitor, text: RECORDED_TEXT }))).toMatchObject({ step: 'decided' });
+    expect(await json(await tryIt({ visitor: visitors[2].visitor, draftId: visitors[2].draft.id, answer: { text: 'soon' } }))).toMatchObject({ error: 'TRY_RATE_LIMITED', detail: expect.stringContaining('this visitor') });
+  });
+
+  it('refuses an answer over 200 characters', async () => {
+    expect((await tryIt({ visitor: 'v', draftId: 'd', answer: { text: 'x'.repeat(201) } })).status).toBe(400);
   });
 });
 

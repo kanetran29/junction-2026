@@ -1428,6 +1428,16 @@
         {"call": "admin_try", "input": {"enabled": true}, "expect": [["tryIt", "=", true]]},
         {"call": "try", "input": {"text": "1,000 litres of lactose-free milk by Monday"}, "expect": [["step", "=", "decided"], ["draft.cached", "=", true], ["order.state", "=", "HELD"]]}
       ]
+    },
+    {
+      "id": "AC63",
+      "tier": 1,
+      "title": "Try it remembers the conversation: a missing date answered in words continues the same draft",
+      "rubric": ["need 20", "e2e 30"],
+      "steps": [
+        {"call": "try", "input": {"text": "20 litres of lactose-free milk"}, "expect": [["step", "=", "needs_input"], ["question.field", "=", "deliverBy"], ["question.text", "=", "When should it arrive?"]]},
+        {"call": "try", "input": {"answer": {"text": "by Tuesday"}}, "expect": [["draft.deliverBy", "=", "2026-11-17"], ["draft.quantity.value", "=", 20], ["step", "=", "decided"], ["order.state", "=", "ACCEPTED"]]}
+      ]
     }
   ],
   "decisions": {

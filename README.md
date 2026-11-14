@@ -76,7 +76,7 @@ The door runs the same path as the reference agent, with no model choosing anyth
 Gemma), confirm with the agent's profile default, quote, place the cheapest covering offer. It exists only where
 `DEMO_MODE=1`; elsewhere both routes are 404 before any validation.
 
-`POST /v1/try` takes `{ text }` (1 to 200 characters after trimming) for a new request, or `{ visitor, draftId, answer: { field: "deliverBy", value: "YYYY-MM-DD" } }` to answer the question about a draft. Add `visitor` to a new request to keep the same sandbox.
+`POST /v1/try` takes `{ text }` (1 to 200 characters after trimming) for a new request, or `{ visitor, draftId, answer }` to answer the question about a draft: a disagreement button `{ field: "deliverBy", value: "YYYY-MM-DD" }`, or words `{ text }` (below). Add `visitor` to a new request to keep the same sandbox.
 - **First call.** It opens a sandbox kitchen: buyer `visitor-<8 hex>`, the kitchen mandate (automatic up to 500 € an order and
   1,500 € a day, hard stop at 5,000 and 10,000, no new allergen, default reliability floor), approver "You (kitchen manager)".
   It returns a `visitor` token (24 random bytes; the door stores only its sha256).
@@ -87,6 +87,16 @@ Gemma), confirm with the agent's profile default, quote, place the cheapest cove
   - `step: "decided"` with `quote` (`quoteId`, `offers`, `rejections`, and `jws` of the placed offer) and
     `order` (`orderId`, `state`, `reasons: [{ code, detail }]`, `netCents`, `grossCents`).
   - A `HELD` order also carries `approval: { token, expiresAt }`, because the visitor is that sandbox's kitchen manager.
+- **Answering in words.** `{ visitor, draftId, answer: { text } }` (1 to 200 characters) continues the visitor's own waiting
+  draft. The door re-reads "<the draft's text>. <answer>" with both models, with the door clock as today, so "next tuesday"
+  becomes a date, and merges the result:
+  - fields the draft already knew stay;
+  - missing fields are filled from the new reading;
+  - a field the answer changes is asked, like any disagreement.
+
+  Every `needs_input` reply has `question: { field, text, readings }`, where `text` is a plain question such as "When should
+  it arrive?", "How much?" or "Which product?". An answer in words counts like a free-text try. Another visitor's draft is
+  404.
 - **Deciding.** `POST /v1/try/decision` with `{ visitor, token, decision: "approve" | "reject" }` goes through the normal
   approval path, re-check included (`APPROVAL_EXPIRED`, `STOCK_TAKEN`, `PRICE_CHANGED` still apply), and answers
   `{ order: { orderId, state, reasons } }`. Only a token of the visitor's own sandbox works: any other is 404 `TOKEN_UNKNOWN`.

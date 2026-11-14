@@ -240,6 +240,45 @@ function differing(a: Fields, b: Fields): string[] {
   return FIELDS.filter((f) => comparable(f, a[f as keyof Fields]) !== comparable(f, b[f as keyof Fields]));
 }
 
+/** True when a draft field holds a value (an empty claims list counts as none). */
+const known = (v: unknown) => v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0);
+
+/**
+ * Folds a re-reading of "<earlier text>. <answer>" into the draft it continues (both models already compared on it): a field
+ * the earlier draft knew stays when the new reading lacks it; a field it lacked comes from the new reading; a field the new
+ * reading changes is never picked but asked, like any disagreement, with both values. The product the earlier draft named
+ * stays named.
+ */
+function mergeAnswer(prev: InterpretedDraft, d: InterpretedDraft): void {
+  const was = prev as unknown as Record<string, unknown>;
+  const now = d as unknown as Record<string, unknown>;
+  /** Drops every open mark on a field. */
+  const settle = (f: string) => {
+    d.unclear = d.unclear.filter((u) => u !== f);
+    d.missing = d.missing.filter((m) => m !== f);
+    d.disagreement = d.disagreement?.filter((x) => x.field !== f);
+  };
+  for (const f of FIELDS) {
+    if (!known(was[f])) continue;
+    if (!known(now[f])) {
+      now[f] = was[f];
+      settle(f);
+    } else if (comparable(f, was[f]) !== comparable(f, now[f])) {
+      settle(f);
+      d.missing.push(f);
+      (d.disagreement ??= []).push({ field: f, readings: [{ model: 'your first sentence', value: was[f] }, { model: 'with your answer', value: now[f] }] });
+      delete now[f];
+    }
+  }
+  if (known(prev.category)) {
+    d.missing = d.missing.filter((m) => m !== 'needs');
+    if (!d.needs.length) d.needs = prev.needs;
+  }
+  if (!d.disagreement?.length) delete d.disagreement;
+  d.claims ??= [];
+  d.status = d.missing.length ? 'needs_input' : 'draft';
+}
+
 /** Stores a draft as one `drafts` row whose body is the whole draft; the quote step reads `status` and the typed fields from it. */
 async function save(env: Env, buyerId: string, d: InterpretedDraft, createdAt: string): Promise<void> {
   await db(env).prepare('INSERT INTO drafts(id, buyer_id, body, created_at) VALUES (?1,?2,?3,?4) ON CONFLICT(id) DO UPDATE SET body = excluded.body')
@@ -274,12 +313,13 @@ export async function readTwice(env: Env, text: string, today: string, fetchFn: 
  * `needs_input`, those fields are left out and listed in `missing` and `disagreement` (with what each model wrote), and
  * the buyer decides; neither reading is picked. When Gemma does not answer, the draft
  * stands as Gemini read it with `crossCheck.result = 'unavailable'`. With `deps.recorded` (readings recorded earlier for
- * this exact text) no model is asked and the draft is marked `cached`. The raw text is stored on the draft and never read
- * by policy. Appends `draft.created`.
+ * this exact text) no model is asked and the draft is marked `cached`. With `input.previous` (a waiting draft the buyer
+ * answered in words) the reading is merged into it (`mergeAnswer`) and keeps its id. The raw text is stored on the draft and
+ * never read by policy. Appends `draft.created`.
  */
 export async function interpret(
   env: Env,
-  input: { buyerId: string; text: string },
+  input: { buyerId: string; text: string; previous?: InterpretedDraft },
   deps: { fetch: typeof fetch; recorded?: Readings } = { fetch },
 ): Promise<InterpretedDraft> {
   const at = await now(env);
@@ -302,6 +342,10 @@ export async function interpret(
   }
   d.crossCheck = { model: env.GEMMA_MODEL, result: !other ? 'unavailable' : differ.length ? 'disagreed' : 'agreed' };
   if (deps.recorded) d.cached = true;
+  if (input.previous) {
+    mergeAnswer(input.previous, d);
+    d.id = input.previous.id;
+  }
   if (second && differ.length && d.status === 'draft') {
     d.status = 'needs_input';
     d.missing = [...new Set([...d.missing, ...differ])];

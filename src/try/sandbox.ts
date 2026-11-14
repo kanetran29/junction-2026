@@ -39,8 +39,24 @@ export interface TryRequest {
   text?: string;
   visitor?: string;
   draftId?: string;
-  answer?: { field: 'deliverBy'; value: string };
+  /** A disagreement button (`field`, `value`), or the visitor's answer in words (`text`). */
+  answer?: { field: 'deliverBy'; value: string } | { text: string };
 }
+
+/** The plain question Try it asks for an open field; any other open point is quoted back. */
+const QUESTIONS: Record<string, string> = {
+  deliverBy: 'When should it arrive?',
+  quantity: 'How much?',
+  category: 'Which product?',
+  needs: 'Which product?',
+  subtype: 'Which kind of product?',
+  claims: 'Any requirements, such as lactose-free?',
+  brand: 'Which brand?',
+  packLitres: 'Which pack size?',
+};
+
+/** The longest conversation one draft carries (its first sentence plus every answer in words). */
+const MAX_CONVERSATION = 1000;
 
 /** One reason as Try it shows it: the code and a sentence (the decision's own detail, else the reason table's text). */
 type ShownReason = { code: string; detail: string };
@@ -51,7 +67,7 @@ export interface TryReply {
   buyerId: string;
   step: 'needs_input' | 'no_offer' | 'decided';
   draft?: InterpretedDraft;
-  question?: { field: string; readings: { model: string; value: unknown }[] };
+  question?: { field: string; text: string; readings: { model: string; value: unknown }[] };
   quote?: { quoteId: string; offers: Offer[]; rejections: Rejection[]; jws?: string };
   order?: { orderId: string; state: string; reasons: ShownReason[]; netCents: number; grossCents: number };
   approval?: { token: string; expiresAt: string };
@@ -129,6 +145,20 @@ async function storedDraft(env: Env, buyerId: string, draftId: string): Promise<
   return JSON.parse(row.body) as InterpretedDraft;
 }
 
+/**
+ * The visitor's own waiting draft with their answer applied: a button answer leaves it as stored (the fill sets the field); an
+ * answer in words re-reads "<draft text>. <answer>" with both models (the door clock as today) and merges it into the draft.
+ * Another visitor's draft is 404, a confirmed one 409, a conversation over 1,000 characters 400.
+ */
+async function answered(env: Env, req: TryRequest, buyerId: string, fetchFn: typeof fetch): Promise<InterpretedDraft> {
+  const draft = await storedDraft(env, buyerId, req.draftId!);
+  if (!req.answer || !('text' in req.answer)) return draft;
+  if (draft.status === 'confirmed') throw new InterpretError('DRAFT_ALREADY_CONFIRMED', 409, 'this draft is already confirmed');
+  const text = `${draft.text.replace(/[\s.!?]+$/, '')}. ${req.answer.text}`;
+  if (text.length > MAX_CONVERSATION) throw new HttpError(400, 'INVALID_REQUEST', 'this conversation is too long: start a new request');
+  return interpret(env, { buyerId, text, previous: draft }, { fetch: fetchFn });
+}
+
 /** An order's reasons for the visitor: why it ended (when it did), then the decision's reasons, each with a sentence. */
 function reasonsOf(v: OrderView): ShownReason[] {
   const text = (code: string) => REASONS[code as ReasonCode]?.text ?? code;
@@ -150,8 +180,9 @@ export async function tryIt(env: Env, req: TryRequest, address: string, fetchFn:
   if (req.visitor) await limitVisitor(env, req.visitor);
   const known = req.visitor ? await sandboxOf(env, req.visitor) : null;
   await limit(env, 'try-all', TRY_ALL_PER_MINUTE, `Try it is busy: at most ${TRY_ALL_PER_MINUTE} calls a minute for everyone`);
+  const words = req.answer && 'text' in req.answer;
   const recorded = req.draftId ? undefined : RECORDED[req.text!];
-  if (!req.draftId && !recorded) {
+  if ((!req.draftId && !recorded) || words) {
     await limit(env, 'try-free-text', TRY_FREE_TEXT_PER_MINUTE, `the models are shared: at most ${TRY_FREE_TEXT_PER_MINUTE} free-text tries a minute for everyone; pick one of the example sentences, they need no model call`);
   }
   const { visitor, buyerId } = req.visitor && known ? { visitor: req.visitor, buyerId: known } : await openSandbox(env, address);
@@ -169,12 +200,13 @@ export async function tryIt(env: Env, req: TryRequest, address: string, fetchFn:
 
 /** The steps of `tryIt` after the sandbox is known: interpret (or use the recorded readings) or load the draft, ask, confirm, quote, place. */
 async function step(env: Env, req: TryRequest, visitor: string, buyerId: string, fetchFn: typeof fetch, recorded?: Readings): Promise<TryReply> {
-  const draft = req.draftId ? await storedDraft(env, buyerId, req.draftId) : await interpret(env, { buyerId, text: req.text! }, { fetch: fetchFn, recorded });
-  const fill: Record<string, unknown> = { ...(draft.unclear.includes('fatLevel') ? { fatLevel: 'any' } : {}), ...(req.answer ? { [req.answer.field]: req.answer.value } : {}) };
+  const draft = req.draftId ? await answered(env, req, buyerId, fetchFn) : await interpret(env, { buyerId, text: req.text! }, { fetch: fetchFn, recorded });
+  const button = req.answer && 'field' in req.answer ? { [req.answer.field]: req.answer.value } : {};
+  const fill: Record<string, unknown> = { ...(draft.unclear.includes('fatLevel') ? { fatLevel: 'any' } : {}), ...button };
   const open = [...new Set([...(draft.status === 'needs_input' ? draft.missing : []), ...draft.unclear])].filter((f) => !Object.hasOwn(fill, f));
   if (open.length) {
     const readings = draft.disagreement?.find((d) => d.field === open[0])?.readings ?? [];
-    return { visitor, buyerId, step: 'needs_input', draft, question: { field: open[0], readings } };
+    return { visitor, buyerId, step: 'needs_input', draft, question: { field: open[0], text: QUESTIONS[open[0]] ?? `Could you say more about "${open[0]}"?`, readings } };
   }
   const confirmed = await confirmDraft(env, { draftId: draft.id, fill, buyerId });
   const q = await createQuote(env, buyerId, { draftId: confirmed.id }, fetchFn);

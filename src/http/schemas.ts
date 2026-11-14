@@ -130,7 +130,10 @@ export const TryBody = z
     text: z.string().trim().min(1).max(200).optional(),
     visitor: z.string().min(1).max(64).optional().openapi({ description: 'The token from an earlier reply; omit it to open a new sandbox kitchen' }),
     draftId: z.string().min(1).max(64).optional(),
-    answer: z.object({ field: z.literal('deliverBy'), value: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).optional(),
+    answer: z
+      .union([z.object({ field: z.literal('deliverBy'), value: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }), z.object({ text: z.string().trim().min(1).max(200) })])
+      .optional()
+      .openapi({ description: 'A disagreement button ({ field: "deliverBy", value }) or the visitor\'s answer in words ({ text }), re-read together with the first sentence' }),
   })
   .refine((b) => (b.draftId !== undefined ? b.visitor !== undefined && b.answer !== undefined : b.text !== undefined), {
     message: 'send text for a new request, or visitor, draftId and answer to answer a question',
@@ -143,7 +146,7 @@ export const TryReply = z
     buyerId: z.string(),
     step: z.enum(['needs_input', 'no_offer', 'decided']),
     draft: InterpretedDraft.optional(),
-    question: z.object({ field: z.string(), readings: z.array(z.object({ model: z.string(), value: z.unknown() })) }).optional(),
+    question: z.object({ field: z.string(), text: z.string(), readings: z.array(z.object({ model: z.string(), value: z.unknown() })) }).optional(),
     quote: z.looseObject({ quoteId: z.string(), offers: z.array(z.looseObject({ offerId: z.string() })), rejections: z.array(z.looseObject({ productId: z.string(), code: z.string() })), jws: z.string().optional() }).optional(),
     order: z.object({ orderId: z.string(), state: z.string(), reasons: z.array(ShownReason), netCents: z.number(), grossCents: z.number() }).optional(),
     approval: z.object({ token: z.string(), expiresAt: z.string() }).optional().openapi({ description: "The approval token of this sandbox's held order: the visitor is its kitchen manager" }),
