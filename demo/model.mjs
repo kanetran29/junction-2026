@@ -28,6 +28,10 @@ export function initialState() {
     truck: { status: "parked", crates: 0, naive: false, since: 0 },
     naive: { step: null, since: 0 },
     gate: { built: true, since: -60 },
+    card: null,
+    list: null,
+    flash: null,
+    rival: null,
     close: false,
     log: [],
   };
@@ -95,7 +99,7 @@ export function reduce(state, ev, t) {
 
   switch (ev.type) {
     case "draft.created":
-      s.draft = { text: d.text ?? "", category: d.category ?? null, claims: d.claims ?? [], quantity: d.quantity ?? null, unclear: d.unclear ?? [] };
+      s.draft = { text: d.text ?? "", category: d.category ?? null, claims: d.claims ?? [], quantity: d.quantity ?? null, packLitres: d.packLitres ?? null, deliverBy: d.deliverBy ?? null, unclear: d.unclear ?? [] };
       s.quote = null;
       s.door = { scan: false, stamp: null, reasons: [], since: t };
       s.shelves = shelvesFor([]);
@@ -142,7 +146,7 @@ export function reduce(state, ev, t) {
     case "order.accepted": {
       const units = (Array.isArray(d.lines) ? d.lines : []).reduce((sum, l) => sum + (Number(l?.salesUnits) || 0), 0);
       s.truck = { status: "loading", crates: Math.min(8, Math.max(1, Math.ceil(units / 125))), naive: false, since: t };
-      s.receipt = { orderId: ev.orderId ?? d.orderId ?? null, netCents: Number.isFinite(d.netCents) ? d.netCents : null };
+      s.receipt = { orderId: ev.orderId ?? d.orderId ?? null, netCents: Number.isFinite(d.netCents) ? d.netCents : null, grossCents: Number.isFinite(d.grossCents) ? d.grossCents : null, approvedBy: d.approvedBy ?? null, summary: d.summary ?? null, lines: Array.isArray(d.lines) ? d.lines : [] };
       goAgent("home", "receipt");
       break;
     }
@@ -175,11 +179,27 @@ export function reduce(state, ev, t) {
       break;
     case "story.reset": {
       const fresh = initialState();
-      Object.assign(s, { draft: null, quote: null, door: fresh.door, shelves: fresh.shelves, truck: fresh.truck });
+      Object.assign(s, { draft: null, quote: null, door: fresh.door, shelves: fresh.shelves, naive: fresh.naive, card: null, list: null, flash: null, rival: null });
+      if (d.truck) s.truck = fresh.truck;
       if (d.phone) s.phone = fresh.phone;
       if (d.agent) s.agent = { ...fresh.agent, since: t };
       break;
     }
+    case "story.card":
+      s.card = d.title || d.lines?.length ? d : null;
+      break;
+    case "story.list":
+      s.list = d.rows?.length ? d : null;
+      break;
+    case "story.agent":
+      goAgent(d.at ?? "home", d.carry ?? null);
+      break;
+    case "story.flash":
+      s.flash = { tone: d.tone ?? "reject", since: t };
+      break;
+    case "story.rival":
+      s.rival = { since: t };
+      break;
     case "story.close":
       s.close = true;
       break;

@@ -4,17 +4,27 @@ Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 
 ## Ready for Kane's review
 
-Mở http://localhost:8790/ (dev server đang chạy, phục vụ thẳng thư mục `demo/`), bấm Play hoặc kéo thanh thời gian. Chưa quay video mới: `demo/story.mp4` vẫn là bản cũ, sẽ quay lại sau khi Kane duyệt.
+Story mới theo `demo/SCRIPT.md` (Kane duyệt "như đề xuất"), có giọng đọc. Mở http://localhost:8790/, bấm Play (nút "Sound on/off" cạnh thanh thời gian). Chưa quay `demo/story.mp4`: Kane xem trên trình duyệt trước.
 
-Story giờ dài 1:48,5 (trước 2:04), để video pitch 2 phút còn khoảng 10 giây cho màn tiêu đề hoặc màn kết. Cần xem:
-1. Hồi 1 (0:00 đến 0:22): chưa có Lazydoor. Chef gõ yêu cầu; agent lấy đơn (0:06), gửi phong thư thẳng tới kệ theo đường cong xám (API thô); kệ trả "999999?" (0:11); bến từ chối "Cut-off Thu 12 Nov 15:00" (0:15); agent về chỗ (0:22).
-2. Chuyển cảnh (0:22 đến 0:26): "So we built a door in front of the warehouse."; cổng lắp từng phần.
-3. Hồi 2 (từ 0:26): "The same agent comes back. The door carries the kitchen's own signed rules."; phong thư vào khe; báo giá (0:37); NEEDS_APPROVAL với phụ đề "Over the kitchen's own 500 € limit, and boxes became cartons: NEEDS_APPROVAL." (0:42); chef duyệt (0:52); xe chở tới bếp (0:54 đến 1:05); đơn AUTO 334 l (1:10); OVER_DAY_AUTO (1:16); REJECT 20.000 l (1:25); NEW_ALLERGEN (1:32); phê duyệt hết hạn (1:37); màn kết (1:41,5 đến 1:48,5).
-4. Mỗi phụ đề hiện đủ lâu để đọc: ít nhất 2 giây và không nhanh hơn 17 ký tự/giây (có test).
-5. Agent đi nhanh hơn một chút; xe chạy tới bếp 2,6 giây (trước 3,4), đứng 3 giây (trước 3,8), về 2,4 giây (trước 3,2). Thanh chắn vẫn mở một lần mỗi chuyến: 0:56,6 đến 1:05,2 và 1:12,1 đến 1:20,8.
-6. Không có chữ "unlimited" trong cảnh hay phụ đề; kệ ghi "999999?" và phụ đề trích nguyên giá trị API "999999 available Monday".
+- Dài **1:48,8** (108,8 s), 9 cảnh: 0:00 yêu cầu · 0:07 không có door · 0:23,8 tua lại, dựng cổng · 0:28,8 cùng câu qua Lazydoor · 0:45,8 giữ chờ duyệt, duyệt, giao hàng · 1:02,8 guardrail (AC13, AC30, AC29) · 1:16,3 ngoại lệ (AC17, AC31, AC20) · 1:31,3 giỏ hàng AC36 và "Which Friday?" · 1:41,8 màn kết.
+- Giọng: Gemini TTS, giọng Charon (`voice.js` của skill hackathon-pitch), 9 đoạn `demo/assets/voice/01–09.mp3` (95,8 s lời). Mỗi đoạn bắt đầu 0,3 s sau đầu cảnh; cảnh = độ dài đoạn + nghỉ (cảnh 5 giữ thêm cho xe giao hàng). Story phát đúng đoạn theo thời gian, tua vẫn khớp.
+- Chữ chỉ ở các vùng của mục 3: Z1 sự kiện, Z2 đồng hồ, Z3 thẻ trên trời phía bếp (chữ chef gõ, yêu cầu có kiểu, phiếu báo giá, hộp duyệt của Kitchen manager, thẻ case; đường mảnh nối tới robot hoặc màn hình), Z4 danh sách trên trời phía phải (reply thô, hàng bị từ chối; đường mảnh nối tới kệ), Z5 con dấu, Z6 biên nhận, Z7 phụ đề. Không còn nhãn nổi, bong bóng hay chip trong cảnh.
+- Robot hút bụi to hơn (khoảng 1,6 lần), đỗ khít trên dock sạc liền với chân màn hình bếp; đèn dock xanh khi robot đỗ, tắt khi đi vắng. Cổng quyết định xong là robot về dock, không chờ xe.
+- Điện thoại dọc: lớp phủ "Rotate for the full scene" che sân khấu và giữ Story lại; xoay ngang thì tự bỏ, hoặc bấm "Watch anyway".
+- Số và chữ theo mục 12–13: câu chef "…in 10-litre boxes if you can.", 7 offer / 28 bị từ chối (20 CUTOFF_PASSED), "+18 more", "Stock unknown: Valio does not stock this product", "CO₂e 1,100 kg (product-group average)", biên nhận "Net 1,010.00 € · Gross 1,146.35 € · Approved by Kitchen manager · Accepted (simulated)", "gluten (AW)" thay "wheat".
 
-Kiểm tra: `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 giây, Live phát hết file mẫu); 36 test pass.
+Lệch so với kịch bản (lý do):
+1. Z4 đặt trên trời phía trên xe tải đang đỗ (khung 1920×1080: x 1392–1894, y 187–322) thay vì x 1490–1890, y 215–600, vì vùng cũ đè lên xe ở bến (vùng cấm).
+2. Z2 chỉ đổi giờ ở case có giờ thật: AC20 (CN 16:55 → 17:05), "Which Friday?" (T6 13/11 21:10); các case khác giữ T7 10:15.
+3. Đơn trong montage (AC13, AC30, AC31, AC36) không cho xe chạy: thẻ ghi ACCEPTED / một lần duyệt. Nếu cho chạy, xe sẽ nhảy về bến giữa các chuyến chồng nhau và lịch lật sai.
+4. "6 left", "403" và "another hotel" nằm trong thẻ Z3/Z4 (luật chữ chỉ ở vùng); ở khe cổng chỉ có dấu ✕ đỏ, phong thư của khách sạn kia bay vào từ mép trái.
+5. Hộp duyệt "Approver inbox · Kitchen manager" là thẻ Z3 nối tới màn hình bếp (màn hình quá nhỏ để đọc chữ); màn hình rung chuông rồi ✓.
+6. Cảnh 3 "tua ngược": đồng hồ và lịch nhảy về T7 14, kèm phụ đề; không có hiệu ứng tua riêng.
+7. Bản ghi Live mẫu (`fixtures/sample-events.json`) chưa đổi, vẫn là đơn cũ ("bulk boxes preferred", 2 bị từ chối).
+
+Cần Kane nghe: Gemini đọc lại thành "Volio" ở đoạn 2 và 4 (cả hai lần thu), có thể là cách Charon phát âm "Valio"; đoạn 5 câu "The manager approves" lên giọng hơi như câu hỏi (lần thu 2 đọc sai thành "500 dollar" nên giữ lần 1).
+
+Kiểm tra: 37 test pass; `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 s, Live phát hết file mẫu; vật cấm: chef, robot, dock, xe, rào/cột/khung/cánh cổng, biển LAZYDOOR). Đã xem 375×812 (lớp phủ), 812×375 (cả cảnh vừa màn hình), và từng cảnh ở 1080p.
 
 ## Nhật ký
 
@@ -159,6 +169,14 @@ Vấn đề tìm thấy:
 - Nhãn màn hình bếp ("Approve …?", "Approved …") giờ cũng đi qua bộ đặt chữ: mặc định nằm bên trái màn hình, không che robot đang đỗ.
 - `label overlaps: 0`, 36 test pass.
 
+### 19. Story mới theo SCRIPT.md, có giọng đọc
+- `story.mjs` viết lại theo 9 cảnh của `SCRIPT.md`, mốc tính từ độ dài thật của 9 đoạn giọng (`VOICE`), tổng 108,8 s. Cue mới trong `model.mjs`: `story.card` (Z3), `story.list` (Z4), `story.agent` (robot đi/về theo kịch bản, như case AC29), `story.flash` (dấu ✕ ở khe), `story.rival` (phong thư khách sạn khác); `story.reset` không còn đưa xe về bến trừ khi ghi `truck: true`.
+- `scene.mjs`: vùng chữ Z3/Z4 cố định thay cho nhãn agent, bong bóng chef, nhãn cổng/bến/màn hình/kệ (bộ đặt chữ của mục 17 không cần nữa nên đã bỏ). Live tự suy ra thẻ Z3/Z4 từ sự kiện gateway. Biên nhận Z6 dùng chữ của door. Thẻ quyết định rộng 400, lý do "Over 500 € (kitchen's own limit)", "Day total over 500 €", "Approved". Lịch chỉ ở MON 16 trong lúc xe đi giao.
+- Robot phóng 1,6 lần, chạy nhanh hơn (tối đa 190 đơn vị/giây) cho montage; dock sạc liền đế màn hình với đèn.
+- `main.mjs`: phát giọng theo đồng hồ Story (không phát khi `?manual=1` để quay), nút tắt/bật tiếng nhớ lựa chọn, lớp phủ xoay ngang. `index.html`: màn kết mới.
+- Test Story viết lại theo kịch bản mới (độ dài, giọng nằm trong cảnh, thứ tự cảnh, số đã kiểm trên door, không còn "wheat"/"unlimited"/"Only 384 left"/"2 rejected", phụ đề đủ thời gian đọc).
+
 ## Còn lại / cần làm sau
+- Quay `demo/story.mp4` khi Kane duyệt Story mới (ghép giọng từ `VOICE`).
 - Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

@@ -76,7 +76,8 @@ body { background: radial-gradient(ellipse at 50% -10%, #0d4654 0%, #031419 62%)
 .endcard .plug svg path { fill: var(--brand); stroke: #fff; stroke-width: 1.4; stroke-linejoin: round; }
 .endcard .plug svg path.prong { fill: #fff; }
 .endcard .line { max-width: 74cqw; margin: 0 auto; font: 700 2.9cqw/1.2 var(--sans); letter-spacing: -.015em; text-wrap: balance; }
-.endcard .sub { font: 500 1.6cqw var(--sans); color: var(--ink-dim); }
+.endcard .sub { max-width: 70cqw; margin: 0 auto; font: 500 1.6cqw/1.35 var(--sans); color: var(--ink-dim); text-wrap: balance; }
+.endcard .small { font: 500 1.25cqw var(--sans); color: var(--ink-dim); opacity: .85; }
 @keyframes fade { from { opacity: 0; } }
 
 .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -309,29 +310,42 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 [data-id="stampfx"][data-stamp="NEEDS_APPROVAL"] .stamp-icon { color: #231300; }
 .receipt-box { fill: #fffaf0; stroke: var(--auto); stroke-width: 3px; }
 .receipt-icon { color: #148a4a; }
-.receipt-amount { fill: #13262e; font: 800 26px var(--sans); }
-.receipt-day { fill: #148a4a; font: 650 20px var(--sans); }
-.label-box { fill: rgb(3 20 25 / .94); stroke: #ff6a4d; stroke-width: 2.5px; }
-.label[data-carry="rejected"] .label-box { stroke: var(--reject); }
-.label[data-carry="receipt"] .label-box { stroke: var(--auto); }
-.label[data-carry="question"] .label-box { stroke: var(--hold); }
-.label-text { font-family: var(--sans); font-weight: 650; fill: #fff; text-anchor: middle; }
-.typed-box { fill: rgb(3 20 25 / .94); stroke: #5ff4ff; stroke-width: 2.5px; }
-.typed-text { fill: #fff; font-family: var(--anatomy-mono); font-weight: 600; }
+.receipt-title { fill: #13262e; font: 800 19px var(--sans); }
+.receipt-line { fill: #13262e; font: 650 16px var(--sans); }
+.receipt-day { fill: #148a4a; font: 650 15px var(--sans); }
+
+/* Text zones (SCRIPT.md section 3): cards in the sky, a thin line to what they are about, never over the cast. */
+.zone-box { fill: rgb(3 20 25 / .92); stroke: #5ff4ff; stroke-width: 2px; }
+.zone[data-tone="hold"] .zone-box { stroke: var(--hold); }
+.zone[data-tone="auto"] .zone-box { stroke: var(--auto); }
+.zone[data-tone="reject"] .zone-box { stroke: var(--reject); }
+.zone[data-tone="naive"] .zone-box { stroke: #ffe066; }
+.zone-title { fill: #fff; font: 700 17px var(--sans); }
+.zone-line { fill: var(--ink); font: 600 16px var(--sans); }
+.zone-line.mono { font: 600 15px var(--anatomy-mono); white-space: pre; }
+.zone-line[data-tone="reject"] { fill: #ff8f85; }
+.zone-line[data-tone="auto"] { fill: #7dffb0; }
+.zone-line[data-tone="dim"] { fill: var(--ink-dim); }
+.zone-chip { fill: rgb(95 244 255 / .12); stroke: #5ff4ff; stroke-width: 1.4px; }
+.zone-chip-text { fill: #fff; font: 600 14px var(--sans); text-anchor: middle; }
+.zone-note { fill: var(--ink-dim); font: italic 500 13px var(--sans); }
+.zone-link { fill: none; stroke: #5ff4ff; stroke-width: 1.6px; stroke-dasharray: 4 4; }
+.dock-led { fill: #23313a; }
+.dock-led[data-on] { fill: var(--auto); filter: drop-shadow(0 0 4px var(--auto)); }
 .mouth { fill: none; stroke: #5a3420; stroke-width: 1.6px; stroke-linecap: round; }
 .stop-line { fill: none; stroke: var(--brand); stroke-width: 4px; stroke-dasharray: 8 6; }
 [data-id="phone"][data-typing] .phone-screen { fill: #5ff4ff; }
 
 @media (max-width: 640px) { .stage { aspect-ratio: 4 / 3.6; } .hud-events { display: none; } .caption { font-size: 15px; bottom: 2cqw; } .brand .for { display: none; } }
 
-/* Narrow portrait phones: a hint to turn the phone sideways; landscape (and kiosk recording) never shows it. */
-.rotate-hint { display: none; }
-@media (orientation: portrait) and (max-width: 640px) {
-  body:not(.kiosk) .rotate-hint { display: flex; align-items: center; gap: 12px; margin: 0; padding: 10px 14px; border: 1px solid var(--petrol-700); border-radius: var(--radius); background: rgb(3 20 25 / .9); color: var(--ink); font-weight: 600; line-height: 1.3; }
-  .rotate-hint svg { width: 28px; height: 28px; flex: none; fill: var(--brand-soft); animation: rotate-hint 2.4s ease-in-out infinite; }
-}
+/* Narrow portrait phones: a prompt over the stage to turn the phone; Story waits until it turns or the viewer watches anyway. */
+.rotate { position: absolute; inset: 0; z-index: 5; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 16px; text-align: center; background: rgb(3 20 25 / .9); color: var(--ink); font: 700 18px/1.3 var(--sans); }
+.rotate[hidden] { display: none; }
+.rotate p { margin: 0; }
+.rotate svg { width: 44px; height: 44px; fill: var(--brand-soft); animation: rotate-hint 2.4s ease-in-out infinite; }
+.rotate button { font: 600 15px var(--sans); color: var(--ink); background: transparent; border: 1px solid var(--petrol-700); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
 @keyframes rotate-hint { 0%, 35% { transform: rotate(0deg); } 65%, 100% { transform: rotate(90deg); } }
-@media (prefers-reduced-motion: reduce) { .rotate-hint svg { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .rotate svg { animation: none; } }
 /* Phones turned sideways: the stage fits the screen height, so the whole scene shows at once below the bar. */
 @media (orientation: landscape) and (max-height: 500px) {
   body:not(.kiosk) .stage { width: min(100%, calc((100dvh - 16px) * 16 / 9)); margin-inline: auto; }

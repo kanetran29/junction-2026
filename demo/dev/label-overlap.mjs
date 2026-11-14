@@ -36,14 +36,10 @@ const collect = () => {
     items.push({ name, x: r.left, y: r.top, w: r.width, h: r.height });
   };
   const one = (id, part, name = id) => add(name, scene.querySelector(`[data-id="${id}"] ${part}`));
-  one("label", ".label-box", "agent label");
-  one("bubble", ".typed-box", "typed request");
+  one("zone3", ".zone-box", "Z3 card");
+  one("zone4", ".zone-box", "Z4 list");
   one("receipt", ".receipt-box", "receipt");
   one("stampfx", ".banner-box", "decision card");
-  one("dockchip", ".chip-box", "dock chip");
-  one("phonechip", ".chip-box", "terminal chip");
-  scene.querySelectorAll('[data-id="doorchips"] > .chip-g').forEach((g, i) => add(`door chip ${i}`, g.querySelector(".chip-box")));
-  scene.querySelectorAll('[data-id="chips"] > .chip-g').forEach((g, i) => add(`rack chip ${i}`, g.querySelector(".chip-box")));
   add("logo sign", scene.querySelector('image[href*="valio-aimo-logo"]'));
   const solid = (id, name) => {
     const before = items.length;
@@ -51,6 +47,7 @@ const collect = () => {
     if (items.length > before) items.at(-1).solid = true;
   };
   solid("chef", "chef");
+  solid("dock", "robot dock");
   solid("agent", "agent");
   solid("truck", "truck");
   solid("gate-fence", "gate fence");

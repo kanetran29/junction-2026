@@ -3,7 +3,7 @@
 // are driven from model state and scene time (no wall clock), so Story mode renders the same frames every time.
 import * as k from "./kit/iso-kit.mjs";
 import { glCamera, glLayer } from "./kit/gl.mjs";
-import { euro } from "./model.mjs";
+import { euro, countdown, CUTOFF } from "./model.mjs";
 import { ICONS } from "./icons.mjs";
 
 export const W = 1600;
@@ -38,7 +38,7 @@ const DOOR_SLOT = [GATE_X - 1.8, 11, 42.5];
 const LETTER = `<rect class="letter-body" x="-12" y="-8" width="24" height="16" rx="1.6"/><path class="letter-flap" d="M-12 -8L0 1.5L12 -8"/><circle class="letter-seal" cx="0" cy="1.5" r="2.8"/>`;
 const LAMP_Z = 88;
 /** Height of the card the robot vacuum carries on its mast: where letters leave and quotes arrive. */
-const HAND_Z = 14;
+const HAND_Z = 20;
 const LAMPS = RACK_X.map((x) => x + RACK.w / 2);
 const WINDOWS = [[-46, 22], [104, 22], [134, 22], [272, 22]];
 /** Logo plate on the wall between the first window and the lamps: world x, bottom z, width, height, inner margin, logo aspect. */
@@ -46,6 +46,9 @@ const LOGO = { x: -6, z: 98, w: 92, h: 32, pad: 4, ratio: 179.06 / 537.17 };
 const CLOCK = [222, WALL_Y, 112, 15];
 /** Bottom edge for the corner cards (decision, receipt): just above where a two-line caption starts. */
 const CARD_BOTTOM = 748;
+/** Width of the decision card (Z5) and size of the receipt card (Z6). */
+const STAMP_W = 400;
+const RECEIPT = { w: 336, h: 118 };
 
 const P = k.fitProjection(
   [...k.boxCorners(PLATE, -24, 0), [PLATE.x + 262, PLATE.y, WALL.h + 6], [PLATE.x + PLATE.w, PLATE.y, WALL.h + 6], [GATE_X, 0, 150]],
@@ -67,18 +70,13 @@ const f1 = (v) => Math.round(v * 10) / 10;
 const M = (material, svg) => `<g class="m m-${material}">${svg}</g>`;
 /** Local (u, v) on the plane y = const mapped to world (x0 + u, y, z0 − v): marks on faces that look at the viewer. */
 const face = (x0, y, z0) => k.sideMatrix([x0, y], z0, P, "left");
-/** Screen box [x0, y0, x1, y1] around world points. */
-const boxOf = (points) => {
-  const xy = points.map(at);
-  return [Math.min(...xy.map((p) => p[0])), Math.min(...xy.map((p) => p[1])), Math.max(...xy.map((p) => p[0])), Math.max(...xy.map((p) => p[1]))];
-};
-/** Words in the scene that a moving label must not cover, left to right: the terminal screen and the kitchen calendar. */
-const KEEP_CLEAR = [
-  boxOf([[PHONE.x, PHONE.y + PHONE.d, PHONE.z], [PHONE.x + PHONE.w, PHONE.y + PHONE.d, PHONE.z], [PHONE.x, PHONE.y + PHONE.d, PHONE.z + PHONE.h], [PHONE.x + PHONE.w, PHONE.y + PHONE.d, PHONE.z + PHONE.h]]),
-  boxOf([[CAL.x, WALL_Y, CAL.z], [CAL.x + CAL.w, WALL_Y, CAL.z], [CAL.x, WALL_Y, CAL.z + CAL.h], [CAL.x + CAL.w, WALL_Y, CAL.z + CAL.h]]),
-];
-/** Right-most screen x the door leaf reaches as it swings open: the door's reason chips start past it. */
-const LEAF_REACH = Math.max(...Array.from({ length: 19 }, (_, i) => (i / 18) * Math.PI * 0.5).flatMap((a) => [4, 86].map((z) => at([HINGE[0] + Math.sin(a) * LEAF_LEN + 2, HINGE[1] + Math.cos(a) * LEAF_LEN, z])[0])));
+/**
+ * Fixed text zones from SCRIPT.md section 3, in viewBox units (the 1920×1080 frame ÷ 1.2): Z3 in the sky over the kitchen
+ * for the one card at a time (the chef's words, the typed request, the quote slip, a case card), Z4 in the sky right of
+ * the warehouse and above the parked truck for lists (raw replies, refusals). No word in the drawing sits anywhere else.
+ */
+const Z3 = { x: 30, y: 184, w: 420 };
+const Z4 = { x: 1160, y: 156, w: 418 };
 /** Local (u, v) on the plane x = const mapped to world (x, y0 + u, z0 − v): marks on faces that look along −x. */
 function faceX(x, y0, z0) {
   const o = at([x, y0, z0]);
@@ -104,9 +102,9 @@ const STAMP = {
 };
 /** Short words for reason codes on the big labels; unknown codes show as they are. */
 const REASON = {
-  OVER_ORDER_AUTO: "Over 500 €",
+  OVER_ORDER_AUTO: "Over 500 € (kitchen's own limit)",
   PACK_SIZE_CHANGED: "Pack size changed",
-  OVER_DAY_AUTO: "Day limit passed",
+  OVER_DAY_AUTO: "Day total over 500 €",
   OVER_ORDER_HARD: "Over hard limit",
   OVER_DAY_HARD: "Over day hard limit",
   NEW_ALLERGEN: "New allergen",
@@ -253,28 +251,28 @@ const thumb = (x, y, z) => {
 };
 
 /**
- * The agent as a small robot vacuum at the origin, about one floor tile across: dark bumper ring, coral shell with a lid
- * seam and a front sensor window, lidar turret, status light, a side brush on the floor.
+ * The agent as a robot vacuum at the origin, about one and a half floor tiles across: dark bumper ring, coral shell with
+ * a lid seam, lidar turret with a yellow cap, status light, a side brush on the floor.
  */
 function robot() {
-  const out = [`<path class="iso-halo" d="${k.haloOf({ x: -10, y: -10, w: 20, d: 20, r: 10 }, 0, 0.1, P)}" style="filter:blur(3px)"/>`];
+  const out = [`<path class="iso-halo" d="${k.haloOf({ x: -16, y: -16, w: 32, d: 32, r: 16 }, 0, 0.1, P)}" style="filter:blur(3px)"/>`];
   const brush = [0, 1, 2].map((i) => {
     const a = i * 2.1 + 0.4;
-    return seg([6.6, 6.6, 0.7], [6.6 + Math.cos(a) * 4, 6.6 + Math.sin(a) * 4, 0.7]);
+    return seg([10.6, 10.6, 0.7], [10.6 + Math.cos(a) * 6.4, 10.6 + Math.sin(a) * 6.4, 0.7]);
   }).join("");
-  out.push(M("dark", L(brush, { tone: "mid" }) + cyl(0, 0, 9, 0.6, 3.2, { tone: "mid" }, 40) + L(k.sideArc(0, 0, 9, 2.2, P, 28), { tone: "lo" })));
-  out.push(M("coral", cyl(0, 0, 8.5, 3.8, 2.6, { tone: "hi" }, 40) + L(k.ring(0, 0, 5.6, 6.4, P, 32), { tone: "lo" })));
-  out.push(M("dark", cyl(-1.5, -1, 2.8, 6.4, 2.2, { tone: "mid" }, 20)));
-  out.push(M("sun", cyl(-1.5, -1, 2.2, 8.6, 0.8, { tone: "hi" }, 20)));
-  const led = at([3.8, 4.6, 6.5]);
-  out.push(`<circle class="chest-led" cx="${f1(led[0])}" cy="${f1(led[1])}" r="${f1(0.9 * KS)}"/>`);
+  out.push(M("dark", L(brush, { tone: "mid" }) + cyl(0, 0, 14.4, 0.6, 5.1, { tone: "mid" }, 48) + L(k.sideArc(0, 0, 14.4, 3.4, P, 32), { tone: "lo" })));
+  out.push(M("coral", cyl(0, 0, 13.6, 5.7, 4.2, { tone: "hi" }, 48) + L(k.ring(0, 0, 9, 9.9, P, 40), { tone: "lo" })));
+  out.push(M("dark", cyl(-2.4, -1.6, 4.5, 9.9, 3.5, { tone: "mid" }, 24)));
+  out.push(M("sun", cyl(-2.4, -1.6, 3.5, 13.4, 1.3, { tone: "hi" }, 24)));
+  const led = at([6, 7.4, 10]);
+  out.push(`<circle class="chest-led" cx="${f1(led[0])}" cy="${f1(led[1])}" r="${f1(1.4 * KS)}"/>`);
   return out.join("");
 }
 
 /** The card the robot carries on a short mast, facing the viewer; colour comes from data-carry and data-stamp. */
 function card() {
-  const plan = { x: 0.5, y: 1, w: 11, d: 1, r: 0.4 };
-  return `<g class="card">${M("dark", L(seg([1, 1.5, 6.4], [1, 1.5, HAND_Z + 5]), { tone: "mid" }))}${M("cream", slab(plan, HAND_Z - 3, 8, { tone: "hi", crease: "lo" }, 2, 0))}<g transform="${face(1, 2.05, HAND_Z + 5)}"><rect class="card-face" x="0" y="0" width="10" height="8" rx=".8"/><rect class="card-line" x="1.5" y="1.8" width="6" height="1"/><circle class="card-stamp" cx="7.4" cy="5.4" r="1.8"/></g></g>`;
+  const plan = { x: 0.8, y: 1.6, w: 17.6, d: 1.6, r: 0.6 };
+  return `<g class="card">${M("dark", L(seg([1.6, 2.4, 9.9], [1.6, 2.4, HAND_Z + 8]), { tone: "mid" }))}${M("cream", slab(plan, HAND_Z - 4.8, 12.8, { tone: "hi", crease: "lo" }, 2, 0))}<g transform="${face(1.6, 3.25, HAND_Z + 8)}"><rect class="card-face" x="0" y="0" width="16" height="12.8" rx="1.2"/><rect class="card-line" x="2.4" y="2.9" width="9.6" height="1.6"/><circle class="card-stamp" cx="11.8" cy="8.6" r="2.9"/></g></g>`;
 }
 
 /** A wall lamp over one rack: bracket, shade and bulb. Its light is the WebGL layer under the front SVG. */
@@ -372,16 +370,22 @@ function sign() {
   return `<g class="neon">${M("gate", slab({ x: GATE_X - 3, y: y0, w: 2.4, d: w, r: 0.6 }, z, h, { tone: "mid" }, 2, 0.4))}<g transform="${faceX(GATE_X - 3.1, y0, z + h)}"><rect class="neon-back" x="1" y="1" width="${w - 2}" height="${h - 2}" rx="2"/><text class="neon-text" x="${w / 2 + 1}" y="${h / 2 + 4}" font-size="11" text-anchor="middle">LAZYDOOR</text></g></g>`;
 }
 
-/** The kitchen terminal on a pedestal: a glowing screen facing the viewer with an icon per state, and a keypad on its right side where the chef types. */
+/**
+ * The kitchen terminal on a pedestal: a glowing screen facing the viewer with an icon per state, a keypad on its right side
+ * where the chef types, and the robot's charging dock built into its base: a floor plate, a charger block with contacts and a light.
+ */
 function phone() {
   const p = PHONE;
-  const stand = M("dark", slab({ x: p.x + 14, y: p.y - 6, w: 16, d: 12, r: 2 }, 0, p.z - 2, { tone: "mid" }, 3, 0.4) + slab({ x: p.x + 4, y: p.y - 10, w: 36, d: 20, r: 3 }, 0, 3, { tone: "mid" }, 3, 0.4) + slab({ x: p.x + 8, y: p.y - 4, w: 28, d: 8, r: 2 }, p.z - 2, 2.4, { tone: "mid" }, 3, 0.4));
+  const stand = M("dark", slab({ x: p.x + 14, y: p.y - 6, w: 16, d: 12, r: 2 }, 0, p.z - 2, { tone: "mid" }, 3, 0.4) + slab({ x: p.x + 8, y: p.y - 4, w: 28, d: 8, r: 2 }, p.z - 2, 2.4, { tone: "mid" }, 3, 0.4));
+  const charger = { x: p.x + 10, y: p.y + 6, w: 24, d: 5, r: 1.5 };
+  const led = at([p.x + 22, charger.y + charger.d + 0.1, 15.4]);
+  const dock = `<g data-id="dock">${M("dark", slab({ x: p.x + 2, y: p.y - 10, w: 40, d: 54, r: 4 }, 0, 1.2, { tone: "mid" }, 4, 0.4) + slab(charger, 1.2, 16, { tone: "mid" }, 2, 0.4) + dots([[p.x + 15, charger.y + charger.d + 0.1, 3.2], [p.x + 29, charger.y + charger.d + 0.1, 3.2]], { size: 1, tone: "hi" }))}<circle data-id="dockled" class="dock-led" cx="${f1(led[0])}" cy="${f1(led[1])}" r="${f1(1.3 * KS)}"/></g>`;
   const screen = `<g transform="${face(p.x, p.y + p.d + 0.1, p.z + p.h)}"><rect class="phone-screen" x="3" y="5" width="${p.w - 6}" height="${p.h - 10}" rx="3"/><rect class="phone-notch" x="${p.w / 2 - 5}" y="2" width="10" height="1.6" rx=".8"/><g class="phone-icon" data-id="phonei"></g><g class="ph-buttons"><rect class="btn-ok" x="6" y="${p.h - 18}" width="14" height="8" rx="3"/><rect class="btn-no" x="${p.w - 20}" y="${p.h - 18}" width="14" height="8" rx="3"/></g></g>`;
   const pad = { x: p.x + p.w, y: p.y - 4, w: 12, d: 10, r: 1.5 };
   const keys = [];
   for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) keys.push([pad.x + 3 + i * 3, pad.y + 2.5 + j * 2.5, p.z + 22]);
   const keypad = M("dark", slab({ x: p.x + p.w - 1, y: p.y - 2, w: 4, d: 6, r: 1 }, p.z + 16, 3, { tone: "mid" }, 2, 0) + slab(pad, p.z + 19, 3, { tone: "mid" }, 3, 0.4)) + dots(keys, { size: 0.9, tone: "hi" });
-  return stand + `<g data-id="phone">${M("phone", slab({ x: p.x, y: p.y, w: p.w, d: p.d, r: 3 }, p.z, p.h, { tone: "hi", crease: "lo" }, 4, 0.6))}${screen}${keypad}</g>`;
+  return stand + dock + `<g data-id="phone">${M("phone", slab({ x: p.x, y: p.y, w: p.w, d: p.d, r: 3 }, p.z, p.h, { tone: "hi", crease: "lo" }, 4, 0.6))}${screen}${keypad}</g>`;
 }
 
 /**
@@ -569,23 +573,22 @@ ${truck()}
 <g data-id="flying"></g>
 <g data-id="doorfly"></g>
 <g data-id="bursts"></g>
-<g data-id="doorchips"></g>
-<g data-id="dockchip" class="chip-g" style="opacity:0"><rect class="chip-box"/><g class="chip-icon"></g><text class="chip-text"></text></g>
 <g data-id="rings"></g>
 <g data-id="confetti"></g>
-<g data-id="chips"></g>
-<g data-id="phonechip" class="chip-g" style="opacity:0"><rect class="chip-box"/><g class="chip-icon"></g><text class="chip-text"></text></g>
-<g data-id="receipt" class="receipt" style="opacity:0"><rect class="receipt-box" width="216" height="80" rx="12"/><g class="receipt-icon">${icon("receipt", 14, 14, 31)}</g><text class="receipt-amount" x="54" y="37"></text><text class="receipt-day" x="54" y="64">Mon 16 Nov</text></g>
+<g data-id="letter2" class="letter" style="opacity:0">${LETTER}</g>
+<g data-id="receipt" class="receipt" style="opacity:0"><rect class="receipt-box" width="${RECEIPT.w}" height="${RECEIPT.h}" rx="12"/><g class="receipt-icon">${icon("receipt", 14, 14, 28)}</g><text class="receipt-title" x="52" y="34"></text><text class="receipt-line" x="16" y="62"></text><text class="receipt-line" x="16" y="84"></text><text class="receipt-day" x="16" y="106"></text></g>
 <g data-id="gateshock" style="opacity:0"><circle class="stamp-shock" r="20"/><circle class="stamp-shock s2" r="20"/></g>
-<g data-id="stampfx" style="opacity:0"><rect class="banner-box" x="0" y="0" width="344" height="232" rx="12"/><g class="stamp-badge" transform="translate(50 50)"><g class="badge-in"><circle class="stamp-disc" r="34"/><g class="stamp-icon"></g></g></g><g class="stamp-labels"></g></g>
-<g data-id="bubble" class="typed" style="opacity:0"><path class="typed-box"/><text class="typed-text"></text></g>
-<g data-id="label" class="label" style="opacity:0"><rect class="label-box" rx="10"/><text class="label-text"></text></g>
+<g data-id="stampfx" style="opacity:0"><rect class="banner-box" x="0" y="0" width="${STAMP_W}" height="232" rx="12"/><g class="stamp-badge" transform="translate(50 50)"><g class="badge-in"><circle class="stamp-disc" r="34"/><g class="stamp-icon"></g></g></g><g class="stamp-labels"></g></g>
+<path data-id="link3" class="zone-link" d="" style="opacity:0"/>
+<path data-id="link4" class="zone-link" d="" style="opacity:0"/>
+<g data-id="zone3" class="zone" style="opacity:0"></g>
+<g data-id="zone4" class="zone" style="opacity:0"></g>
 </svg>`;
   host.innerHTML = `${back}<canvas class="scene-gl" aria-hidden="true"></canvas>${front}`;
   const root = host.querySelector(".scene-front");
   const stage = host.closest(".stage") ?? host;
   const q = (id) => root.querySelector(`[data-id="${id}"]`);
-  const ids = ["agent", "gate-fence", "gate-post", "gate-front", "gate-sign", "stopline", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "bubble", "label", "exhaust", "doorfly", "bursts", "doorchips", "dockchip", "rings", "confetti", "stampfx", "gateshock", "chips", "phonechip", "receipt", "flying", "counter", "chef", "letter", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "phonei"];
+  const ids = ["agent", "gate-fence", "gate-post", "gate-front", "gate-sign", "stopline", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "zone3", "zone4", "link3", "link4", "letter2", "exhaust", "doorfly", "bursts", "rings", "confetti", "stampfx", "gateshock", "receipt", "flying", "counter", "chef", "letter", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "phonei", "dockled"];
   const el = Object.fromEntries(ids.map((id) => [id, q(id)]));
   const racks = [...root.querySelectorAll(".rack")].sort((a, b) => a.dataset.rack - b.dataset.rack);
   const counterCrates = [...el.counter.querySelectorAll(".ccrate")];
@@ -628,14 +631,11 @@ ${truck()}
   };
   const svgNode = (tag, cls) => `<${tag} class="${cls}"/>`;
   const chipMarkup = () => `<g class="chip-g"><rect class="chip-box"/><g class="chip-icon"></g><text class="chip-text"></text></g>`;
-  /** Width and height of a label chip for its text, icon and font size. */
-  const chipSize = (text, iconName, size = 21) => {
-    const perChar = text === text.toUpperCase() && /[A-Z]/.test(text) ? 0.68 : 0.57;
-    return { width: Math.round(text.length * size * perChar + (iconName ? size * 1.5 : 0) + 30), height: Math.round(size * 1.75) };
-  };
-  /** A label chip: rounded box, icon and text at a screen point, sized to its text. Returns its screen box. */
+  /** A label chip: rounded box, icon and text at a screen point, sized to its text. */
   const chip = (node, { x, y, text, iconName, tone, size = 21, anchor = "middle" }) => {
-    const { width, height } = chipSize(text, iconName, size);
+    const perChar = text === text.toUpperCase() && /[A-Z]/.test(text) ? 0.68 : 0.57;
+    const width = Math.round(text.length * size * perChar + (iconName ? size * 1.5 : 0) + 30);
+    const height = Math.round(size * 1.75);
     const left = Math.max(14, Math.min(W - 14 - width, anchor === "middle" ? x - width / 2 : anchor === "end" ? x - width : x));
     setAttr(node, "data-tone", tone ?? "");
     setAttr(node, "transform", `translate(${f1(left)} ${f1(y - height)})`);
@@ -649,43 +649,63 @@ ${truck()}
     setAttr(label, "y", f1(height / 2 + size * 0.36));
     setAttr(label, "font-size", size);
     setText(label, text);
-    return [left, y - height, left + width, y];
   };
 
-  /** Screen boxes [x0, y0, x1, y1] that text keeps clear of this frame: the chef, the agent, the truck, the door, and labels placed so far. */
-  const taken = [];
-  const GAP = 6;
-  const rest = new Map();
-  /** A group's screen box at rest (its own transform left out), measured once, moved by (dx, dy). */
-  const bodyBox = (node, dx = 0, dy = 0) => {
-    let b = rest.get(node);
-    if (!b) {
-      const r = node.getBBox();
-      if (!r.width) return null;
-      b = [r.x, r.y, r.x + r.width, r.y + r.height];
-      rest.set(node, b);
-    }
-    return [b[0] + dx, b[1] + dy, b[2] + dx, b[3] + dy];
-  };
-  /** True when box b stays inside the drawing above the caption and keeps GAP from everything taken. */
-  const clear = (b) => b[0] >= 8 && b[1] >= 8 && b[2] <= W - 8 && b[3] <= CARD_BOTTOM && taken.every((o) => b[0] >= o[2] + GAP || b[2] <= o[0] - GAP || b[1] >= o[3] + GAP || b[3] <= o[1] - GAP);
+  /** Escapes text for markup built as a string (gateway text in Live mode is untrusted). */
+  const esc = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   /**
-   * Picks a w×h spot [left, top] for a label from candidates, trying the spot it used last frame first so it does not
-   * flicker between two, and reserves it. Returns null when every candidate would cover something: the label then waits.
+   * Draws a zone card at box: title, lines ({text, tone} or plain strings), a row of chips and a small wrapped note; the
+   * markup is rebuilt only when the words change. Returns the card's screen box, or null when there is no card.
    */
-  const place = (key, w, h, candidates) => {
-    const last = live.spot[key];
-    const order = last !== undefined && candidates[last] ? [last, ...candidates.keys()] : [...candidates.keys()];
-    const i = order.find((j) => clear([candidates[j][0], candidates[j][1], candidates[j][0] + w, candidates[j][1] + h]));
-    live.spot[key] = i;
-    if (i === undefined) return null;
-    const [x, y] = candidates[i];
-    taken.push([x, y, x + w, y + h]);
-    return [x, y];
+  const drawCard = (group, box, card) => {
+    if (!card) {
+      setAttr(group, "style", "opacity:0");
+      return null;
+    }
+    const key = JSON.stringify(card);
+    if (group.dataset.key !== key) {
+      group.dataset.key = key;
+      const parts = [];
+      let y = 10;
+      if (card.title) {
+        parts.push(`<text class="zone-title" x="16" y="${y + 16}">${esc(card.title)}</text>`);
+        y += 26;
+      }
+      for (const line of card.lines ?? []) {
+        const { text, tone } = typeof line === "string" ? { text: line } : line;
+        parts.push(`<text class="zone-line${card.mono ? " mono" : ""}" data-tone="${esc(tone ?? "")}" x="16" y="${y + 15}">${esc(text)}</text>`);
+        y += 20;
+      }
+      if (card.chips?.length) {
+        let x = 16;
+        for (const c of card.chips) {
+          const w = Math.round(c.length * 8.2 + 22);
+          parts.push(`<rect class="zone-chip" x="${x}" y="${y + 4}" width="${w}" height="24" rx="12"/><text class="zone-chip-text" x="${x + w / 2}" y="${y + 21}">${esc(c)}</text>`);
+          x += w + 8;
+        }
+        y += 32;
+      }
+      for (const note of card.note ? wrap(card.note, 56) : []) {
+        parts.push(`<text class="zone-note" x="16" y="${y + 13}">${esc(note)}</text>`);
+        y += 17;
+      }
+      group.dataset.h = String(y + 8);
+      group.innerHTML = `<rect class="zone-box" width="${box.w}" height="${y + 8}" rx="12"/>${parts.join("")}`;
+    }
+    setAttr(group, "data-tone", card.tone ?? "");
+    setAttr(group, "transform", `translate(${box.x} ${box.y})`);
+    setAttr(group, "style", null);
+    return [box.x, box.y, box.x + box.w, box.y + Number(group.dataset.h)];
+  };
+  /** A thin line from a zone card's edge point a to a target in the scene b, ending in a dot; hidden when b is null. */
+  const drawLink = (node, a, b) => {
+    if (!a || !b) return setAttr(node, "style", "opacity:0");
+    setAttr(node, "d", `M${f1(a[0])} ${f1(a[1])}L${f1(b[0])} ${f1(b[1])}M${f1(b[0] - 3)} ${f1(b[1])}a3 3 0 1 0 6 0a3 3 0 1 0 -6 0`);
+    setAttr(node, "style", null);
   };
 
   /** The robot's path: parked at the foot of the kitchen terminal, out round the chef onto the lane, along it to the door's scan line. */
-  const ROUTE = [[-284, -11], [-258, LANE], [-106, LANE]];
+  const ROUTE = [[-284, -6], [-256, LANE], [-112, LANE]];
   const lengths = (route) => route.reduce((acc, p, i) => (i ? [...acc, acc[i - 1] + Math.hypot(p[0] - route[i - 1][0], p[1] - route[i - 1][1])] : [0]), []);
   const pointOn = (route, cum, s) => {
     const i = Math.max(1, cum.findIndex((c) => c >= s));
@@ -696,7 +716,7 @@ ${truck()}
   };
   const RC = lengths(ROUTE);
   const STATION = { chef: 0, home: 0, door: RC[2] };
-  const HAND_AT_DOOR = at([ROUTE[2][0] + 6, ROUTE[2][1] + 2, HAND_Z + 1]);
+  const HAND_AT_DOOR = at([ROUTE[2][0] + 9.6, ROUTE[2][1] + 3.2, HAND_Z + 2]);
   const RACK_TOP = at([RACK_X[0] + RACK.w / 2, RACK.y + RACK.d, RACK.h + 18]);
   /** Control point of the raw API arc in Act 1: high over the place where the door will stand. */
   const RAW_BEND = [(HAND_AT_DOOR[0] + RACK_TOP[0]) / 2, Math.min(HAND_AT_DOOR[1], RACK_TOP[1]) - 150];
@@ -706,7 +726,7 @@ ${truck()}
 
   /** Moves s toward target along a route with a speed limit and a short ease in and out. */
   const travel = (s, v, target, dt) => {
-    const want = Math.max(-130, Math.min(130, (target - s) * 4.5));
+    const want = Math.max(-190, Math.min(190, (target - s) * 6));
     v += (want - v) * (1 - Math.exp(-dt / 0.14));
     s += v * dt;
     if (Math.abs(target - s) < 0.3 && Math.abs(v) < 3) return [target, 0];
@@ -737,8 +757,8 @@ ${truck()}
     el.leaf.innerHTML = M("garnet", S(paths, { tone: "hi", crease: "lo" }) + extra);
   };
 
-  /** Draws one frame from state at scene time t; snap jumps eased parts to their targets, calm turns effects off. */
-  function draw(state, t, dt, { snap = false, calm = false } = {}) {
+  /** Draws one frame from state at scene time t; snap jumps eased parts to their targets, calm turns effects off, story takes the zone cards from the script instead of deriving them. */
+  function draw(state, t, dt, { snap = false, calm = false, story = false } = {}) {
     dt = Math.min(dt, 1 / 20);
     const stamp = STAMP[state.door.stamp] ? state.door.stamp : null;
     const target = STATION[state.agent.at] ?? STATION.home;
@@ -753,21 +773,12 @@ ${truck()}
     }
     const [ax, ay] = pointOn(ROUTE, RC, live.s);
     setAttr(el.agent, "transform", k.translateAlong(P, [ax, ay, 0]));
+    setAttr(el.dockled, "data-on", Math.abs(live.s - STATION.home) < 0.5 && Math.abs(live.v) < 3 ? "" : null);
     setAttr(cardEl, "data-carry", state.agent.carry ?? "none");
     setAttr(cardEl, "data-stamp", state.agent.carry === "quote" || state.agent.carry === "rejected" ? stamp ?? "" : state.agent.carry === "receipt" ? "AUTO" : "");
     const posted = drawLetter(state, t, snap, calm, ax, ay);
     setAttr(cardEl, "style", state.agent.carry && !posted ? null : "opacity:0");
 
-    const o = at([0, 0, 0]);
-    const moved = (node, p) => {
-      const q = at(p);
-      return bodyBox(node, q[0] - o[0], q[1] - o[1]);
-    };
-    const agentBox = moved(el.agent, [ax, ay, 0]);
-    const leaf = el.leaf.getBBox();
-    const gateParts = state.gate.built ? [...["gate-fence", "gate-post", "gate-front", "gate-sign"].map((id) => bodyBox(el[id])), leaf.width ? [leaf.x, leaf.y, leaf.x + leaf.width, leaf.y + leaf.height] : null] : [];
-    taken.length = 0;
-    taken.push(...[...KEEP_CLEAR, bodyBox(el.chef), agentBox, moved(el.truck, [truckRun(state.truck, t - state.truck.since).front, TRUCK_Y, 0]), ...gateParts].filter(Boolean));
 
     drawGate(state.gate, t, calm);
     drawRaw(state, t);
@@ -775,9 +786,9 @@ ${truck()}
 
     setAttr(el.asks, "style", state.door.scan ? `stroke-dashoffset:${f1(-t * 24)}` : "opacity:0");
     if (state.door.scan && Math.abs(live.v) < 6) {
-      const z = 1 + (calm ? 0.5 : Math.sin((t - state.door.since) * 3.4) * 0.5 + 0.5) * 18;
-      const y = ay + 10;
-      const ends = [at([ax - 10, y, z]), at([ax + 10, y, z])];
+      const z = 1 + (calm ? 0.5 : Math.sin((t - state.door.since) * 3.4) * 0.5 + 0.5) * 16;
+      const y = ay + 15;
+      const ends = [at([ax - 15, y, z]), at([ax + 15, y, z])];
       const head = [at([GATE_X - 16, -6, 92]), at([GATE_X - 16, 28, 92])];
       el.scan.innerHTML = `<path class="scan-fan" d="${k.pathOf([head[0], head[1], ends[1], ends[0]], true)}"/><path class="scan-line" d="${k.pathOf(ends)}"/>`;
     } else if (el.scan.firstChild) el.scan.innerHTML = "";
@@ -788,12 +799,11 @@ ${truck()}
     drawStamp(stamp, state.door.reasons, state.door.since, state.phone.status, t, calm, shippedAt);
     drawPhone(state.phone, t, calm);
     drawClock(state.now);
-    const typed = drawTyped(state, t, calm);
     drawDoor(state, t, calm);
     drawTruck(state, t, dt, snap, calm);
     flushBursts(t, calm);
+    const typed = drawZones(state, t, calm, story, ax, ay);
     drawChef(state, t, typed, calm);
-    drawLabel(state, ax, ay, agentBox);
     drawSky(state, dt, snap || calm);
   }
 
@@ -838,7 +848,7 @@ ${truck()}
       setAttr(el.letter, "style", "opacity:0");
       return false;
     }
-    const hand = at([ax + 6, ay + 2, HAND_Z + 1]);
+    const hand = at([ax + 9.6, ay + 3.2, HAND_Z + 2]);
     if (!state.gate.built) {
       const u = (t - live.handAt) / 1.3;
       if (calm || u < 0 || u >= 1) setAttr(el.letter, "style", "opacity:0");
@@ -865,10 +875,9 @@ ${truck()}
     return t < back + 0.7;
   }
 
-  /** Racks: an icon on the tag, a big label chip above, the alarm light and snapping lock on a closed shelf, the X on a crossed one. */
+  /** Racks: an icon on the tag, the alarm light and snapping lock on a closed shelf, the X on a crossed one (their words are in Z4). */
   function drawRacks(state, t, calm) {
     const naive = state.naive;
-    const chips = pool(el.chips, racks.length, chipMarkup);
     racks.forEach((rackEl, i) => {
       const shelf = state.shelves[i];
       let status = shelf.status;
@@ -887,13 +896,10 @@ ${truck()}
       const iconName = { ok: "check", locked: "lock", limited: "warn", crossed: "cross", naive: "warn" }[status] ?? "";
       setAttr(rackEl, "data-status", status);
       setIcon(rackEl.querySelector(".tag-icon"), iconName, (RACK.w - 28) / 2 - 6.5, 1, 12);
-      const age = t - since;
-      const node = chips[i];
-      if (status !== "naive" || !text) return setAttr(node, "style", "opacity:0");
-      const [cx, cy] = at([RACK_X[i] + RACK.w / 2, RACK.y + RACK.d, RACK.h + 20]);
-      taken.push(chip(node, { x: cx + 6, y: cy - 4, text, iconName, tone: status, size: 20, anchor: "start" }));
-      setAttr(node, "style", `opacity:${(calm ? 1 : clamp01(age / 0.25)).toFixed(3)}`);
     });
+  }
+
+  /** Burst marks    });
   }
 
   /** Burst marks (✓ or ✕) collected each frame from the door and the dock, drawn from one pool. */
@@ -914,20 +920,18 @@ ${truck()}
     bursts.length = 0;
   };
 
-  /** Door check: each quoted product flies from its shelf to the door's scanner; refused ones bounce off with a red mark and a reason at the door. */
+  /** Door check: quoted products fly from their shelves to the scanner, refused ones bounce off with a red mark; a flash marks a refused call; a rival hotel's letter flies in from the left. */
   function drawDoor(state, t, calm) {
     const q = state.quote;
     const tokens = pool(el.doorfly, 6, () => `<g class="fly" style="opacity:0"></g>`);
-    const chips = pool(el.doorchips, 4, chipMarkup);
     const items = [];
     if (q) {
-      q.rejections.forEach((r) => items.push({ productId: String(r.productId), ok: false, code: r.code, remaining: r.remaining ?? r.limit ?? null }));
-      const line = q.offers[0]?.lines?.[0];
-      if (line) items.push({ productId: String(line.productId), ok: true });
+      const lines = (q.offers[0]?.lines ?? []).filter((l) => l?.productId).map((l) => ({ productId: String(l.productId), ok: true }));
+      const refused = q.rejections.filter((r) => r?.productId).map((r) => ({ productId: String(r.productId), ok: false }));
+      items.push(...refused.slice(0, tokens.length - lines.length), ...lines.slice(0, tokens.length));
     }
     const [dx, dy] = at(DOOR_POINT);
     const origin = at([0, 0, 0]);
-    let refused = 0;
     tokens.forEach((node, i) => {
       const item = items[i];
       if (!item || calm) return setAttr(node, "style", "opacity:0");
@@ -961,32 +965,22 @@ ${truck()}
       if (t >= arrive && t < arrive + 1.4) bursts.push({ x: dx, y: dy - 34, t0: arrive, ok: item.ok });
     });
     if (state.door.stamp === "REJECT" && q && state.door.since >= q.at && t - state.door.since < 1.4) bursts.push({ x: dx, y: dy - 34, t0: state.door.since, ok: false });
-    const tr = state.truck;
-    const shipped = q && tr.status !== "parked" && !tr.naive && tr.since >= q.at;
-    const list = shipped ? [] : items.filter((it) => !it.ok).slice(0, chips.length).map((item) => {
-      const text = item.code === "STOCK_LIMITED" ? (item.remaining !== null ? `Only ${item.remaining} left` : "Stock limited") : item.code === "CUTOFF_PASSED" ? "Cut-off passed" : reasonText(item.code);
-      return { item, text, arrive: q.at + 0.2 + items.indexOf(item) * 0.45 + 0.6 };
-    });
-    const front = bodyBox(el["gate-front"]);
-    const shelf = bodyBox(racks[0]);
-    const width = Math.max(0, ...list.map((c) => chipSize(c.text, "cross", 20).width));
-    const spot = list.length && front && shelf ? place("doorchips", width, list.length * 44 - 9, [[Math.max(front[2], LEAF_REACH) + 12, shelf[3] + 8]]) : null;
-    chips.forEach((node, k) => {
-      const c = list[k];
-      if (!c || !spot || (t < c.arrive && !calm)) return setAttr(node, "style", "opacity:0");
-      chip(node, { x: spot[0], y: spot[1] + 35 + refused * 44, text: c.text, iconName: "cross", tone: "reject", size: 20, anchor: "start" });
-      setAttr(node, "style", `opacity:${(calm ? 1 : clamp01((t - c.arrive) / 0.25)).toFixed(3)}`);
-      refused += 1;
-    });
+    if (state.flash && t - state.flash.since < 1.4) bursts.push({ x: dx, y: dy - 34, t0: state.flash.since, ok: false });
+    const rival = state.rival ? (t - state.rival.since) / 1.1 : -1;
+    if (calm || rival < 0 || rival >= 1) setAttr(el.letter2, "style", "opacity:0");
+    else {
+      const slot = at(DOOR_SLOT);
+      const e = ease(rival);
+      placeLetter(el.letter2, -20 + (slot[0] + 20) * e, slot[1] + 90 * (1 - e) - Math.sin(Math.PI * e) * 70, 1 - 0.35 * e, rival > 0.9 ? (1 - rival) / 0.1 : 1);
+    }
   }
 
-  /** Dock gate: the naive agent's crates are refused here at the cut-off; a pending approval waits here; an expired one keeps it shut. */
+  /** Dock gate  /** Dock gate: the naive agent's crates fly to the truck and are refused there at the cut-off. */
   function drawDock(state, t, calm) {
     const tr = state.truck;
     const naive = state.naive;
     const tokens = pool(el.flying, 8, () => `<g class="fly" style="opacity:0">${flyingCrate("crate2")}</g>`);
     const origin = at([0, 0, 0]);
-    let words = null;
     if (tr.naive && (naive.step === "load" || naive.step === "stuck")) {
       const loadAt = naive.step === "load" ? naive.since : tr.since - 4;
       const [fx, fy] = at([RACK_X[0] + RACK.w / 2, RACK.y + RACK.d + 4, 30]);
@@ -1020,19 +1014,8 @@ ${truck()}
         const hit = loadAt + i * 0.35 + 0.6;
         if (t >= hit && t < hit + 1.4) bursts.push({ x: sx, y: sy - 30, t0: hit, ok: false });
       }
-      if (t > loadAt + 0.6) words = ["Cut-off Thu 12 Nov 15:00", "lock", "reject"];
     }
     else for (let i = 5; i < 8; i++) setAttr(tokens[i], "style", "opacity:0");
-    const parked = truckRun(tr, t - tr.since).front === DOCK_X;
-    if (!words && parked && state.phone.status === "buzzing") words = ["Waiting for approval", "clock", "hold"];
-    if (!words && parked && state.phone.status === "expired") words = ["Approval expired", "clock", "reject"];
-    if (!words) return setAttr(el.dockchip, "style", "opacity:0");
-    const [px, py] = at([BARRIER.x, BARRIER.post, 0]);
-    const { width, height } = chipSize(words[0], words[1], 20);
-    const spot = place("dockchip", width, height, [[px - 24 - width, py + 4 - height], [px - 24 - width, py + 16]]);
-    if (!spot) return setAttr(el.dockchip, "style", "opacity:0");
-    chip(el.dockchip, { x: spot[0], y: spot[1] + height, text: words[0], iconName: words[1], tone: words[2], size: 20, anchor: "start" });
-    setAttr(el.dockchip, "style", null);
   }
 
   /**
@@ -1064,16 +1047,15 @@ ${truck()}
     setAttr(badge, "transform", scale !== 1 ? `scale(${scale.toFixed(3)})` : null);
     setIcon(group.querySelector(".stamp-icon"), meta.icon, -21, -21, 42);
     const words = reasons.map(reasonText);
-    if (stamp === "NEEDS_APPROVAL" && phoneStatus === "approved") words.push("Approved on phone");
+    if (stamp === "NEEDS_APPROVAL" && phoneStatus === "approved") words.push("Approved");
     const items = [{ text: meta.label, tone: meta.cls, size: 22, x: 94, y: 70 }];
     words.slice(0, 3).forEach((w, i) => {
-      const approved = w === "Approved on phone";
-      items.push({ text: w, tone: approved ? "auto" : "plain", size: 20, x: 18, y: 128 + i * 44, iconName: approved ? "check" : null });
+      const approved = w === "Approved";
+      items.push({ text: w, tone: approved ? "auto" : "plain", size: 18, x: 18, y: 128 + i * 44, iconName: approved ? "check" : null });
     });
     const height = 100 + Math.min(3, words.length) * 44;
     setAttr(group.querySelector(".banner-box"), "height", height);
-    setAttr(group, "transform", `translate(${W - 16 - 344} ${CARD_BOTTOM - height})`);
-    taken.push([W - 16 - 344, CARD_BOTTOM - height, W - 16, CARD_BOTTOM]);
+    setAttr(group, "transform", `translate(${W - 16 - STAMP_W} ${CARD_BOTTOM - height})`);
     const rows = pool(group.querySelector(".stamp-labels"), items.length, chipMarkup);
     rows.forEach((row, i) => {
       const item = items[i];
@@ -1083,7 +1065,7 @@ ${truck()}
     });
   }
 
-  /** Phone: glowing screen with a state icon, pulse rings while waiting, and a big label chip with the amount. */
+  /** Kitchen terminal: glowing screen with a state icon and pulse rings while an approval waits (its words are in Z3). */
   function drawPhone(ph, t, calm) {
     setAttr(el.phone, "data-status", ph.status);
     const buzz = !calm && ph.status === "buzzing" && (t - ph.since) % 2.4 < 0.9 ? Math.sin(t * 90) * 1.3 : 0;
@@ -1100,20 +1082,6 @@ ${truck()}
       setAttr(ring, "ry", f1(60 + 110 * u));
       setAttr(ring, "style", `opacity:${(0.85 * (1 - u)).toFixed(3)}`);
     });
-    const words = {
-      buzzing: [ph.cents !== null ? `Approve ${euro(ph.cents)}?` : "Approve?", "bell", "hold"],
-      approved: [ph.cents !== null ? `Approved ${euro(ph.cents)}` : "Approved", "check", "auto"],
-      rejected: ["Rejected", "cross", "reject"],
-      expired: ["Expired at cut-off", "clock", "muted"],
-    }[ph.status];
-    if (!words) return setAttr(el.phonechip, "style", "opacity:0");
-    const [px, py] = at([PHONE.x + PHONE.w, PHONE.y + PHONE.d, 0]);
-    const { width, height } = chipSize(words[0], words[1]);
-    const [screen] = KEEP_CLEAR;
-    const spot = place("phonechip", width, height, [[screen[0] - 8 - width, screen[3] - height], [px - 8 - width, py + 18 - height], [px - 8 - width, py + 40]]);
-    if (!spot) return setAttr(el.phonechip, "style", "opacity:0");
-    chip(el.phonechip, { x: spot[0], y: spot[1] + height, text: words[0], iconName: words[1], tone: words[2], anchor: "start" });
-    setAttr(el.phonechip, "style", null);
   }
 
   /** Wall clock hands from the door's clock; remembers today's weekday and date for the calendar. */
@@ -1176,15 +1144,19 @@ ${truck()}
       setAttr(node, "style", on ? null : "opacity:0");
     });
     live.happy = run.accepted && age >= run.unloadDone - 0.2 && age < run.unloadDone + 3.4;
-    const delivered = run.accepted && age >= run.arrive;
+    const delivered = run.accepted && age >= run.arrive && age < run.home + 1.5;
     const [day, date] = delivered ? ["MON", "16"] : live.today;
     setText(el.caldate, date);
     setText(el.calday, day);
     setAttr(el.caldate, "data-flip", delivered ? "" : null);
     if (run.accepted && age >= run.unloadDone - 0.2 && age < run.home + 1.5) {
-      setAttr(el.receipt, "transform", `translate(40 ${CARD_BOTTOM - 90})`);
-      taken.push([40, CARD_BOTTOM - 90, 256, CARD_BOTTOM - 10]);
-      setText(el.receipt.querySelector(".receipt-amount"), state.receipt?.netCents != null ? euro(state.receipt.netCents) : "Delivered");
+      const r = state.receipt ?? {};
+      const [line1, line2] = el.receipt.querySelectorAll(".receipt-line");
+      setAttr(el.receipt, "transform", `translate(24 ${CARD_BOTTOM - RECEIPT.h})`);
+      setText(el.receipt.querySelector(".receipt-title"), r.summary ? `Receipt · ${r.summary}` : "Receipt");
+      setText(line1, [r.netCents != null ? `Net ${euro(r.netCents)}` : "", r.grossCents != null ? `Gross ${euro(r.grossCents)}` : ""].filter(Boolean).join(" · "));
+      setText(line2, r.approvedBy ? `Approved by ${r.approvedBy}` : "Accepted");
+      setText(el.receipt.querySelector(".receipt-day"), "Accepted (simulated) · Mon 16 Nov");
       setAttr(el.receipt, "style", `opacity:${(calm ? 1 : clamp01((age - run.unloadDone + 0.2) / 0.3)).toFixed(3)}`);
     } else setAttr(el.receipt, "style", "opacity:0");
 
@@ -1242,46 +1214,36 @@ ${truck()}
     });
   }
 
-  /** What the chef is typing into the kitchen terminal: the request appears letter by letter above the terminal. */
-  function drawTyped(state, t, calm) {
-    let source = null;
-    if (state.say) source = { text: state.say.text, since: state.say.since };
-    else if (state.draft && state.agent.at === "chef" && (state.agent.carry === "draft" || state.agent.carry === "question") && t - state.agent.since < 5) source = { text: state.draft.text, since: state.agent.since };
-    if (!source) {
-      setAttr(el.bubble, "style", "opacity:0");
-      return { typing: false };
+  /**
+   * The text zones. Z3: the chef's words typed letter by letter, else the card the script names (Story) or one derived from
+   * the gateway state (Live), with a thin line to the robot or the terminal. Z4: the script's list, or the quote's refusals,
+   * with a line to the rack. Returns whether the chef is still typing.
+   */
+  function drawZones(state, t, calm, story, ax, ay) {
+    let typing = false;
+    let card = story ? state.card : liveCard(state);
+    if (state.say) {
+      const text = state.say.text;
+      const shown = calm ? text.length : Math.floor((t - state.say.since) * 18);
+      let left = shown;
+      const caret = !calm && shown < text.length + 12 && Math.floor(t * 3) % 2 === 0 ? "▍" : "";
+      const lines = wrap(text, 38).map((line) => {
+        const part = line.slice(0, Math.max(0, left));
+        left -= line.length + 1;
+        return part;
+      });
+      const last = lines.findLastIndex((l) => l.length > 0);
+      card = { title: "Kitchen terminal · the chef types", mono: true, lines: lines.map((l, i) => (i === last ? l + caret : l || " ")), link: "terminal" };
+      typing = shown < text.length + 8;
     }
-    const full = wrap(source.text, 20);
-    const shown = calm ? source.text.length : Math.floor((t - source.since) * 18);
-    let left = shown;
-    const lines = full.map((line) => {
-      const part = line.slice(0, Math.max(0, left));
-      left -= line.length + 1;
-      return part;
-    });
-    const size = 21;
-    const lineH = size * 1.3;
-    const width = Math.max(...full.map((l) => l.length + 1)) * size * 0.62 + 40;
-    const height = full.length * lineH + 26;
-    const [tx, ty] = at([PHONE.x + PHONE.w / 2, PHONE.y + PHONE.d, PHONE.z + PHONE.h + 6]);
-    const x = Math.max(14, tx + 26 - width);
-    const y = ty - height - 22;
-    taken.push([x, y, x + width, ty]);
-    const rr = 12;
-    const tipX = Math.min(Math.max(tx, x + 30), x + width - 30);
-    const d = `M${f1(x + rr)} ${f1(y)}H${f1(x + width - rr)}Q${f1(x + width)} ${f1(y)} ${f1(x + width)} ${f1(y + rr)}V${f1(y + height - rr)}Q${f1(x + width)} ${f1(y + height)} ${f1(x + width - rr)} ${f1(y + height)}H${f1(tipX + 12)}L${f1(tx)} ${f1(ty - 4)}L${f1(tipX - 12)} ${f1(y + height)}H${f1(x + rr)}Q${f1(x)} ${f1(y + height)} ${f1(x)} ${f1(y + height - rr)}V${f1(y + rr)}Q${f1(x)} ${f1(y)} ${f1(x + rr)} ${f1(y)}Z`;
-    el.bubble.querySelector(".typed-box").setAttribute("d", d);
-    const txt = el.bubble.querySelector(".typed-text");
-    while (txt.children.length < full.length) txt.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "tspan"));
-    [...txt.children].forEach((span, i) => {
-      const caret = !calm && i === lines.findLastIndex((l) => l.length > 0) && shown < source.text.length + 12 && Math.floor(t * 3) % 2 === 0 ? "▍" : "";
-      setText(span, (lines[i] ?? "") + caret);
-      setAttr(span, "x", f1(x + 20));
-      setAttr(span, "y", f1(y + 13 + size + i * lineH - 4));
-    });
-    setAttr(txt, "font-size", size);
-    setAttr(el.bubble, "style", `opacity:${Math.min(1, (t - source.since) / 0.3).toFixed(3)}`);
-    return { typing: shown < source.text.length + 8 };
+    const box3 = drawCard(el.zone3, Z3, card);
+    const target = card?.link === "agent" ? at([ax + 9.6, ay + 3.2, HAND_Z + 8]) : card?.link === "terminal" ? at([PHONE.x + PHONE.w / 2, PHONE.y + PHONE.d, PHONE.z + PHONE.h]) : null;
+    drawLink(el.link3, box3 && target && [Math.min(Math.max(target[0], box3[0] + 24), box3[2] - 24), box3[3]], target);
+    const list = story ? state.list : liveList(state);
+    const box4 = drawCard(el.zone4, Z4, list && { title: list.title, mono: list.mono, lines: list.rows, note: list.note });
+    const rack = Number.isInteger(list?.rack) ? at([RACK_X[list.rack] + RACK.w / 2, RACK.y + RACK.d, RACK.h + 18]) : null;
+    drawLink(el.link4, box4 && rack && [box4[0], box4[3] - 14], rack);
+    return { typing };
   }
 
   /** The chef acts: types at the terminal, looks at it when an approval waits, taps to approve, cheers at delivery, frowns at an empty counter. */
@@ -1289,7 +1251,7 @@ ${truck()}
     const ph = state.phone;
     const tapping = ph.status === "approved" && t - ph.since < 1;
     const looking = ph.status === "buzzing" || tapping;
-    const sad = (state.naive.step === "load" && t - state.naive.since > 0.7) || state.naive.step === "stuck" || ph.status === "expired";
+    const sad = (state.naive.step === "load" && t - state.naive.since > 0.7) || state.naive.step === "stuck" || (state.naive.step === "gone" && !state.gate.built) || ph.status === "expired";
     const typing = typed.typing || tapping;
     const happy = live.happy;
     const shrug = sad && !happy && !typing;
@@ -1304,44 +1266,6 @@ ${truck()}
     setAttr(smile, "style", happy ? null : "opacity:0");
     setAttr(frown, "style", sad && !happy ? null : "opacity:0");
     setAttr(el.phone, "data-typing", typed.typing && ph.status === "idle" ? "" : null);
-  }
-
-  /** The agent's card content as a label next to it: over its head, else under its feet or beside it, never over the cast, the door or other text. */
-  function drawLabel(state, ax, ay, body) {
-    const lines = cardLines(state);
-    if (!lines.length || !body) return setAttr(el.label, "style", "opacity:0");
-    const head = at([ax, ay, HAND_Z + 7]);
-    const size = 21;
-    const width = Math.max(...lines.map((l) => l.length)) * size * 0.56 + 32;
-    const height = lines.length * size * 1.3 + 18;
-    const [hx, above, below, mid] = [head[0], head[1] - height - 8, body[3] + 16, (body[1] + body[3]) / 2 - height / 2];
-    const spot = place("label", width, height, [
-      [hx - width / 2, above], [hx - width / 2, below],
-      [hx - 24, above], [hx + 24 - width, above], [hx - 24, below], [hx + 24 - width, below],
-      [body[2] + 8, mid], [body[0] - 8 - width, mid],
-    ]);
-    if (!spot) return setAttr(el.label, "style", "opacity:0");
-    const [left, top] = spot;
-    const box = el.label.querySelector(".label-box");
-    box.setAttribute("x", f1(left));
-    box.setAttribute("y", f1(top));
-    box.setAttribute("width", f1(width));
-    box.setAttribute("height", f1(height));
-    setAttr(el.label, "data-carry", state.agent.carry);
-    const txt = el.label.querySelector(".label-text");
-    const key = lines.join("\n");
-    if (txt.dataset.key !== key) {
-      txt.dataset.key = key;
-      txt.textContent = "";
-      lines.forEach(() => txt.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "tspan")));
-      txt.setAttribute("font-size", size);
-    }
-    [...txt.children].forEach((span, i) => {
-      span.textContent = lines[i];
-      span.setAttribute("x", f1(left + width / 2));
-      span.setAttribute("y", f1(top + 9 + size + i * size * 1.3 - 3));
-    });
-    setAttr(el.label, "style", null);
   }
 
   /** Sky follows the clock: petrol night, a warming horizon toward the cut-off, red after an expiry. Lamps rise with it. */
@@ -1364,24 +1288,36 @@ ${truck()}
   return { draw, svg: root };
 }
 
-/** Words on the agent's card for what it is carrying. */
-function cardLines(state) {
+/** Live mode's Z3 card from the gateway state: the approver inbox while an approval waits, else what the robot carries. */
+function liveCard(state) {
   const { carry } = state.agent;
   const d = state.draft;
   const q = state.quote;
+  const ph = state.phone;
   const claim = (c) => String(c).replace(/^FREE_FROM_/, "").toLowerCase().replace(/_/g, " ") + "-free";
-  if (carry === "question") return [`Needs: ${(d?.unclear ?? []).join(", ")}`];
+  if (ph.status === "buzzing") return { title: "Approver inbox", tone: "hold", link: "terminal", lines: [ph.cents !== null ? `${euro(ph.cents)} net` : "Order held", `Decide within ${countdown(state.now, ph.expiresAt ?? CUTOFF)}`] };
+  if (carry === "question") return { title: "The door asks", tone: "hold", link: "agent", lines: [`Needs: ${(d?.unclear ?? []).join(", ")}`] };
   if (carry === "draft" && d) {
     const qty = d.quantity ? `${Number(d.quantity.value).toLocaleString("en-US")} ${d.quantity.unit}` : "? qty";
-    return [`Draft: ${qty}`, (d.claims ?? []).map(claim).join(", ")].filter(Boolean);
+    return { title: "Typed request", link: "agent", lines: [[qty, ...(d.claims ?? []).map(claim)].join(" · "), d.deliverBy ? `by ${d.deliverBy}` : ""].filter(Boolean) };
   }
   if (carry === "quote" && q) {
     const best = q.offers[0];
-    return [best ? `Quote: ${euro(best.netCents)}` : "Quote: no offer", `${q.rejections.length} rejected`];
+    const line = best?.lines?.[0];
+    return { title: "Best offer · quote", link: "agent", lines: best ? [line ? `${line.productId} × ${line.salesUnits}` : "offer", Number.isFinite(best.netCents) ? euro(best.netCents) : ""].filter(Boolean) : ["No offer"] };
   }
-  if (carry === "rejected") return [`Rejected: ${reasonText(state.door.reasons[0] ?? (state.phone.status === "rejected" ? "by manager" : ""))}`];
-  if (carry === "receipt") return ["Accepted", state.receipt?.netCents != null ? euro(state.receipt.netCents) : ""].filter(Boolean);
-  return [];
+  if (carry === "rejected") return { title: "Refused", tone: "reject", link: "agent", lines: [reasonText(state.door.reasons[0] ?? (ph.status === "rejected" ? "by manager" : ""))] };
+  return null;
+}
+
+/** Live mode's Z4 list: the quote's first refusals with their codes, the rest counted. */
+function liveList(state) {
+  const refused = state.quote?.rejections ?? [];
+  if (!refused.length) return null;
+  const rows = refused.slice(0, 3).map((r) => ({ text: `✕ ${r.productId ?? "—"} · ${r.code}`, tone: "reject" }));
+  if (refused.length > 3) rows.push({ text: `+${refused.length - 3} more refused`, tone: "dim" });
+  const rack = state.shelves.findIndex((x) => x.productId && x.productId === String(refused[0].productId));
+  return { rows, rack: rack >= 0 ? rack : undefined };
 }
 
 /** "Sat 14 Nov 10:15" in Helsinki time. */
