@@ -1,0 +1,875 @@
+{
+  "source": "research/acceptance/cases.json",
+  "run": {
+    "passed": 63,
+    "total": 63,
+    "version": "e48a8c55-f64f-471f-a52f-4681cd8973e4",
+    "date": "2026-11-15"
+  },
+  "cases": [
+    {
+      "id": "AC01",
+      "title": "Brief example end to end",
+      "rubric": [
+        "e2e",
+        "need",
+        "controls"
+      ],
+      "calls": [
+        "interpret",
+        "confirm_draft",
+        "quote",
+        "place_order",
+        "approve",
+        "get_receipt"
+      ],
+      "checks": 22,
+      "pass": true
+    },
+    {
+      "id": "AC02",
+      "title": "Search by attributes, not names, and no Valio calls",
+      "rubric": [
+        "need",
+        "openness"
+      ],
+      "calls": [
+        "search_products"
+      ],
+      "checks": 5,
+      "pass": true
+    },
+    {
+      "id": "AC03",
+      "title": "Quote asks Valio only about the shortlist and types every rejection",
+      "rubric": [
+        "need",
+        "exceptions",
+        "openness"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 9,
+      "pass": true
+    },
+    {
+      "id": "AC04",
+      "title": "Units, money and quote expiry",
+      "rubric": [
+        "need",
+        "e2e"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 6,
+      "pass": true
+    },
+    {
+      "id": "AC05",
+      "title": "Bulk 10 l preference: the closed boxes are refused, the change needs approval",
+      "rubric": [
+        "exceptions",
+        "controls",
+        "need"
+      ],
+      "calls": [
+        "quote",
+        "place_order"
+      ],
+      "checks": 7,
+      "pass": true
+    },
+    {
+      "id": "AC06",
+      "title": "Arla only: limited stock, wrong subtypes, shortfall",
+      "rubric": [
+        "exceptions",
+        "need"
+      ],
+      "calls": [
+        "quote",
+        "place_order"
+      ],
+      "checks": 10,
+      "pass": true
+    },
+    {
+      "id": "AC07",
+      "title": "Delivery by Saturday cannot be met",
+      "rubric": [
+        "exceptions"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC08",
+      "title": "Delivery by next Friday arrives Monday",
+      "rubric": [
+        "need"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC09",
+      "title": "Chicken breast by kg: lot steps, cheapest total, variable weight",
+      "rubric": [
+        "need",
+        "exceptions"
+      ],
+      "calls": [
+        "quote",
+        "place_order"
+      ],
+      "checks": 9,
+      "pass": true
+    },
+    {
+      "id": "AC10",
+      "title": "After the Sunday 17:00 cut-off nothing is offered",
+      "rubric": [
+        "exceptions",
+        "controls"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC11",
+      "title": "Pieces for a volume product are not guessed",
+      "rubric": [
+        "exceptions",
+        "controls"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC12",
+      "title": "Unknown product id is a typed rejection, not a crash",
+      "rubric": [
+        "exceptions"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC13",
+      "title": "Small order inside the mandate is placed alone",
+      "rubric": [
+        "controls",
+        "e2e"
+      ],
+      "calls": [
+        "quote",
+        "place_order"
+      ],
+      "checks": 3,
+      "pass": true
+    },
+    {
+      "id": "AC14",
+      "title": "Split orders cannot dodge approval (daily auto limit, D1)",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "quote_and_place"
+      ],
+      "checks": 4,
+      "pass": true
+    },
+    {
+      "id": "AC15",
+      "title": "Concurrent orders are counted together",
+      "rubric": [
+        "controls",
+        "exceptions"
+      ],
+      "calls": [
+        "quote_and_place_concurrently"
+      ],
+      "checks": 3,
+      "pass": true
+    },
+    {
+      "id": "AC16",
+      "title": "Above the hard per-order limit is refused even with approval",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "quote",
+        "place_order"
+      ],
+      "checks": 3,
+      "pass": true
+    },
+    {
+      "id": "AC17",
+      "title": "Official substitute that adds wheat to a gluten-free oat drink is refused",
+      "rubric": [
+        "controls",
+        "exceptions"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 3,
+      "pass": true
+    },
+    {
+      "id": "AC18",
+      "title": "Official substitute that drops lactose-free is refused",
+      "rubric": [
+        "controls",
+        "exceptions"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC19",
+      "title": "Unknown allergen data is not treated as safe",
+      "rubric": [
+        "controls",
+        "exceptions"
+      ],
+      "calls": [
+        "quote",
+        "place_order"
+      ],
+      "checks": 5,
+      "pass": true
+    },
+    {
+      "id": "AC20",
+      "title": "Approval after the cut-off expires and places nothing",
+      "rubric": [
+        "controls",
+        "exceptions"
+      ],
+      "calls": [
+        "quote",
+        "place_order",
+        "set_clock",
+        "approve",
+        "get_order"
+      ],
+      "checks": 4,
+      "pass": true
+    },
+    {
+      "id": "AC21",
+      "title": "A retried order returns the same receipt",
+      "rubric": [
+        "exceptions",
+        "controls"
+      ],
+      "calls": [
+        "quote",
+        "place_order_twice"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC22",
+      "title": "An approval link works once",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "quote",
+        "place_order",
+        "approve"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC23",
+      "title": "A tampered mandate stops every order for that buyer",
+      "rubric": [
+        "controls",
+        "openness"
+      ],
+      "calls": [
+        "quote",
+        "place_order"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC24",
+      "title": "Words in the request cannot widen authority",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "interpret",
+        "confirm_draft",
+        "quote",
+        "place_order"
+      ],
+      "checks": 4,
+      "pass": true
+    },
+    {
+      "id": "AC25",
+      "title": "One buyer cannot read another buyer's quote",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "quote",
+        "get_quote_as"
+      ],
+      "checks": 1,
+      "pass": true
+    },
+    {
+      "id": "AC26",
+      "title": "Open interfaces: OpenAPI, MCP and reason codes agree",
+      "rubric": [
+        "openness"
+      ],
+      "calls": [
+        "http_get",
+        "mcp_list_tools"
+      ],
+      "checks": 15,
+      "pass": true
+    },
+    {
+      "id": "AC27",
+      "title": "Facts admit what they do not know",
+      "rubric": [
+        "need",
+        "openness"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 3,
+      "pass": true
+    },
+    {
+      "id": "AC28",
+      "title": "Replay gives the same answer with zero live calls",
+      "rubric": [
+        "e2e"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 4,
+      "pass": true
+    },
+    {
+      "id": "AC29",
+      "title": "The agent cannot approve its own order",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "quote",
+        "place_order",
+        "approve_as_agent",
+        "get_order"
+      ],
+      "checks": 5,
+      "pass": true
+    },
+    {
+      "id": "AC30",
+      "title": "The brief's order split in three still meets a human",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "quote_and_place"
+      ],
+      "checks": 5,
+      "pass": true
+    },
+    {
+      "id": "AC31",
+      "title": "Two buyers, six units: the first commit wins, the other gets a typed refusal",
+      "rubric": [
+        "exceptions",
+        "controls"
+      ],
+      "calls": [
+        "quote_and_place_concurrently"
+      ],
+      "checks": 7,
+      "pass": true
+    },
+    {
+      "id": "AC32",
+      "title": "What the loser gets: what is left, and the same type from another product",
+      "rubric": [
+        "exceptions",
+        "need"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 6,
+      "pass": true
+    },
+    {
+      "id": "AC33",
+      "title": "A quote reserves nothing",
+      "rubric": [
+        "controls",
+        "exceptions"
+      ],
+      "calls": [
+        "quote",
+        "quote_and_place",
+        "place_order"
+      ],
+      "checks": 5,
+      "pass": true
+    },
+    {
+      "id": "AC34",
+      "title": "Approval is not a reservation: the first authorised order wins",
+      "rubric": [
+        "exceptions",
+        "controls"
+      ],
+      "calls": [
+        "quote_and_place",
+        "approve"
+      ],
+      "checks": 7,
+      "pass": true
+    },
+    {
+      "id": "AC35",
+      "title": "A price that changed while the order was held is not approved silently",
+      "rubric": [
+        "exceptions",
+        "controls"
+      ],
+      "calls": [
+        "quote",
+        "place_order",
+        "set_replay_variant",
+        "approve"
+      ],
+      "checks": 3,
+      "pass": true
+    },
+    {
+      "id": "AC36",
+      "title": "Basket: three small lines, one total, one approval",
+      "rubric": [
+        "need",
+        "controls",
+        "e2e"
+      ],
+      "calls": [
+        "quote_basket",
+        "place_basket",
+        "approve",
+        "get_receipt"
+      ],
+      "checks": 16,
+      "pass": true
+    },
+    {
+      "id": "AC37",
+      "title": "A basket inside the mandate is placed alone, as one order",
+      "rubric": [
+        "controls",
+        "e2e"
+      ],
+      "calls": [
+        "quote_basket",
+        "place_basket"
+      ],
+      "checks": 5,
+      "pass": true
+    },
+    {
+      "id": "AC38",
+      "title": "A partial basket needs a human",
+      "rubric": [
+        "exceptions",
+        "controls"
+      ],
+      "calls": [
+        "quote_basket",
+        "place_basket"
+      ],
+      "checks": 6,
+      "pass": true
+    },
+    {
+      "id": "AC39",
+      "title": "Basket stock is committed for every line or for none",
+      "rubric": [
+        "exceptions",
+        "controls"
+      ],
+      "calls": [
+        "quote_basket",
+        "quote_and_place",
+        "place_basket"
+      ],
+      "checks": 6,
+      "pass": true
+    },
+    {
+      "id": "AC40",
+      "title": "Gross is computed per VAT rate",
+      "rubric": [
+        "need"
+      ],
+      "calls": [
+        "quote_basket",
+        "place_basket"
+      ],
+      "checks": 4,
+      "pass": true
+    },
+    {
+      "id": "AC41",
+      "title": "A sales-unit GTIN resolves to exactly one product and says what one unit is",
+      "rubric": [
+        "need",
+        "openness"
+      ],
+      "calls": [
+        "resolve"
+      ],
+      "checks": 4,
+      "pass": true
+    },
+    {
+      "id": "AC42",
+      "title": "An exact name shared by two products is never picked for the agent",
+      "rubric": [
+        "exceptions",
+        "need"
+      ],
+      "calls": [
+        "resolve"
+      ],
+      "checks": 4,
+      "pass": true
+    },
+    {
+      "id": "AC43",
+      "title": "A brand Valio does not carry, and a misspelt one, are reported, not repaired",
+      "rubric": [
+        "exceptions"
+      ],
+      "calls": [
+        "resolve",
+        "quote"
+      ],
+      "checks": 10,
+      "pass": true
+    },
+    {
+      "id": "AC44",
+      "title": "A vague request gets a typed form, not a guess",
+      "rubric": [
+        "exceptions",
+        "controls"
+      ],
+      "calls": [
+        "interpret"
+      ],
+      "checks": 3,
+      "pass": true
+    },
+    {
+      "id": "AC45",
+      "title": "Occasion search returns families with evidence, never products or quantities",
+      "rubric": [
+        "need",
+        "openness"
+      ],
+      "calls": [
+        "list_families"
+      ],
+      "checks": 7,
+      "pass": true
+    },
+    {
+      "id": "AC46",
+      "title": "The quote says how it ranked and accounts for every candidate",
+      "rubric": [
+        "openness",
+        "controls"
+      ],
+      "calls": [
+        "quote"
+      ],
+      "checks": 3,
+      "pass": true
+    },
+    {
+      "id": "AC47",
+      "title": "The door publishes who decides what",
+      "rubric": [
+        "openness",
+        "controls"
+      ],
+      "calls": [
+        "http_get"
+      ],
+      "checks": 5,
+      "pass": true
+    },
+    {
+      "id": "AC48",
+      "title": "Idempotency follows the ACP rules",
+      "rubric": [
+        "exceptions",
+        "openness"
+      ],
+      "calls": [
+        "quote",
+        "place_order_without_key",
+        "place_order_same_key_other_body"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC49",
+      "title": "An expired mandate stops every order",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "quote",
+        "place_order"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC50",
+      "title": "Every quote offer is signed by the door and verifies with the published JWKS",
+      "rubric": [
+        "controls",
+        "openness"
+      ],
+      "calls": [
+        "quote",
+        "verify_offer_jws",
+        "http_get"
+      ],
+      "checks": 8,
+      "pass": true
+    },
+    {
+      "id": "AC51",
+      "title": "An order carrying a quote signature with a changed price is refused and places nothing; the real one is accepted",
+      "rubric": [
+        "controls",
+        "exceptions"
+      ],
+      "calls": [
+        "quote",
+        "place_order_with_jws"
+      ],
+      "checks": 5,
+      "pass": true
+    },
+    {
+      "id": "AC52",
+      "title": "A held order has no signed receipt until the approver decides; then it is signed with the approver's name",
+      "rubric": [
+        "controls",
+        "e2e"
+      ],
+      "calls": [
+        "quote",
+        "place_order",
+        "approve",
+        "verify_receipt_jws"
+      ],
+      "checks": 8,
+      "pass": true
+    },
+    {
+      "id": "AC53",
+      "title": "The event log is hash-chained from genesis and the door signs the verified head",
+      "rubric": [
+        "openness",
+        "controls"
+      ],
+      "calls": [
+        "quote_and_place",
+        "audit_verify",
+        "all_events"
+      ],
+      "checks": 7,
+      "pass": true
+    },
+    {
+      "id": "AC54",
+      "title": "A changed event is found and named by seq; a reset starts a fresh, valid chain",
+      "rubric": [
+        "openness"
+      ],
+      "calls": [
+        "quote",
+        "tamper_and_verify",
+        "reset_and_verify"
+      ],
+      "checks": 6,
+      "pass": true
+    },
+    {
+      "id": "AC55",
+      "title": "A discovery document tells any agent where the API, MCP, rules, events, audit, keys and demo are",
+      "rubric": [
+        "openness"
+      ],
+      "calls": [
+        "http_get"
+      ],
+      "checks": 9,
+      "pass": true
+    },
+    {
+      "id": "AC56",
+      "title": "Try it: a visitor's small order runs the agent's path in a sandbox kitchen and is accepted with no human",
+      "rubric": [
+        "e2e",
+        "openness"
+      ],
+      "calls": [
+        "try"
+      ],
+      "checks": 5,
+      "pass": true
+    },
+    {
+      "id": "AC57",
+      "title": "Try it: a large order is held under the kitchen limit and the visitor approves it as the kitchen manager",
+      "rubric": [
+        "controls",
+        "e2e"
+      ],
+      "calls": [
+        "try",
+        "try_decision"
+      ],
+      "checks": 4,
+      "pass": true
+    },
+    {
+      "id": "AC58",
+      "title": "Try it: the visitor can reject their held order",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "try",
+        "try_decision"
+      ],
+      "checks": 2,
+      "pass": true
+    },
+    {
+      "id": "AC59",
+      "title": "Try it: a visitor can never decide another kitchen's order, and an agent key can never decide",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "try",
+        "try_other_visitor",
+        "try_decision",
+        "try_decision_as_agent"
+      ],
+      "checks": 6,
+      "pass": true
+    },
+    {
+      "id": "AC60",
+      "title": "Try it refuses text over 200 characters and an empty request",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "try_raw"
+      ],
+      "checks": 3,
+      "pass": true
+    },
+    {
+      "id": "AC61",
+      "title": "Try it: an example sentence is served from recorded Gemini and Gemma readings, with no model call",
+      "rubric": [
+        "openness",
+        "e2e"
+      ],
+      "calls": [
+        "try"
+      ],
+      "checks": 4,
+      "pass": true
+    },
+    {
+      "id": "AC62",
+      "title": "Try it can be switched off at once with the admin key, and on again",
+      "rubric": [
+        "controls"
+      ],
+      "calls": [
+        "admin_try",
+        "try_raw",
+        "try"
+      ],
+      "checks": 6,
+      "pass": true
+    },
+    {
+      "id": "AC63",
+      "title": "Try it remembers the conversation: a missing date answered in words continues the same draft",
+      "rubric": [
+        "need",
+        "e2e"
+      ],
+      "calls": [
+        "try"
+      ],
+      "checks": 7,
+      "pass": true
+    }
+  ]
+}

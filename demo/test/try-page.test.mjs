@@ -110,6 +110,7 @@ test("try panel: a short thread; the answer goes to the same draft, or as one se
   await page.route("**/v1/try", (route) => {
     const body = route.request().postDataJSON();
     posted.push(body);
+    if (body.text === "slow request") return new Promise((r) => setTimeout(r, 3200)).then(() => route.fulfill(reply(200, accepted)));
     if (body.draftId) return route.fulfill(takesAnswers ? reply(200, accepted) : reply(400, { error: "BAD_REQUEST" }));
     if (body.text === "200 cans of beans") return route.fulfill(reply(200, { ...base, step: "needs_input", draft: { id: "d-beans" }, question: { field: "deliverBy", readings: [] } }));
     return route.fulfill(reply(200, accepted));
@@ -121,6 +122,16 @@ test("try panel: a short thread; the answer goes to the same draft, or as one se
     await page.click("#try-panel .try-send");
     await page.waitForSelector(`#try-panel .try-thread .try-box[data-kind="${kind}"]`);
   };
+
+  await page.fill("#try-text", "slow request");
+  await page.click("#try-panel .try-send");
+  const current = () => page.$$eval("#try-panel .try-steps li", (lis) => lis.map((li) => li.dataset.state).join(" "));
+  assert.equal(await current(), "now next next");
+  assert.equal((await page.textContent('#try-panel .try-steps li[data-state="now"]')).trim(), "Reading your request…");
+  await page.waitForFunction(() => document.querySelector('#try-panel .try-steps li[data-state="now"]')?.textContent === "Asking Valio…", null, { timeout: 3000 });
+  assert.equal(await current(), "done now next");
+  await page.waitForSelector('#try-panel .try-thread .try-box[data-kind="accepted"]');
+  assert.equal(await page.locator("#try-panel .try-steps").count(), 0, "the steps go once the door answers");
 
   await ask("200 cans of beans", "question");
   assert.deepEqual(await thread(), ["You: 200 cans of beans", "Lazydoor: When should it arrive?"]);

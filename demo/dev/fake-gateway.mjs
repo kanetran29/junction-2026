@@ -15,7 +15,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const arg = (name) => process.argv.includes(name);
 const option = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined);
 const PORT = Number(option("--port")) || 8790;
-const TYPES = { ".html": "text/html", ".mjs": "text/javascript", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".mp4": "video/mp4", ".mp3": "audio/mpeg", ".svg": "image/svg+xml" };
+const TYPES = { ".html": "text/html", ".mjs": "text/javascript", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".mp4": "video/mp4", ".mp3": "audio/mpeg", ".svg": "image/svg+xml", ".webp": "image/webp", ".png": "image/png", ".pdf": "application/pdf" };
 const events = [];
 const listeners = new Set();
 const CENTS_PER_L = 101;

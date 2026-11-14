@@ -1,0 +1,51 @@
+{
+  "title": "Lazydoor",
+  "pdf": "assets/deck/lazydoor-deck.pdf",
+  "slides": [
+    {
+      "src": "assets/deck/01.webp",
+      "heading": "Agents will order for kitchens. Who checks the agent?",
+      "notes": "Kitchens will let AI agents do the ordering. Valio's API answers availability and price, but nothing in it checks whether the agent's order makes sense. So who checks the agent?"
+    },
+    {
+      "src": "assets/deck/02.webp",
+      "heading": "Friday 16:30: an agent orders milk for Monday",
+      "notes": "Hotel Aurora's chef needs 1,000 litres of lactose-free milk by Monday. The agent calls Valio's API, sees 999999 and Monday, orders 50 cases of 10-litre boxes. But 999999 means stock unknown, and that box closed on Thursday at 15:00. Nobody checked, nobody approved. Monday morning, there is no milk."
+    },
+    {
+      "src": "assets/deck/03.webp",
+      "heading": "One door at Valio for every agent",
+      "notes": "Lazydoor is one door at Valio that any agent goes through. It applies two layers of rules: Valio's, the same for everyone, and each kitchen's own signed mandate. Inside the kitchen's limits the agent is done alone; above them the door holds the order and asks the kitchen manager. Lazy at the order, strict at the border."
+    },
+    {
+      "src": "assets/deck/04.webp",
+      "heading": "Words in, a checked order out",
+      "notes": "The same sentence again, through the door. Gemini turns it into a typed request and Gemma reads it a second time on its own. The door searches the catalogue and asks Valio only about the 35 lactose-free milks, not everything. 20 are past their cut-off and say so with a reason code. Best offer: one-litre cartons, 1,010 euros, price held for 30 minutes."
+    },
+    {
+      "src": "assets/deck/05.webp",
+      "heading": "Strict at the border",
+      "notes": "This is the part judges asked for: autonomy with controls. The agent cannot approve its own order. It cannot split an order to slip under the limit. A Valio substitute that adds gluten is refused. Two agents racing for six boxes: one wins, the other is told two are left. And an approval after Valio's cut-off expires."
+    },
+    {
+      "src": "assets/deck/06.webp",
+      "heading": "Try it: type a request, decide as the manager",
+      "notes": "DEMO, about two minutes. Open the demo page on the deployed door. Show the Story from the door going up to the held order and the manager's phone. Then Live: hand the laptop to the reviewer and let them type a request in Try it, or click a chip. If the door holds it, they approve as the kitchen manager. End on Inside: the audit chain is valid, checked live."
+    },
+    {
+      "src": "assets/deck/07.webp",
+      "heading": "Built to be trusted",
+      "notes": "Every write lives in Aiven PostgreSQL through Hyperdrive. Each order commits in one transaction under an advisory lock, so the stock ledger never oversells, and every step is an event in a hash-chained log. Quotes and receipts are signed with the door's Ed25519 key, published at /.well-known/jwks.json. Gemini drafts, Gemma double-checks. Any agent connects through the typed HTTP API or the MCP server."
+    },
+    {
+      "src": "assets/deck/08.webp",
+      "heading": "It works, and you can check it",
+      "notes": "This is not a mock-up. 63 acceptance cases and 11 scenarios pass on the deployed door. A real Gemini agent ordered milk: held, approved by the manager, accepted at 1,010 euros. And you don't have to trust us: /v1/audit/verify recomputes the hash chain and signs the result, and our verify script checks it from outside. Change one byte of a quote and the door refuses it."
+    },
+    {
+      "src": "assets/deck/09.webp",
+      "heading": "Path to production",
+      "notes": "Ordering is simulated today because Valio's API has no order endpoint. Valio adds that endpoint and its allocation rule; the door, the rules and the agents stay as they are. Kitchens sign their limits once, and any agent can plug in. Lazy at the order, strict at the border. Thank you."
+    }
+  ]
+}

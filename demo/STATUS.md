@@ -286,6 +286,29 @@ Vấn đề tìm thấy:
 - Built with: logo nằm trên tên mỗi dòng (một dấu, hai dấu hay logo ngang đều thẳng hàng). Deck slide 7: Aiven, Gemini + Gemma, OpenAPI + MCP ở ô agent; render lại `pitch/out/deck.pdf` và `slides/07.png`.
 - Test: 67 pass với Playwright; `label overlaps: 0`; 375 px không cuộn ngang.
 
+### 38. Deck với số đo mới; Try it hiện tiến trình
+- Deck render lại từ `pitch/pitch.json` mới: slide 8 là 63/63, 11/11, 406; notes ghi 63 acceptance cases. Thiết kế giữ nguyên.
+- Try it: trong lúc door làm việc, hộp chờ hiện ba bước "Reading your request…", "Asking Valio…", "Deciding…" (bắt đầu ở 0, 2,5 và 5 s; bước xong chấm xanh, bước đang chạy chấm hồng và chữ đậm), sau 9 s thêm "Free text can take up to 15 s.". Các bước theo thời gian vì door trả lời một lần; tắt khi có trả lời.
+- Test: 68 pass với Playwright; `label overlaps: 0`. Lưu ý: `main` đã có số mới trong `demo/proof.json`, `compare.mjs`, `index.html` (từ build session); nhánh này không sửa các file đó nên merge không đụng.
+
+### 39. Tab "Deck" (Kane: "thêm cả deck vào trang đi")
+- `?mode=deck`, tab thứ năm sau Inside: 9 slide thành một cột, rộng hết khung nội dung, ảnh đầu tải ngay, các ảnh sau tải lười; alt của mỗi ảnh là tiêu đề slide; dưới mỗi slide là "Notes" (đóng sẵn) với lời nói từ `pitch.json`; nút "Download PDF" ở đầu trang. Inside có thêm nút "Deck" cạnh "Code on GitHub" và "The live door".
+- `node deck/build.mjs <pitch.json> <out> --site` xuất luôn `demo/assets/deck/NN.webp` (1600 px, cwebp q90, 60 tới 110 KB), `demo/assets/deck/lazydoor-deck.pdf` (8,6 MB) và `demo/deck.json` (ảnh, tiêu đề, notes), nên tab luôn khớp với bản render 63/63, 406.
+- 375 px: thanh tab 5 nút vừa khít (nút hẹp hơn dưới 480 px). `dev/fake-gateway.mjs` biết thêm kiểu `.webp`, `.png`, `.pdf` (server 8790 cần khởi động lại mới trả đúng kiểu; không khởi động lại vẫn chạy).
+- Test: 70 pass với Playwright; `label overlaps: 0`.
+
+### 40. Mã AC có nghĩa (Kane: "mã AC là gì cần show ra")
+- Nhánh này đã merge `main` (a1ee7c4, không xung đột) để có `research/acceptance/cases.json` 63 case và `proof.json` 63/63; Try it giờ ưu tiên câu hỏi `question.text` của door (164c84e).
+- `node demo/dev/acceptance.mjs [last-run.json]` viết `demo/acceptance.json`: mỗi case id, tiêu đề, rubric, các lệnh gọi API, số check (333 check tất cả); thêm passed, total, version, date từ `~/junction-2026/.data/acceptance-last-run.json` khi file đó có (chưa có: "not yet measured"). Không chép input hay dữ liệu sản phẩm.
+- Mọi chip AC (Inside guardrails, Compare) là link `?mode=inside#ac-AC05` có title và aria-label "AC05: <tiêu đề case>"; trước chip đầu tiên của mỗi trang có dòng "AC = acceptance case: an automated end-to-end check run on the deployed door. 63/63 pass." (số từ proof.json, chỉ khi confirmed).
+- Inside có mục "Acceptance cases" sau Proof: 5 nhóm theo rubric đầu tiên của case (End-to-end demo 3, The user's need 11, Controls 25, Exceptions 17, Openness 7), mỗi nhóm là disclosure đóng sẵn; mỗi case có id, tiêu đề, chip lệnh gọi, số check, dấu pass khi đã đo. `#ac-AC05` mở đúng nhóm, tô sáng case và cuộn tới. Link nguồn research/acceptance/cases.json trên GitHub.
+- Test: 73 pass với Playwright (đồng bộ acceptance.json với cases.json, dấu pass theo run, chip có title và link, 63 case, anchor mở đúng nhóm, 375 px); `label overlaps: 0`.
+
+### 41. Logo Junction; acceptance cases đã đo
+- Logo Junction (Kane: "junction 2026 cũng cần logo"): wordmark trắng mà trang 2026.hackjunction.com tự phục vụ với alt "Junction 2026" (`/logos/junction_wordmark_logo_-_white_no_background.webp`; trang không có bản SVG), giữ nguyên file, ghi vào `NOTICE.md`. Header: thay chữ "Junction 2026" bằng logo (alt "Junction 2026"), cao ngang huy hiệu Valio Aimo (chữ chỉ chiếm một phần ba chiều cao ảnh nên ảnh vẽ cao hơn và lề trong suốt chồng vào khoảng trống). Deck slide 1: dòng cuối là "Valio Aimo, Trusted Trade Agents" + logo; render lại `pitch/out` và tab Deck (`--site`).
+- `demo/acceptance.json` tạo lại từ `~/junction-2026/.data/acceptance-last-run.json`: 63/63 passed ngày 2026-11-15, door version e48a8c55; mỗi case có dấu "✓ passed" và số check theo lần chạy (tổng 333, khớp số expect trong cases.json). Không còn "not yet measured".
+- Test: 73 pass với Playwright; `label overlaps: 0`.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

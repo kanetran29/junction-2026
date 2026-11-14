@@ -9,6 +9,8 @@ import { buildScene } from "./scene.mjs";
 import { STRENGTHS, PAGE_ONLY, GROUPS, COMPARE_NOTE, CONNECT_LINE } from "./compare.mjs";
 import { ICONS } from "./icons.mjs";
 import { mountInside } from "./inside-view.mjs";
+import { mountDeck } from "./deck-view.mjs";
+import { AC_ID, acChip, acNote, labelAcChips } from "./acceptance-view.mjs";
 import { runCheck, CHECKS } from "./inside.mjs";
 import { mountTry } from "./try-view.mjs";
 
@@ -26,10 +28,11 @@ if (kiosk) document.body.classList.add("kiosk");
 const scene = buildScene($("scene"));
 const still = matchMedia("(prefers-reduced-motion: reduce)");
 
-let mode = ["live", "compare", "inside"].includes(params.get("mode")) ? params.get("mode") : "story";
+let mode = ["live", "compare", "inside", "deck"].includes(params.get("mode")) ? params.get("mode") : "story";
 /** The pages that replace the stage (no scene, no story or live). */
-const PAGES = ["compare", "inside"];
+const PAGES = ["compare", "inside", "deck"];
 let insideMounted = false;
+let deckMounted = false;
 const story = { t: 0, next: 0, state: initialState(), playing: false, snap: true };
 /** Live watches the door at ?gateway= (a local preview against the deployed door) or the page's own origin, and follows ?buyer=. */
 const GATEWAY = params.get("gateway") || location.origin;
@@ -46,7 +49,7 @@ function el(tag, cls, text = "") {
   return node;
 }
 
-/** Fills the Story's closing comparison (eight rows, ✕ without the door, ✓ with Lazydoor) and the Compare page's table. */
+/** Fills the Story's closing comparison (eight rows, ✕ without the door, ✓ with Lazydoor) and the Compare page's table, whose AC chips link to their case. */
 function buildCompare() {
   $("compare-rows").replaceChildren(...STRENGTHS.map((row) => {
     const li = el("li");
@@ -69,13 +72,15 @@ function buildCompare() {
       const line = el("p");
       line.append(glyph("check"), el("span", "", row.with));
       const tags = el("span", "chips");
-      for (const e of row.evidence) tags.append(el("span", "chip proof", e));
+      for (const e of row.evidence) tags.append(AC_ID.test(e) ? acChip(e) : el("span", "chip proof", e));
       withDoor.append(line, tags);
       pair.append(el("h3", "", row.topic), without, withDoor);
       group.append(pair);
     }
     return group;
   }));
+  document.querySelector("#compare-page .pairs-legend").before(acNote());
+  labelAcChips($("compare-page"));
 }
 
 /** A Phosphor glyph (check or cross) from icons.mjs, inline. */
@@ -361,6 +366,11 @@ function setMode(next) {
   $("stage").hidden = PAGES.includes(mode);
   $("compare-page").hidden = mode !== "compare";
   $("inside-page").hidden = mode !== "inside";
+  $("deck-page").hidden = mode !== "deck";
+  if (mode === "deck" && !deckMounted) {
+    deckMounted = true;
+    mountDeck($("deck-page"));
+  }
   if (mode !== "live") $("audit-chip").hidden = true;
   if (mode === "inside" && !insideMounted) {
     insideMounted = true;

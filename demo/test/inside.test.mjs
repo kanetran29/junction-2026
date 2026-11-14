@@ -76,7 +76,7 @@ test("inside page: renders every section, loads proof.json, shows each live chec
     scroll: document.documentElement.scrollWidth,
     client: document.documentElement.clientWidth,
   }));
-  assert.deepEqual(out.sections, ["hero", "flow", "guardrails", "checks", "proof", "stack", "production"]);
+  assert.deepEqual(out.sections, ["hero", "flow", "guardrails", "checks", "proof", "acceptance", "stack", "production"]);
   assert.equal(out.h1, "Lazy at the order, strict at the border.");
   assert.ok(out.h1Lines <= 2, `the punchline takes ${out.h1Lines} lines at 375 px`);
   assert.equal(out.stills.length, 4);

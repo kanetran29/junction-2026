@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { viewOf, postTry, EXAMPLES, dayLabel, CACHED_NOTE, questionFor } from "../try.mjs";
+import { viewOf, postTry, EXAMPLES, dayLabel, CACHED_NOTE, questionFor, PROGRESS, SLOW, stepAt } from "../try.mjs";
 
 const SERVER = fileURLToPath(new URL("../dev/fake-gateway.mjs", import.meta.url));
 const PORT = 8795;
@@ -14,6 +14,7 @@ test("try: each step of the door's reply renders as the panel shows it", () => {
   assert.equal(q.lines[0], "Gemini read Fri 13 Nov, Gemma read Fri 20 Nov. The door asks, never guesses.");
   const when = viewOf(ok({ step: "needs_input", draft: { id: "d-beans" }, question: { field: "deliverBy", readings: [] } }));
   assert.deepEqual([when.kind, when.title, when.choices, when.draftId], ["question", "When should it arrive?", [], "d-beans"]);
+  assert.equal(viewOf(ok({ step: "needs_input", draft: { id: "d1" }, question: { field: "deliverBy", text: "Which day should it arrive?", readings: [] } })).title, "Which day should it arrive?", "the door's own words win");
   assert.deepEqual(["quantity", "category", "needs", "brand", "somethingNew"].map(questionFor), ["How much?", "Which product?", "Which product?", "Which brand?", "One more detail: somethingNew?"]);
   assert.deepEqual(q.choices.map((c) => [c.label, c.value]), [["Fri 13 Nov", "2026-11-13"], ["Fri 20 Nov", "2026-11-20"]]);
 
@@ -76,4 +77,10 @@ test("dev server: the try sandbox asks, holds, accepts and logs events under the
   assert.equal(answered.body.order.state, "ACCEPTED");
   const events = (await (await fetch(`http://localhost:${PORT}/v1/events?since=0`)).json()).events;
   assert.ok(events.length > 10 && events.every((e) => e.buyerId === held.body.buyerId));
+});
+
+test("try: while the door works the panel steps through reading, asking Valio and deciding, then notes that free text takes longer", () => {
+  assert.deepEqual(PROGRESS.map((p) => p.text), ["Reading your request…", "Asking Valio…", "Deciding…"]);
+  assert.deepEqual([0, 2.4, 2.5, 4.9, 5, 30].map(stepAt), [0, 0, 1, 1, 2, 2]);
+  assert.deepEqual([SLOW.at, SLOW.text], [9, "Free text can take up to 15 s."]);
 });

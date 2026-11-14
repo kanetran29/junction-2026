@@ -38,7 +38,7 @@ const reasonLine = (r, codes) => {
 /** Net and gross of an order as one line. */
 const money = (o) => [Number.isFinite(o?.netCents) ? `Net ${euro(o.netCents)}` : "", Number.isFinite(o?.grossCents) ? `Gross ${euro(o.grossCents)}` : ""].filter(Boolean).join(" · ");
 
-/** The door's question for a field the request left open, in plain words. */
+/** The question for a field the request left open, in plain words, when the door sends no text of its own. */
 const QUESTIONS = {
   deliverBy: "When should it arrive?",
   quantity: "How much?",
@@ -51,6 +51,20 @@ const QUESTIONS = {
   fatLevel: "Which fat level?",
 };
 export const questionFor = (field) => QUESTIONS[field] ?? `One more detail: ${field}?`;
+
+/**
+ * The steps the panel shows while the door works, at the second each one starts after Send: a try takes about 6 s, free
+ * text up to 15 s. Timed, since the reply comes in one piece; `SLOW` is the note once a try runs long.
+ */
+export const PROGRESS = [
+  { at: 0, text: "Reading your request…" },
+  { at: 2.5, text: "Asking Valio…" },
+  { at: 5, text: "Deciding…" },
+];
+export const SLOW = { at: 9, text: "Free text can take up to 15 s." };
+
+/** The index of the progress step that is current `seconds` after Send. */
+export const stepAt = (seconds) => PROGRESS.findLastIndex((p) => seconds >= p.at);
 
 /** The line under an answer whose readings were recorded (the example chips are served from recorded readings). */
 export const CACHED_NOTE = "Example: readings recorded from Gemini and Gemma";
@@ -86,7 +100,7 @@ function replyView({ status, body, retryAfter }, codes, byManager) {
     const read = (v) => (date ? dayLabel(v) : String(v));
     const readings = q.readings ?? [];
     const draftId = body.draft?.id ?? null;
-    if (readings.length < 2) return { kind: "question", tone: "hold", title: questionFor(q.field), lines: [], choices: [], field: q.field, draftId };
+    if (readings.length < 2) return { kind: "question", tone: "hold", title: typeof q.text === "string" && q.text.trim() ? q.text.trim() : questionFor(q.field), lines: [], choices: [], field: q.field, draftId };
     return {
       kind: "question",
       tone: "hold",
