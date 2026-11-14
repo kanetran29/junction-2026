@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { insertStatements } from '../scripts/build-index';
 import type { Env } from '../src/env';
 import { createApp } from '../src/http/routes';
-import { sha256Hex } from '../src/orders/store';
+import { sha256Hex } from '../src/util';
 import { fakeValio, product } from './quote-helpers';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'vk', ADMIN_KEY: 'adm', GEMINI_API_KEY: 'gk', GEMINI_MODEL: 'gm' };
@@ -53,6 +53,22 @@ describe('auth', () => {
     expect((await call('/admin/orders?idempotencyKey=x')).status).toBe(401);
     expect((await call('/admin/orders?idempotencyKey=x', { key: 'adm', env: { ...e, DEMO_MODE: '0' } })).status).toBe(404);
     expect((await call('/admin/orders?idempotencyKey=x', { key: 'adm' })).status).toBe(200);
+  });
+
+  it('mints a judge key for hotel-b that reads every buyer events and survives a reset', async () => {
+    const keys = await reset();
+    expect((await call('/admin/judge-key', { key: keys.agentKeys['hotel-a'], body: {} })).status).toBe(401);
+    expect((await call('/admin/judge-key', { key: 'adm', body: {}, env: { ...e, DEMO_MODE: '0' } })).status).toBe(404);
+    const minted = await call('/admin/judge-key', { key: 'adm', body: {} });
+    expect(minted.status).toBe(201);
+    const { key, buyer } = await json(minted);
+    expect(buyer).toBe('hotel-b');
+    expect((await call('/v1/events?buyer=hotel-a', { key })).status).toBe(200);
+    expect((await call('/v1/events?buyer=hotel-a', { key: keys.agentKeys['hotel-b'] })).status).toBe(403);
+    const fresh = await reset();
+    expect((await call('/v1/events', { key })).status).toBe(200);
+    expect((await call('/v1/events', { key: keys.agentKeys['hotel-a'] })).status).toBe(401);
+    expect((await call('/v1/events', { key: fresh.agentKeys['hotel-a'] })).status).toBe(200);
   });
 
   it('refuses the admin key on buyer routes (it has no buyer)', async () => {

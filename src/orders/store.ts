@@ -10,6 +10,7 @@ import { orderable } from '../offers/orderable';
 import { decide, type Decision, type Reason, type Unmet } from '../policy/decide';
 import type { Offer, OfferLine, Quote } from '../quote/build';
 import { createQuote, getQuote } from '../quote/store';
+import { newId, sha256Hex } from '../util';
 import { ValioError, fetchOffers, type Offers } from '../valio/client';
 
 export type OrderState = 'PLACING' | 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED';
@@ -97,15 +98,6 @@ const EPS = 1e-9;
 const PLACING_TTL_MS = 60_000;
 /** Rounds to 3 decimals (stock amounts shown to buyers). */
 const round3 = (x: number) => Math.round(x * 1000) / 1000;
-/** A short opaque id with a type prefix (`ord_`, `b_`). */
-const newId = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`;
-
-/** Hex sha256 of a string. */
-export async function sha256Hex(s: string): Promise<string> {
-  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 /** A random 32-byte approval token as unpadded base64url. */
 function newToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));

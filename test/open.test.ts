@@ -4,7 +4,7 @@ import { insertStatements } from '../scripts/build-index';
 import type { Env } from '../src/env';
 import { logEvent } from '../src/events/log';
 import { createApp } from '../src/http/routes';
-import { sha256Hex } from '../src/orders/store';
+import { sha256Hex } from '../src/util';
 import { product } from './quote-helpers';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', ADMIN_KEY: 'adm' };

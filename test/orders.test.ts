@@ -5,7 +5,8 @@ import { setClock } from '../src/clock';
 import type { Env } from '../src/env';
 import { listEvents } from '../src/events/log';
 import { seedMandate } from '../src/mandate/jws';
-import { approve, approverInbox, createBasket, getOrder, OrderError, placeOrder, reject, sha256Hex } from '../src/orders/store';
+import { approve, approverInbox, createBasket, getOrder, OrderError, placeOrder, reject } from '../src/orders/store';
+import { sha256Hex } from '../src/util';
 import { createQuote } from '../src/quote/store';
 import { fakeValio, product, type Row } from './quote-helpers';
 

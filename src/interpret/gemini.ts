@@ -4,6 +4,7 @@ import type { Env } from '../env';
 import { logEvent } from '../events/log';
 import type { Quantity } from '../offers/conversion';
 import { draftSchema } from '../quote/store';
+import { newId } from '../util';
 
 /** A buyer-facing failure: MODEL_UNAVAILABLE (503), DRAFT_NOT_FOUND (404), DRAFT_UNCLEAR or DRAFT_ALREADY_CONFIRMED (409). */
 export class InterpretError extends Error {
@@ -195,7 +196,7 @@ export async function interpret(
   const raw = await askModel(env, input.text, today, ref, deps.fetch);
   const { fields, unclear } = validate(raw, today, new Set(ref.categories.map((c) => c.category)), new Set(ref.claimIds));
   const needs = (Array.isArray(raw.needs) ? raw.needs : []).filter((n) => typeof n === 'string' && n);
-  const d: InterpretedDraft = { id: `d_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`, status: 'draft', text: input.text, ...fields, unclear: [], missing: [], needs };
+  const d: InterpretedDraft = { id: newId('d'), status: 'draft', text: input.text, ...fields, unclear: [], missing: [], needs };
   if (!raw.category && needs.length === 0) {
     d.status = 'needs_input';
     d.missing = ['needs', ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy'])];

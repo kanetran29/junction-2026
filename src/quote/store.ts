@@ -6,6 +6,7 @@ import { logEvent } from '../events/log';
 import { orderable } from '../offers/orderable';
 import type { ReasonCode } from '../domain/reasons';
 import { ValioError, fetchOffers, type Offers } from '../valio/client';
+import { newId } from '../util';
 import { buildQuote, type Draft, type Quote } from './build';
 
 /** A quote request that cannot be answered: Valio failed (UPSTREAM_ERROR) or the named draft is missing or not confirmed. */
@@ -41,9 +42,6 @@ export const draftSchema = z
 
 /** What a quote request names: a stored draft, a draft to confirm and use, or a product list. */
 export type QuoteInput = { draftId: string } | { draft: unknown } | { products: string[]; quantity: unknown; deliverBy: string };
-
-/** A short opaque id with a type prefix (`q_`, `d_`). */
-const newId = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`;
 
 /** Stores a quote (one row per quote, body is the JSON). */
 export async function saveQuote(env: Env, q: Quote): Promise<void> {

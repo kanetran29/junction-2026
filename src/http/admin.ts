@@ -5,7 +5,7 @@ import { DEFAULT_MANDATE_EXP } from '../domain/constants';
 import type { Env } from '../env';
 import { logEvent } from '../events/log';
 import { seedMandate } from '../mandate/jws';
-import { sha256Hex } from '../orders/store';
+import { newId, sha256Hex } from '../util';
 import { HttpError, identify } from './auth';
 
 const BUYERS = ['hotel-a', 'hotel-b'] as const;
@@ -23,7 +23,7 @@ const ResetBody = z.object({
   priorAccepted: z.array(z.object({ buyer: z.string(), productId: z.string(), salesUnits: z.number().positive() })).nullish(),
 });
 
-/** A random API key with a readable prefix (`ld_` agent, `ap_` approver); only its sha256 is stored. */
+/** A random API key with a readable prefix (`ld_` agent, `ap_` approver, `jd_` judge); only its sha256 is stored. */
 function newKey(prefix: string): string {
   return `${prefix}_${[...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
@@ -39,7 +39,7 @@ async function setSetting(env: Env, key: string, value: string | null): Promise<
 
 /** Appends a settled ACCEPTED order (for the day total and the ledger) that the case file says exists already. */
 async function insertPriorOrder(env: Env, buyerId: string, netCents: number, line?: { productId: string; salesUnits: number }): Promise<void> {
-  const id = `ord_prior${crypto.randomUUID().replaceAll('-', '').slice(0, 10)}`;
+  const id = newId('ord_prior');
   const body = JSON.stringify({ lines: [], unmet: [] });
   const stmts = [
     env.DB.prepare("INSERT INTO orders(id, buyer_id, state, net_cents, gross_cents, delivery_date, body, created_at) VALUES (?,?,'ACCEPTED',?,?,?,?,?)").bind(id, buyerId, netCents, netCents, DEFAULT_DELIVERY, body, helsinkiIso(await now(env))),
@@ -65,8 +65,8 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
   });
 
   /**
-   * Returns the gateway to a case's starting state: wipes drafts, quotes, baskets, orders, lines, events, approver and API
-   * keys, mandates and buyer keys (so a v1 mandate can be seeded again), applies the clock, replay recording and variants,
+   * Returns the gateway to a case's starting state: wipes drafts, quotes, baskets, orders, lines, events, approver keys
+   * and agent API keys (judge keys survive), mandates and buyer keys (so a v1 mandate can be seeded again), applies the clock, replay recording and variants,
    * seeds both buyers' signed mandates from the given euro limits, books the prior accepted orders and mints fresh keys.
    */
   admin.post('/admin/reset', async (c) => {
@@ -81,7 +81,7 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
         throw new HttpError(400, 'INVALID_REQUEST', (err as Error).message);
       }
     }
-    await env.DB.batch(['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'api_keys', 'rate_limits', 'mandates', 'buyer_keys'].map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
+    await env.DB.batch(['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'mandates', 'buyer_keys'].map((t) => env.DB.prepare(`DELETE FROM ${t}`)).concat(env.DB.prepare("DELETE FROM api_keys WHERE role <> 'judge'")));
     await setClock(env, b.clock ?? null);
     await setSetting(env, 'replay', b.replay ? '1' : null);
     await setSetting(env, 'recording', b.replay ?? null);
@@ -113,6 +113,16 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
     }
     await logEvent(env, { buyerId: 'admin', type: 'clock.set', data: { now: helsinkiIso(await now(env)) } });
     return c.json({ agentKeys, approverKeys });
+  });
+
+  /**
+   * Mints a judge key: it places orders as `hotel-b` and reads every buyer's events. Returned once (only its sha256 is
+   * stored) and kept across `/admin/reset`, so the key handed to a judge keeps working.
+   */
+  admin.post('/admin/judge-key', async (c) => {
+    const key = newKey('jd');
+    await c.env.DB.prepare("INSERT INTO api_keys(key_hash, buyer_id, label, role) VALUES (?,?,'judge','judge')").bind(await sha256Hex(key), 'hotel-b').run();
+    return c.json({ key, buyer: 'hotel-b', role: 'judge' }, 201);
   });
 
   /** Sets (ISO with offset) or clears (null) the demo clock and logs `clock.set`. */

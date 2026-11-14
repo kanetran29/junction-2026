@@ -1,6 +1,6 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Env } from '../env';
-import { sha256Hex } from '../orders/store';
+import { sha256Hex } from '../util';
 
 export type Role = 'agent' | 'judge' | 'admin';
 
