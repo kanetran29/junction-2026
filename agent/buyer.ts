@@ -96,7 +96,7 @@ function compactOrder(r: Json): Json {
     state: r.state,
     reason: r.reason,
     outcome: r.decision?.outcome,
-    reasons: (r.decision?.reasons ?? []).map((x: Json) => `${x.code}: ${x.detail}`),
+    reasons: (r.decision?.reasons ?? []).map((x: Json) => (x.detail ? `${x.code}: ${x.detail}` : x.code)),
     approver: r.approval?.status === 'pending' ? r.approval.approver : undefined,
     netCents: r.order?.netCents,
     grossCents: r.order?.grossCents,

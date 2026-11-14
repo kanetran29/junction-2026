@@ -276,3 +276,12 @@ Hiện không có gì. (Quyền Hyperdrive đã được thêm; Aiven + Gemma đ
 - Test: 329/329 (thêm case không key; cập nhật hai case cũ). Deploy phiên bản **`88244083-c195-487c-8a17-65c2fc37ac9a`**. Kiểm trên URL
   thật: không key → 200 kèm event, stream không key → 200 `text/event-stream`, key sai → 401. Nghiệm thu **49/49**, scenarios
   **11/11**. Đã reset demo về trạng thái chuẩn (Thứ Sáu 21:10, replay, mandate mặc định); judge key vẫn dùng được.
+
+### Quy ước reset demo chuẩn (từ 14/11, sau khi quay Live)
+- Từ giờ "reset demo chuẩn" là: clock `2026-11-13T21:10:00+02:00`, replay `replies_2026-11-16`, **và mandate của bếp v2.1**
+  `{"perOrder":{"auto":500,"hard":5000},"perDay":{"auto":1500,"hard":10000}}`, không dùng mặc định 500/500 nữa. Bảng luật của
+  trang Live hiển thị 500 € một đơn và 1.500 € một ngày, nên door phải khớp. Door hiện ở đúng trạng thái này (session tổng đã reset).
+- Lưu ý: `pnpm agent` (không có `AGENT_KEY`) tự reset với mandate **mặc định** 500/500 (`agent/buyer.ts`, `main`). Sau khi chạy
+  agent, reset lại theo quy ước trên.
+- Sửa lỗi nhỏ của agent: dòng HELD in `PACK_SIZE_CHANGED: undefined` vì lý do loại thay đổi offer không có `detail` (trường này
+  vốn là tuỳ chọn, `src/policy/decide.ts`). Giờ agent chỉ in mã khi không có detail. Không cần deploy (agent chạy ở máy).
