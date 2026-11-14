@@ -55,7 +55,9 @@ function buildCompare() {
     li.append(el("span", "cmp-without", `✕ ${row.without}`), el("span", "cmp-with", `✓ ${row.with}`));
     return li;
   }));
-  $("compare-foot").textContent = CONNECT_LINE;
+  const count = el("span", "", "60");
+  count.dataset.proof = "acceptance";
+  $("compare-foot").replaceChildren(`${CONNECT_LINE} · `, count, " acceptance cases pass.");
   $("compare-note").textContent = COMPARE_NOTE;
   const rows = [...STRENGTHS, ...PAGE_ONLY];
   $("compare-groups").replaceChildren(...GROUPS.map((g) => {
@@ -415,7 +417,21 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft") seek(story.t - 5);
 });
 
+/** Sets every `[data-proof]` count on the page from proof.json (the numbers measured on the deployed door); the HTML keeps the last confirmed value if it cannot be read. */
+async function fillProofCounts() {
+  try {
+    const proof = await (await fetch("proof.json")).json();
+    for (const node of document.querySelectorAll("[data-proof]")) {
+      const n = proof[node.dataset.proof]?.passed;
+      if (Number.isFinite(n)) node.textContent = String(n);
+    }
+  } catch {
+    // keep the confirmed values already in the page
+  }
+}
+
 buildCompare();
+fillProofCounts();
 seek(Number(params.get("t")) || 0);
 setMode(mode);
 if (params.get("autoplay") === "1" && mode === "story") setPlaying(true);

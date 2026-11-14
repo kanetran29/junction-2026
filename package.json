@@ -1,0 +1,50 @@
+{
+  "name": "lazydoor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "index:build": "tsx scripts/build-index.ts",
+    "index:load": "wrangler d1 execute DB --local --file .data/valio/build/products.sql",
+    "migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "replies:load:remote": "wrangler d1 execute DB --remote --file .data/valio/build/replies.sql",
+    "categories:load:remote": "wrangler d1 execute DB --remote --file .data/valio/build/categories.sql",
+    "docs:reasons": "tsx scripts/reason-codes-md.ts",
+    "index:load:remote": "wrangler d1 execute DB --remote --file .data/valio/build/products.sql",
+    "acceptance": "tsx test/acceptance/run.ts",
+    "agent": "tsx --env-file-if-exists=.dev.vars agent/buyer.ts",
+    "scenarios": "tsx agent/scenarios.ts",
+    "test": "vitest run",
+    "pretest": "bash scripts/check-secrets.sh && node scripts/build-demo.mjs",
+    "replies:build": "tsx scripts/load-replies.ts",
+    "replies:load": "wrangler d1 execute DB --local --file .data/valio/build/replies.sql",
+    "mandate:sign": "tsx scripts/mandate-sign.ts",
+    "categories:build": "tsx scripts/tag-categories.ts",
+    "categories:load": "wrangler d1 execute DB --local --file .data/valio/build/categories.sql",
+    "pg:local": "docker run -d --name lazydoor-pg -p 54329:5432 -e POSTGRES_PASSWORD=lazydoor -e POSTGRES_DB=lazydoor postgres:18",
+    "dev:load": "wrangler d1 migrations apply DB --local && pnpm index:load && pnpm replies:load && pnpm categories:load"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.23.0",
+    "@cloudflare/workers-types": "^5.20261113.1",
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.162.0"
+  },
+  "dependencies": {
+    "@hono/zod-openapi": "^1.6.3",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "hono": "^4.13.18",
+    "postgres": "3.4.9",
+    "qrcode-generator": "^2.0.4",
+    "zod": "^4.6.7"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
+  }
+}

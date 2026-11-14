@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lazydoor",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "build": { "command": "node scripts/build-demo.mjs" },
+  "assets": { "directory": "./dist/assets", "binding": "ASSETS", "run_worker_first": true },
+  // Workers Paid: the default 30 s of CPU a request, set explicitly (a Free account refuses a deploy with this field)
+  "limits": { "cpu_ms": 30000 },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lazydoor",
+      "database_id": "4ff32275-5661-41e2-9e74-f36b175237bc",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "21b9cce92554495198bb02c3d2cb226b",
+      "localConnectionString": "postgres://postgres:lazydoor@localhost:54329/lazydoor"
+    }
+  ],
+  "vars": {
+    "VALIO_API_BASE": "https://junction26.valioaimo.fi",
+    "DEMO_MODE": "1",
+    "GEMINI_MODEL": "gemini-3.8-flash",
+    "GEMMA_MODEL": "gemma-4-31b-it"
+  }
+}
