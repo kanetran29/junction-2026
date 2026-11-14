@@ -246,3 +246,17 @@ Hiện không có gì. (Quyền Hyperdrive đã được thêm; Aiven + Gemma đ
   Door để vế đó ở `unclear` là đúng ("asks, never guesses"). Câu chef của video đổi thành "…, in 10-litre boxes if you can." (ra
   `packLitres 10`, Gemma agreed; xem `demo/SCRIPT.md` mục 12b ở nhánh demo).
 
+
+### C4. Chạy liền chuỗi Story v2.1 trên door thật (xong)
+- Reset một lần (clock Thứ Sáu 21:10, replay `replies_2026-11-16`, `468465` hết hàng, hạn mức bếp 500 € một đơn và 1.500 € một
+  ngày), rồi chạy 8 bước của `demo/SCRIPT.md` mục 14.6 liền, không reset giữa chừng. **8/8 đúng như chờ đợi:**
+  1. Sữa: HELD, `OVER_ORDER_AUTO` + `PACK_SIZE_CHANGED`, **không** có `OVER_DAY_AUTO`; Gemma agreed, `packLitres 10`.
+  2. Agent tự duyệt: 403 `AGENT_CANNOT_APPROVE`, đơn vẫn HELD.
+  3. Gà `470746` 20 kg: hotel-a ACCEPTED 190,92 € ở mức AUTO; hotel-b REJECTED `STOCK_TAKEN`, `available 2`.
+  4. "for Friday, Atria only": `needs_input`, `missing: deliverBy`, Gemini 13/11, Gemma 20/11.
+  5. Thứ Bảy 10:15 duyệt sữa: ACCEPTED, biên nhận Net 1.010,00 / Gross 1.146,35 EUR.
+  6. Yến mạch `468465`: 0 offer, `470863` `NEW_ALLERGEN` ("adds allergen AW").
+  7. Chủ nhật 15:50 giỏ 3 dòng: một đơn HELD 666,00 € (gross 755,91), `OVER_ORDER_AUTO` + `OVER_DAY_AUTO`.
+  8. Chủ nhật 17:05 duyệt giỏ: `EXPIRED`, `APPROVAL_EXPIRED` (lần đầu đo trên giỏ).
+- Mọi request, response và 52 event lưu ở `.data/story-v2.1-run.json` (gitignore, quyền 600, đã thay mọi key và token bằng nhãn).
+- Sau đó reset về trạng thái demo chuẩn; `/health`: Thứ Sáu 21:10, replay, `aiven-postgres`. Judge key vẫn dùng được.
