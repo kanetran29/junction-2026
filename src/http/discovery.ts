@@ -26,6 +26,13 @@ export function discovery(origin: string, demo: boolean) {
     reasonCodes: `${origin}/v1/reason-codes`,
     events: { poll: `${origin}/v1/events`, stream: `${origin}/v1/events/stream`, auth: 'an agent key reads its own buyer, a judge key every buyer; a demo door (DEMO_MODE=1) also answers with no key' },
     audit: { verify: `${origin}/v1/audit/verify`, chain: 'hash = sha256(prevHash + RFC 8785 canonical JSON of the event without prevHash and hash), from 64 zeros after a reset' },
+    peppol: {
+      export: 'GET /v1/orders/{id}/peppol',
+      approver: 'GET /approve/{token}/peppol',
+      format: 'Peppol BIS Order 3.0 (UBL 2.1 Order, "Order only"), application/xml',
+      auth: 'an agent or judge key for your own order; a Try it visitor sends X-Visitor-Token for their own sandbox order; the approval token for the approver route',
+      note: 'feature flag peppol (off by default, then 404); export only, no access point, nothing is sent; an order that is not ACCEPTED is 409 ORDER_NOT_ACCEPTED',
+    },
     jwks: `${origin}/.well-known/jwks.json`,
     signing: { alg: 'EdDSA', quoteOffers: AUD.quote, receipts: AUD.receipt, audit: AUD.audit },
     approval: {
