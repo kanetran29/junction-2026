@@ -2,6 +2,19 @@
 
 Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 
+## Ready for Kane's review
+
+Mở http://localhost:8790/ (dev server đang chạy, phục vụ thẳng thư mục `demo/`), bấm Play hoặc kéo thanh thời gian. Chưa quay video mới: `demo/story.mp4` vẫn là bản cũ, sẽ quay lại sau khi Kane duyệt.
+
+Cần xem:
+1. 0:15 đến 0:26, agent ngây thơ: thùng của kệ hộp 10 l bị cổng bến từ chối (dấu ✕ đỏ ở bến, nhãn "Cut-off Thu 12 Nov 15:00"), xe không chất hàng, quầy bếp trống. Không còn mây mưa.
+2. 0:44 đến 0:47: cổng Lazydoor từ chối hộp 10 l đã đóng và hàng Arla thiếu (thùng bay tới cổng rồi bật lại, ✕ đỏ ở cổng, lý do "Cut-off passed", "Only 384 left" ngay cạnh cổng); hàng được chọn qua cổng với ✓.
+3. 1:00 đến 1:13, đơn được chấp nhận: thùng lên xe, cổng bến nâng, xe chạy tới bếp, dỡ thùng lên quầy, chef giơ ngón cái, thẻ hoá đơn 1,010.00 €, lịch lật sang MON 16, xe quay về.
+4. Xe tải cận cảnh 1080p: [shots/after-truck.png](shots/after-truck.png) (một khung xe, cabin và thùng cùng trục, bánh chạm đường dưới vòm).
+5. Chữ ở 50%: [shots/after-scene-50pct.png](shots/after-scene-50pct.png).
+6. 1:23 chờ duyệt ("Waiting for approval" ở cổng bến) và 1:46 phê duyệt hết hạn: cổng bến đóng, "Approval expired".
+
+
 ## Nhật ký
 
 ### 1. Kế hoạch (xong)
@@ -84,6 +97,15 @@ Vấn đề tìm thấy:
 - Kiểm tra: ảnh 1080p xem ở 50% (khoảng cách laptop/máy chiếu), đọc được mọi chữ: [toàn cảnh 50%](shots/after-scene-50pct.png).
 - Ảnh sau: [toàn cảnh](shots/after-scene.png), [xe tải](shots/after-truck.png), [bếp và chef](shots/after-kitchen-chef.png), [cổng và robot](shots/after-door-robot.png), [kho](shots/after-warehouse.png), [giao hàng tới bếp](shots/after-delivery.png).
 - Kịch bản dài 123 giây (thêm 4 giây cho xe tới bếp). Hiệu năng vẫn trên 60 khung/giây ở 1080p (đo lại trước khi quay).
+
+### 11. Sửa theo nhận xét của Kane lúc 1:24 (xe tải, chặn đúng chỗ luật tác động)
+- Ảnh Kane chụp là bản trước (xe thùng bạt, giao diện cũ); xe đã được dựng lại ở mục 10. Kiểm tra lại cận cảnh 1080p: một khung gầm, cabin và thùng cùng trục và cùng mặt đất, bánh nằm dưới vòm và chạm đường, ánh sáng một hướng ([xe tải](shots/after-truck.png)).
+- Bỏ hình ảnh "mây mưa, xe không chạy được": thời tiết không phải lý do đơn hỏng. Chặn xảy ra đúng nơi luật tác động:
+  - Trong luồng Lazydoor: lúc có báo giá, mỗi sản phẩm ứng viên bay từ kệ tới máy quét của cổng; hàng bị loại bật lại với ✕ đỏ ở cổng và lý do ngay cạnh cổng; hàng được chọn qua với ✓. Khi chính sách ra REJECT, đơn bị dừng ở cổng (✕ ở cổng). Hàng bị loại không bao giờ tới bến hay xe ([cổng từ chối](shots/after-door-refusal.png)).
+  - Agent ngây thơ: thùng từ kệ hộp 10 l bị cổng bến (thanh chắn trước đầu xe) từ chối với nhãn "Cut-off Thu 12 Nov 15:00"; xe trống, quầy bếp trống ([bến từ chối](shots/after-dock-refusal.png)).
+  - Chờ duyệt: cổng bến đóng, đèn vàng, "Waiting for approval". Hết hạn: cổng bến đóng, "Approval expired", xe không chất hàng ([hết hạn](shots/after-expired.png)).
+- Thanh chắn chuyển từ hàng rào ra cổng bến trước đầu xe; bỏ khoá đỏ, đèn báo và dấu X trên kệ (kệ chỉ còn icon trạng thái trên bảng tên).
+- Bản quay 60 khung/giây làm trước nhận xét này nằm ngoài repo và không commit.
 
 ## Còn lại / cần làm sau
 - Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).

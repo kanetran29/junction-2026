@@ -30,8 +30,8 @@ const TRUCK_Y = 60;
 const T_LEN = 140;
 const DOCK_X = 160;
 const BAY_X = -296;
-const STOP_X = -38;
-const BARRIER = { x: GATE_X, post: ROAD.y + ROAD.d + 5, z: 24, len: 56 };
+const BARRIER = { x: 136, post: ROAD.y + ROAD.d + 5, z: 24, len: 56 };
+const DOOR_POINT = [GATE_X + 8, 10, 46];
 const LAMP_Z = 88;
 const LAMPS = RACK_X.map((x) => x + RACK.w / 2);
 const WINDOWS = [[-46, 22], [104, 22], [134, 22], [272, 22]];
@@ -260,12 +260,6 @@ function rack(i) {
   const tag = { x: x0 + 14, y: y + d - 3, w: w - 28, d: 3, r: 0.8 };
   out.push(M("dark", slab(tag, h + 2, 16, { tone: "hi", crease: "lo" }, 2, 0.4)));
   out.push(`<g transform="${face(tag.x, tag.y + tag.d + 0.1, h + 18)}"><rect class="tag-face" x="1.2" y="1.2" width="${tag.w - 2.4}" height="13.6" rx="1"/><g class="tag-icon"></g></g>`);
-  const alarm = [x0 + w - 8, y + d - 1.5, h + 18];
-  const glow = at([alarm[0], alarm[1], alarm[2] + 3]);
-  out.push(`<g class="alarm">${M("dark", cyl(alarm[0], alarm[1], 3.4, alarm[2], 1.4, { tone: "mid" }, 16))}<g class="alarm-lens">${cyl(alarm[0], alarm[1], 2.6, alarm[2] + 1.4, 4.2, { tone: "hi" }, 16)}</g><circle class="alarm-glow" cx="${f1(glow[0])}" cy="${f1(glow[1])}" r="${f1(14 * KS)}"/></g>`);
-  const front = y + d + 0.5;
-  out.push(`<g class="lock">${M("red", slab({ x: x0 - 2, y: front, w: w + 4, d: 2, r: 0.6 }, 36, 4, { tone: "hi" }, 2, 0) + slab({ x: x0 + w / 2 - 4, y: front + 2, w: 8, d: 3, r: 1 }, 30, 9, { tone: "hi" }, 2, 0))}</g>`);
-  out.push(`<g class="cross"><path class="x-line" d="${seg([x0, front, 2], [x0 + w, front, h])}${seg([x0 + w, front, 2], [x0, front, h])}"/></g>`);
   return `<g class="rack" data-rack="${i}" data-status="idle">${out.join("")}</g>`;
 }
 
@@ -388,12 +382,12 @@ function truck() {
   return `<g data-id="truck">${out.join("")}</g>`;
 }
 
-/** The Lazydoor road barrier on the fence line: post, cap and lamp; the striped boom is drawn per frame. */
+/** The dock gate in front of the parked truck: post, cap and lamp; the striped boom is drawn per frame. */
 function barrier() {
   const { x, post } = BARRIER;
   const lamp = at([x, post, 33]);
   const plan = { x: x - 5, y: post - 5, w: 10, d: 10, r: 2 };
-  return M("magenta", slab(plan, 0, 26, { tone: "mid" }, 3, 0.6) + L(k.sideSeam(plan, 8, P, 3), { tone: "lo" })) + M("dark", slab({ x: x - 6, y: post - 6, w: 12, d: 12, r: 2 }, 26, 4, { tone: "mid" }, 3, 0.4)) + `<path data-id="boom" class="boom" d=""/><path data-id="boom-stripes" class="boom-stripes" d=""/><circle data-id="blamp" class="barrier-lamp" cx="${f1(lamp[0])}" cy="${f1(lamp[1])}" r="${f1(2.8 * KS)}"/>`;
+  return M("amber", slab(plan, 0, 26, { tone: "mid" }, 3, 0.6) + L(k.sideSeam(plan, 8, P, 3), { tone: "lo" })) + M("dark", slab({ x: x - 6, y: post - 6, w: 12, d: 12, r: 2 }, 26, 4, { tone: "mid" }, 3, 0.4)) + `<path data-id="boom" class="boom" d=""/><path data-id="boom-stripes" class="boom-stripes" d=""/><circle data-id="blamp" class="barrier-lamp" cx="${f1(lamp[0])}" cy="${f1(lamp[1])}" r="${f1(2.8 * KS)}"/>`;
 }
 
 /** A small crate built at the origin, moved in screen space when it flies between shelf, truck and counter. */
@@ -478,10 +472,6 @@ export function truckRun(tr, age) {
     }
     return { n, load, go, arrive, unloadDone, back, home, front, v, accepted: true };
   }
-  if (tr.naive && tr.status === "stuck") {
-    const u = clamp01(age / 2.4);
-    return { n: 3, front: lerp(DOCK_X, STOP_X, ease(u)), v: u < 1 ? ((STOP_X - DOCK_X) * 6 * u * (1 - u)) / 2.4 : 0, stuckAt: 2.4, accepted: false };
-  }
   return { n, load: n * 0.22 + 0.45, front: DOCK_X, v: 0, accepted: false };
 }
 
@@ -504,7 +494,10 @@ ${truck()}
 <g>${barrier()}</g>
 <g data-id="scan"></g>
 <g data-id="flying"></g>
-<g data-id="cloud" style="opacity:0"><g data-id="rain"></g><path class="cloud-edge" d=""/><path class="cloud" d=""/></g>
+<g data-id="doorfly"></g>
+<g data-id="bursts"></g>
+<g data-id="doorchips"></g>
+<g data-id="dockchip" class="chip-g" style="opacity:0"><rect class="chip-box"/><g class="chip-icon"></g><text class="chip-text"></text></g>
 <g data-id="rings"></g>
 <g data-id="confetti"></g>
 <g data-id="chips"></g>
@@ -519,7 +512,7 @@ ${truck()}
   const root = host.querySelector(".scene-front");
   const stage = host.closest(".stage") ?? host;
   const q = (id) => root.querySelector(`[data-id="${id}"]`);
-  const ids = ["agent", "naive", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "bubble", "label", "exhaust", "cloud", "rain", "rings", "confetti", "stampfx", "gateshock", "chips", "phonechip", "receipt", "flying", "counter", "chef", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "phonei"];
+  const ids = ["agent", "naive", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "bubble", "label", "exhaust", "doorfly", "bursts", "doorchips", "dockchip", "rings", "confetti", "stampfx", "gateshock", "chips", "phonechip", "receipt", "flying", "counter", "chef", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "phonei"];
   const el = Object.fromEntries(ids.map((id) => [id, q(id)]));
   const racks = [...root.querySelectorAll(".rack")].sort((a, b) => a.dataset.rack - b.dataset.rack);
   const counterCrates = [...el.counter.querySelectorAll(".ccrate")];
@@ -663,7 +656,9 @@ ${truck()}
     drawStamp(stamp, state.door.reasons, state.door.since, state.phone.status, t, calm);
     drawPhone(state.phone, t, calm);
     drawClock(state.now);
+    drawDoor(state, t, calm);
     drawTruck(state, t, dt, snap, calm);
+    flushBursts(t, calm);
     drawBubble(state, t);
     drawLabel(state, ax, ay, bob);
     drawSky(state, dt, snap || calm);
@@ -704,7 +699,7 @@ ${truck()}
       if (status === "crossed") text = shelf.code === "NEW_ALLERGEN" ? "Allergen" : "Rejected";
       if (shelf.more) text += ` +${shelf.more}`;
       if (i === 0 && naive.step && naive.step !== "gone" && status === "idle") {
-        status = naive.step === "stuck" ? "locked" : "naive";
+        status = naive.step === "stuck" || naive.step === "load" ? "locked" : "naive";
         since = naive.since;
         text = naive.step === "stuck" ? "Closed" : "999999?";
       }
@@ -712,15 +707,142 @@ ${truck()}
       setAttr(rackEl, "data-status", status);
       setIcon(rackEl.querySelector(".tag-icon"), iconName, (RACK.w - 28) / 2 - 6.5, 1, 12);
       const age = t - since;
-      setAttr(rackEl, "data-alarm", status === "locked" && (calm || Math.floor(age * 3.2) % 2 === 0) ? "on" : null);
-      const drop = status === "locked" && !calm ? (1 - backOut(age / 0.32)) * 16 * KS : 0;
-      setAttr(rackEl.querySelector(".lock"), "transform", drop ? `translate(0 ${f1(-drop)})` : null);
       const node = chips[i];
-      if (status === "idle" || !text) return setAttr(node, "style", "opacity:0");
+      if (status !== "naive" || !text) return setAttr(node, "style", "opacity:0");
       const [cx, cy] = at([RACK_X[i] + RACK.w / 2, RACK.y + RACK.d, RACK.h + 20]);
       chip(node, { x: cx, y: cy - 4, text, iconName, tone: status, size: 23 });
       setAttr(node, "style", `opacity:${(calm ? 1 : clamp01(age / 0.25)).toFixed(3)}`);
     });
+  }
+
+  /** Burst marks (✓ or ✕) collected each frame from the door and the dock, drawn from one pool. */
+  const bursts = [];
+  const flushBursts = (t, calm) => {
+    const nodes = pool(el.bursts, 8, () => `<g class="burst" style="opacity:0"><circle class="burst-ring" r="20"/><g class="burst-icon"></g></g>`);
+    nodes.forEach((node, i) => {
+      const b = bursts[i];
+      if (!b) return setAttr(node, "style", "opacity:0");
+      const a = calm ? 0.4 : t - b.t0;
+      const u = clamp01(a / 0.7);
+      setAttr(node, "data-ok", b.ok ? "" : null);
+      setAttr(node, "transform", `translate(${f1(b.x)} ${f1(b.y)})`);
+      setAttr(node.querySelector(".burst-ring"), "r", f1(18 + 26 * easeOut(u)));
+      setIcon(node.querySelector(".burst-icon"), b.ok ? "check" : "cross", -14, -14, 28);
+      setAttr(node, "style", `opacity:${(calm ? 1 : a < 0.9 ? 1 : clamp01(1 - (a - 0.9) / 0.5)).toFixed(3)}`);
+    });
+    bursts.length = 0;
+  };
+
+  /** Door check: each quoted product flies from its shelf to the door's scanner; refused ones bounce off with a red mark and a reason at the door. */
+  function drawDoor(state, t, calm) {
+    const q = state.quote;
+    const tokens = pool(el.doorfly, 6, () => `<g class="fly" style="opacity:0"></g>`);
+    const chips = pool(el.doorchips, 4, chipMarkup);
+    const items = [];
+    if (q) {
+      q.rejections.forEach((r) => items.push({ productId: String(r.productId), ok: false, code: r.code, remaining: r.remaining ?? r.limit ?? null }));
+      const line = q.offers[0]?.lines?.[0];
+      if (line) items.push({ productId: String(line.productId), ok: true });
+    }
+    const [dx, dy] = at(DOOR_POINT);
+    const origin = at([0, 0, 0]);
+    let refused = 0;
+    tokens.forEach((node, i) => {
+      const item = items[i];
+      if (!item || calm) return setAttr(node, "style", "opacity:0");
+      const rackIndex = Math.max(0, state.shelves.findIndex((s) => s.productId === item.productId));
+      if (node.dataset.mat !== String(rackIndex)) {
+        node.dataset.mat = String(rackIndex);
+        node.innerHTML = flyingCrate(`crate${rackIndex}`);
+      }
+      const start = 0.2 + i * 0.45;
+      const age = t - q.at - start;
+      if (age < 0) return setAttr(node, "style", "opacity:0");
+      const [fx, fy] = at([RACK_X[rackIndex] + RACK.w / 2, RACK.y + RACK.d + 4, 30]);
+      let x;
+      let y;
+      let op = 1;
+      if (age < 0.6) {
+        const u = age / 0.6;
+        x = fx + (dx - fx) * easeOut(u);
+        y = fy + (dy - fy) * easeOut(u) - Math.sin(Math.PI * u) * 60;
+      } else {
+        const a = age - 0.6;
+        x = dx + (item.ok ? 0 : 46 * a);
+        y = dy + (item.ok ? 0 : -30 * a + 160 * a * a);
+        op = clamp01(1 - a / (item.ok ? 0.3 : 0.7));
+      }
+      setAttr(node, "transform", `translate(${f1(x - origin[0])} ${f1(y - origin[1])})`);
+      setAttr(node, "style", op < 1 ? `opacity:${op.toFixed(3)}` : null);
+    });
+    items.forEach((item, i) => {
+      const arrive = q.at + 0.2 + i * 0.45 + 0.6;
+      if (t >= arrive && t < arrive + 1.4) bursts.push({ x: dx, y: dy - 34, t0: arrive, ok: item.ok });
+    });
+    if (state.door.stamp === "REJECT" && q && state.door.since >= q.at && t - state.door.since < 1.4) bursts.push({ x: dx, y: dy - 34, t0: state.door.since, ok: false });
+    const [cx, cy] = at([GATE_X + 10, 52, 128]);
+    chips.forEach((node, k) => {
+      const list = items.filter((it) => !it.ok);
+      const item = list[k];
+      if (!item) return setAttr(node, "style", "opacity:0");
+      const arrive = q.at + 0.2 + items.indexOf(item) * 0.45 + 0.6;
+      if (t < arrive && !calm) return setAttr(node, "style", "opacity:0");
+      const text = item.code === "STOCK_LIMITED" ? (item.remaining !== null ? `Only ${item.remaining} left` : "Stock limited") : item.code === "CUTOFF_PASSED" ? "Cut-off passed" : reasonText(item.code);
+      chip(node, { x: cx + 40, y: cy + refused * 50, text, iconName: "cross", tone: "reject", size: 23, anchor: "start" });
+      setAttr(node, "style", `opacity:${(calm ? 1 : clamp01((t - arrive) / 0.25)).toFixed(3)}`);
+      refused += 1;
+    });
+  }
+
+  /** Dock gate: the naive agent's crates are refused here at the cut-off; a pending approval waits here; an expired one keeps it shut. */
+  function drawDock(state, t, calm) {
+    const tr = state.truck;
+    const naive = state.naive;
+    const tokens = pool(el.flying, 8, () => `<g class="fly" style="opacity:0">${flyingCrate("crate2")}</g>`);
+    const origin = at([0, 0, 0]);
+    let words = null;
+    if (tr.naive && (naive.step === "load" || naive.step === "stuck")) {
+      const loadAt = naive.step === "load" ? naive.since : tr.since - 4;
+      const [fx, fy] = at([RACK_X[0] + RACK.w / 2, RACK.y + RACK.d + 4, 30]);
+      const [sx, sy] = at([DOCK_X + 60, TRUCK_Y - 10, 34]);
+      for (let i = 0; i < 3; i++) {
+        const node = tokens[5 + i];
+        if (node.dataset.mat !== "0") {
+          node.dataset.mat = "0";
+          node.innerHTML = flyingCrate("crate0");
+        }
+        const age = t - loadAt - i * 0.35;
+        if (age < 0 || calm) {
+          setAttr(node, "style", "opacity:0");
+          continue;
+        }
+        let x = sx;
+        let y = sy;
+        let op = 1;
+        if (age < 0.6) {
+          const u = age / 0.6;
+          x = fx + (sx - fx) * easeOut(u);
+          y = fy + (sy - fy) * easeOut(u) - Math.sin(Math.PI * u) * 50;
+        } else {
+          const a = age - 0.6;
+          x = sx - 36 * a;
+          y = sy - 20 * a + 170 * a * a;
+          op = clamp01(1 - a / 0.7);
+        }
+        setAttr(node, "transform", `translate(${f1(x - origin[0])} ${f1(y - origin[1])})`);
+        setAttr(node, "style", op < 1 ? `opacity:${op.toFixed(3)}` : null);
+        const hit = loadAt + i * 0.35 + 0.6;
+        if (t >= hit && t < hit + 1.4) bursts.push({ x: sx, y: sy - 30, t0: hit, ok: false });
+      }
+      if (t > loadAt + 0.6) words = ["Cut-off Thu 12 Nov 15:00", "lock", "reject"];
+    }
+    else for (let i = 5; i < 8; i++) setAttr(tokens[i], "style", "opacity:0");
+    if (!words && state.phone.status === "buzzing") words = ["Waiting for approval", "clock", "hold"];
+    if (!words && state.phone.status === "expired") words = ["Approval expired", "clock", "reject"];
+    if (!words) return setAttr(el.dockchip, "style", "opacity:0");
+    const [px, py] = at([BARRIER.x, BARRIER.post, 0]);
+    chip(el.dockchip, { x: px - 10, y: py + 52, text: words[0], iconName: words[1], tone: words[2], size: 23, anchor: "start" });
+    setAttr(el.dockchip, "style", null);
   }
 
   /** The door's decision: a shockwave at the gate beacon, and a banner at top centre where the stamp slams in with its reasons. */
@@ -812,19 +934,7 @@ ${truck()}
     const tr = state.truck;
     const age = t - tr.since;
     const run = truckRun(tr, age);
-    let opacity = 1;
-    let naiveLook = tr.naive;
-    if (tr.status === "parked" && tr.since > 0) opacity = clamp01(age / 0.6);
-    if (tr.status === "parked" && state.naive.step === "gone" && age < 1.2) {
-      run.front = age < 0.6 ? STOP_X : DOCK_X;
-      opacity = age < 0.6 ? 1 - age / 0.6 : (age - 0.6) / 0.6;
-      naiveLook = age < 0.6;
-    }
-    const jitter = tr.naive && tr.status === "stuck" && age > run.stuckAt && !calm ? Math.sin(age * 22) * 1.6 * Math.max(0, 1 - (age % 2.2) / 0.8) : 0;
-    setAttr(el.truck, "transform", k.translateAlong(P, [run.front + jitter, TRUCK_Y, 0]));
-    setAttr(el.truck, "style", opacity < 1 ? `opacity:${opacity.toFixed(3)}` : null);
-    setAttr(el.truck, "data-naive", naiveLook ? "" : null);
-    setAttr(el.truck, "data-stuck", tr.naive && tr.status === "stuck" ? "" : null);
+    setAttr(el.truck, "transform", k.translateAlong(P, [run.front, TRUCK_Y, 0]));
 
     const rear = run.front + T_LEN;
     const near = run.front < BARRIER.x + 90 && rear > BARRIER.x - 30;
@@ -836,19 +946,20 @@ ${truck()}
     const boom = k.pathOf([at(pivot), at(tip)]);
     setAttr(el.boom, "d", boom);
     setAttr(el["boom-stripes"], "d", boom);
-    setAttr(el.blamp, "data-open", live.boom > 0.5 ? "" : null);
+    setAttr(el.blamp, "data-state", live.boom > 0.5 ? "open" : state.phone.status === "buzzing" ? "wait" : "closed");
+    drawDock(state, t, calm);
 
-    const flying = pool(el.flying, 8, () => `<g class="fly" style="opacity:0">${flyingCrate("crate2")}</g>`);
+    const flying = pool(el.flying, 8, () => `<g class="fly" style="opacity:0">${flyingCrate("crate2")}</g>`).slice(0, 5);
     const origin = at([0, 0, 0]);
     const okRack = racks.findIndex((r) => r.dataset.status === "ok");
-    const source = tr.naive ? 0 : okRack >= 0 ? okRack : 2;
+    const source = okRack >= 0 ? okRack : 2;
     const from = at([RACK_X[source] + RACK.w / 2, RACK.y + RACK.d + 4, 36]);
     const truckTop = (front) => at([front + 100, TRUCK_Y + 19, 74]);
     const flights = [];
-    if (tr.status === "loading") for (let i = 0; i < Math.min(run.n, 8); i++) flights.push({ start: i * 0.22, dur: 0.45, a: from, b: truckTop(DOCK_X), fadeEnd: true });
+    if (run.accepted) for (let i = 0; i < Math.min(run.n, 8); i++) flights.push({ start: i * 0.22, dur: 0.45, a: from, b: truckTop(DOCK_X), fadeEnd: true });
     if (run.accepted) for (let i = 0; i < Math.min(run.n, SLOTS.length); i++) flights.push({ start: run.arrive + i * 0.2, dur: 0.42, a: truckTop(BAY_X), b: at([SLOTS[i], -95, 48]), fadeEnd: false });
     flying.forEach((node, i) => {
-      const f = flights.find((fl, j) => j % 8 === i && age >= fl.start && age < fl.start + fl.dur) ?? null;
+      const f = flights.find((fl, j) => j % 5 === i && age >= fl.start && age < fl.start + fl.dur) ?? null;
       if (!f || calm) return setAttr(node, "style", "opacity:0");
       const u = (age - f.start) / f.dur;
       const e = easeOut(u);
@@ -888,7 +999,6 @@ ${truck()}
       setAttr(line, "d", k.pathOf([at([tail, TRUCK_Y + 36, z]), at([tail + len, TRUCK_Y + 36, z])]));
       setAttr(line, "style", `opacity:${(Math.min(1, speed / 120) * 0.85).toFixed(3)}`);
     });
-    drawCloud(state.naive, t, calm);
   }
 
   /** A short confetti burst from the truck when an order is accepted. */
@@ -909,13 +1019,13 @@ ${truck()}
     });
   }
 
-  /** Exhaust puffs from the stack: light grey while the truck drives, dark coughs while the naive load sits stuck. */
+  /** Exhaust puffs from the stack while the truck drives. */
   function drawExhaust(tr, run, age, calm) {
     const puffs = pool(el.exhaust, 16, () => svgNode("circle", "puff"));
     const moving = Math.abs(run.v) > 1;
-    const stuck = tr.naive && tr.status === "stuck";
-    const every = stuck ? 0.45 : 0.11;
-    const life = stuck ? 1.6 : 1.1;
+    const stuck = false;
+    const every = 0.11;
+    const life = 1.1;
     puffs.forEach((node, j) => {
       if (calm || !(moving || stuck)) return setAttr(node, "style", "opacity:0");
       const born = (Math.floor(age / every) - j) * every;
@@ -928,31 +1038,6 @@ ${truck()}
       setAttr(node, "cy", f1(py - 34 * a));
       setAttr(node, "r", f1((3.5 + 11 * a) * KS * 0.7));
       setAttr(node, "style", `opacity:${(0.65 * (1 - a / life)).toFixed(3)}`);
-    });
-  }
-
-  /** Grey rain cloud over the naive agent's truck once it stops at the closed barrier. */
-  function drawCloud(naive, t, calm) {
-    const age = t - naive.since;
-    const visible = (naive.step === "stuck" && age > 2.2) || (naive.step === "gone" && age < 1);
-    if (!visible) return setAttr(el.cloud, "style", "opacity:0");
-    const op = naive.step === "gone" ? 1 - age : Math.min(1, (age - 2.2) / 0.6);
-    setAttr(el.cloud, "style", `opacity:${clamp01(op).toFixed(3)}`);
-    const [cx, cy] = at([STOP_X + 70, TRUCK_Y + 19, 128]);
-    const r = 20 * KS;
-    const blob = (x, y, rr) => `M${f1(cx + x - rr)} ${f1(cy + y)}a${f1(rr)} ${f1(rr)} 0 1 0 ${f1(2 * rr)} 0a${f1(rr)} ${f1(rr)} 0 1 0 ${f1(-2 * rr)} 0`;
-    const d = blob(-r * 1.3, r * 0.2, r * 0.8) + blob(0, -r * 0.25, r) + blob(r * 1.25, r * 0.15, r * 0.85) + blob(r * 0.1, r * 0.45, r * 0.9);
-    setAttr(el.cloud.querySelector(".cloud-edge"), "d", d);
-    setAttr(el.cloud.querySelector(".cloud"), "d", d);
-    const drops = pool(el.rain, RAIN.length, () => svgNode("path", "rain"));
-    const fall = 72 * KS;
-    drops.forEach((node, i) => {
-      const p = RAIN[i];
-      const u = calm ? p.phase : (p.phase + age * p.speed) % 1;
-      const x = cx + p.x * r * 1.9 - u * 6;
-      const y = cy + r * 0.9 + u * fall;
-      setAttr(node, "d", `M${f1(x)} ${f1(y)}l-4 ${f1(16 * KS * 0.5)}`);
-      setAttr(node, "style", `opacity:${(0.85 * Math.sin(Math.PI * u)).toFixed(3)}`);
     });
   }
 

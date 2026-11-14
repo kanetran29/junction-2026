@@ -112,7 +112,7 @@ export function reduce(state, ev, t) {
     case "quote.created": {
       const offers = Array.isArray(d.offers) ? d.offers : [];
       const rejections = Array.isArray(d.rejections) ? d.rejections : [];
-      s.quote = { offers, rejections };
+      s.quote = { offers, rejections, at: t };
       const rows = rejections.filter((r) => r?.productId).map((r) => ({ productId: String(r.productId), status: shelfStatus(r.code), remaining: r.remaining ?? r.limit ?? null, code: r.code ?? null }));
       for (const line of offers[0]?.lines ?? []) if (line?.productId && !rows.some((r) => r.productId === String(line.productId))) rows.push({ productId: String(line.productId), status: "ok", remaining: null, code: null });
       s.shelves = shelvesFor(rows, t);

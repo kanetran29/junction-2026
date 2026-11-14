@@ -25,8 +25,9 @@ const BEATS = [
   [15, "story.naive", { step: "grab" }],
   [15.2, "story.caption", { text: "Raw API for the 10 l novobox 463038: “999999 available Monday”." }],
   [19.5, "story.naive", { step: "load" }],
+  [20.1, "story.caption", { text: "The dock refuses the load: its cut-off was Thursday 12 Nov 15:00. The counter stays empty." }],
   [23.5, "story.naive", { step: "stuck" }],
-  [23.7, "story.caption", { text: "Its cut-off was Thursday 12 Nov 15:00. Nothing ships, the counter stays empty." }],
+  [25.5, "story.caption", { text: "The naive agent learns it after the fact. Lazydoor checks before anything is ordered." }],
   [30, "story.naive", { step: "gone" }],
   [30.2, "story.reset", { agent: true }],
 
@@ -38,7 +39,7 @@ const BEATS = [
   [39.2, "story.caption", { text: "Search by type and claim: 35 lactose-free milks. The door asks Valio about each." }],
   [41, "valio.called", { endpoint: "availability", ids: 35, replay: false }, "d"],
   [44.5, "quote.created", { offers: [offer(1000, ["PACK_SIZE_CHANGED"])], rejections: [{ productId: "463038", code: "CUTOFF_PASSED" }, { productId: "469363", code: "STOCK_LIMITED", remaining: 384 }] }, "q"],
-  [44.7, "story.caption", { text: "Boxes closed Thu 15:00, Arla has only 384. Best offer: 1,000 × 1 l = 1,010.00 €." }],
+  [44.7, "story.caption", { text: "The door refuses the closed 10 l boxes and the short Arla stock. Best offer: 1,010.00 €." }],
   [50.5, "policy.decided", { outcome: "NEEDS_APPROVAL", reasons: why("OVER_ORDER_AUTO", "PACK_SIZE_CHANGED") }, "q"],
   [50.7, "story.caption", { text: "Over the 500 € limit, and boxes became cartons: NEEDS_APPROVAL." }],
   [53.5, "approval.requested", { orderId: "ord_1", expiresAt: CUTOFF }, "o"],
@@ -80,7 +81,7 @@ const BEATS = [
   [104.7, "story.caption", { text: "The clock passes the cut-off: Sunday 17:05." }],
   [105.2, "clock.set", { now: AFTER_CUTOFF }],
   [106.7, "approval.expired", { orderId: "ord_3" }, "o"],
-  [106.9, "story.caption", { text: "The pending approval expires. Nothing is ordered after the cut-off." }],
+  [106.9, "story.caption", { text: "The approval expires at the cut-off. The dock stays shut, nothing ships." }],
 
   // 5. Close.
   [111.2, "story.close", {}],

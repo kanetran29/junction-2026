@@ -148,3 +148,8 @@ test("reduce: shelves remember when their status was set", () => {
   const d = reduce(s, { seq: 2, type: "stock.denied", data: { productId: "469363", remaining: 3 } }, 20);
   assert.equal(d.shelves.find((x) => x.productId === "469363").since, 20);
 });
+
+test("reduce: a quote remembers when it arrived", () => {
+  const s = reduce(initialState(), { seq: 1, type: "quote.created", data: QUOTE }, 44.5);
+  assert.equal(s.quote.at, 44.5);
+});

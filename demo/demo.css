@@ -210,9 +210,13 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 [data-id="asks"] .iso-wire-end { stroke: #ff7ab8; fill: #1a0612; }
 .scene-front .iso-line[data-flow] { animation: none; stroke-dasharray: 4 8; }
 .boom { fill: none; stroke: #f7e8c8; stroke-width: 9px; stroke-linecap: round; }
-.boom-stripes { fill: none; stroke: var(--brand); stroke-width: 9px; stroke-dasharray: 11 11; }
+.boom-stripes { fill: none; stroke: #e0322f; stroke-width: 9px; stroke-dasharray: 11 11; }
 .barrier-lamp { fill: var(--reject); stroke: #03161c; stroke-width: 1.5px; }
-.barrier-lamp[data-open] { fill: var(--auto); }
+.barrier-lamp[data-state="open"] { fill: var(--auto); }
+.barrier-lamp[data-state="wait"] { fill: var(--hold); }
+.burst { --b: var(--reject); color: #fff; }
+.burst[data-ok] { --b: var(--auto); }
+.burst-ring { fill: var(--b); stroke: #fff; stroke-width: 3px; }
 
 /* Racks. */
 .rack .lock, .rack .cross { display: none; }
