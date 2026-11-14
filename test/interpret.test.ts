@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { setClock } from '../src/clock';
 import type { Env } from '../src/env';
 import { listEvents } from '../src/events/log';
-import { confirmDraft, InterpretError, interpret } from '../src/interpret/gemini';
+import { clearListsCache, confirmDraft, InterpretError, interpret } from '../src/interpret/gemini';
 import { draftSchema } from '../src/quote/store';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', GEMINI_API_KEY: 'test-key', GEMINI_MODEL: 'gemini-test' };
@@ -33,6 +33,7 @@ const milk = {
 
 describe('interpret', () => {
   beforeEach(async () => {
+    clearListsCache();
     for (const t of ['drafts', 'events', 'category_names', 'products']) await e.DB.prepare(`DELETE FROM ${t}`).run();
     await e.DB.prepare("INSERT INTO category_names(category, names, tag_source) VALUES ('10400','Milk','reviewed')").run();
     await e.DB.prepare("INSERT INTO products(id, category, names, claims) VALUES ('T0001','10400','[]','[\"FREE_FROM_LACTOSE\",\"FREE_FROM_GLUTEN\",\"VEGAN\"]')").run();
@@ -133,6 +134,7 @@ describe('interpret', () => {
 
 describe('confirmDraft', () => {
   beforeEach(async () => {
+    clearListsCache();
     for (const t of ['drafts', 'events', 'category_names', 'products']) await e.DB.prepare(`DELETE FROM ${t}`).run();
     await e.DB.prepare("INSERT INTO category_names(category, names, tag_source) VALUES ('10400','Milk','reviewed')").run();
     await e.DB.prepare("INSERT INTO products(id, category, names, claims) VALUES ('T0001','10400','[]','[\"FREE_FROM_LACTOSE\"]')").run();

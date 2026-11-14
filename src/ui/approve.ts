@@ -8,7 +8,8 @@ import { identify } from '../http/auth';
 import { OrderError, approve, approverInbox, freeStock, getOrder, limitKey, reject, type ApproveReply, type OrderView } from '../orders/store';
 import type { Draft, OfferLine } from '../quote/build';
 import { getQuote } from '../quote/store';
-import { eur, lineNet, productName, qty, renderReceipt } from '../receipt/render';
+import { lineNet } from '../domain/money';
+import { eur, productName, qty, renderReceipt } from '../receipt/render';
 
 /** Escapes a value for HTML text and double-quoted attributes; every interpolated value goes through it. */
 export function escapeHtml(s: unknown): string {
@@ -136,7 +137,7 @@ export async function receiptText(env: Env, orderId: string, buyerId?: string): 
   const view: OrderView | null = m && (await getOrder(env, m.buyer_id, orderId));
   if (!m || !view) return null;
   const products = await getProducts(env, view.order.lines.map((l) => l.productId));
-  return renderReceipt(view.order, [], await draftsOf(env, m), view.decision, { products, approver: view.approval.approver, reason: view.reason });
+  return renderReceipt(view.order, await draftsOf(env, m), view.decision, { products, approver: view.approval.approver, reason: view.reason });
 }
 
 /**

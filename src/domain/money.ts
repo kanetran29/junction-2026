@@ -14,6 +14,9 @@ export function lineNetCents(unitPrice: number, salesUnits: number): number {
   return halfUp(halfUp(unitPrice * 100) * salesUnits);
 }
 
+/** The net cents of a priced order line: its unit price in cents times its sales units, half up (the same figure on the receipt, the approval page and the basket gross). */
+export const lineNet = (l: { netCentsPerSalesUnit: number; salesUnits: number }) => halfUp(l.netCentsPerSalesUnit * l.salesUnits);
+
 /**
  * Gross cents of a basket from its net cents per VAT rate (percent): each rate's net is grossed up and rounded half up
  * on its own, then summed, which is how the oracle computes a multi-rate basket.

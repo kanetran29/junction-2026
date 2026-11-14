@@ -1,7 +1,7 @@
 import { getProducts, type CatalogProduct } from '../catalog/search';
 import { helsinkiIso, now } from '../clock';
 import { MANDATE_AUD, type Mandate } from '../domain/constants';
-import { grossCents, halfUp } from '../domain/money';
+import { grossCents, halfUp, lineNet } from '../domain/money';
 import type { ReasonCode } from '../domain/reasons';
 import type { Env } from '../env';
 import { logEvent, type NewEvent } from '../events/log';
@@ -121,7 +121,7 @@ function linesHash(lines: OfferLine[], buyerId: string, mandateVersion: number):
 /** Basket-level gross: the net of every line grouped per VAT rate, grossed up per rate. */
 function basketGross(lines: OfferLine[]): number {
   const byRate = new Map<number, number>();
-  for (const l of lines) byRate.set(l.taxRate, (byRate.get(l.taxRate) ?? 0) + halfUp(l.netCentsPerSalesUnit * l.salesUnits));
+  for (const l of lines) byRate.set(l.taxRate, (byRate.get(l.taxRate) ?? 0) + lineNet(l));
   return grossCents(byRate);
 }
 

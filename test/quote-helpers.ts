@@ -81,7 +81,7 @@ export function offersFor(rows: Record<string, Row>, extra: Partial<Offers> = {}
       error: Boolean(r.noPrice),
     });
   }
-  return { availability, price, calls: 2, liveCalls: 2, replay: false, timeNow: '2026-11-13T21:10:00+02:00', ids: Object.keys(rows), ...extra };
+  return { availability, price, calls: 2, liveCalls: 2, replay: false, ids: Object.keys(rows), ...extra };
 }
 
 /** A fake Valio fetch answering the availability and price endpoints from synthetic rows, recording each call's endpoint and ids. */

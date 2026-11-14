@@ -1,4 +1,4 @@
-import { replayOn } from '../clock';
+import { getSetting, replayOn } from '../clock';
 import type { Env } from '../env';
 import { halfUp } from '../domain/money';
 
@@ -45,8 +45,6 @@ export interface Offers {
   /** Calls that really went over the network; 0 in replay. */
   liveCalls: number;
   replay: boolean;
-  /** The reply's `timeNow` (+02:00). */
-  timeNow: string;
   /** The ids asked of both endpoints, for the caller's `valio.called` events. */
   ids: string[];
 }
@@ -81,6 +79,7 @@ function unknown(id: string): { av: AvailabilityRow; price: PriceRow } {
   };
 }
 
+/** A price raised by 10 %, rounded half up to the cent (the `price_plus_10pct` replay variant); null and undefined stay as they are. */
 const plus10 = (v: number | null | undefined) => (typeof v === 'number' ? halfUp(Math.round(v * 110 * 1e6) / 1e6) / 100 : v);
 
 /** Applies a demo variant to one product's recorded rows: `out_of_stock` empties its schedule, `price_plus_10pct` raises its prices 10 %. */
@@ -96,24 +95,17 @@ function applyVariant(variant: string | undefined, av: AvailabilityRow, price: P
   }
 }
 
-/** Reads one setting value, or null. */
-async function setting(env: Env, key: string): Promise<string | null> {
-  return (await env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first<{ value: string }>())?.value ?? null;
-}
-
 /** Serves the recorded replies from `valio_replies` (recording and variants come from settings), with unknown ids answered like the mock. */
-async function replayOffers(env: Env, ids: string[]): Promise<Pick<Offers, 'availability' | 'price' | 'timeNow'>> {
-  const recording = (await setting(env, 'recording')) ?? DEFAULT_RECORDING;
-  const variants = JSON.parse((await setting(env, 'variants')) ?? '{}') as Record<string, string>;
+async function replayOffers(env: Env, ids: string[]): Promise<Pick<Offers, 'availability' | 'price'>> {
+  const recording = (await getSetting(env, 'recording')) ?? DEFAULT_RECORDING;
+  const variants = JSON.parse((await getSetting(env, 'variants')) ?? '{}') as Record<string, string>;
   const { results } = await env.DB.prepare(
-    'SELECT kind, product_id, body, time_now FROM valio_replies WHERE recording = ? AND product_id IN (SELECT value FROM json_each(?))',
+    'SELECT kind, product_id, body FROM valio_replies WHERE recording = ? AND product_id IN (SELECT value FROM json_each(?))',
   )
     .bind(recording, JSON.stringify(ids))
-    .all<{ kind: string; product_id: string; body: string; time_now: string | null }>();
+    .all<{ kind: string; product_id: string; body: string }>();
   const rows = { availability: new Map<string, AvailabilityRow>(), price: new Map<string, PriceRow>() };
-  let timeNow = '';
   for (const r of results) {
-    timeNow ||= r.time_now ?? '';
     rows[r.kind as 'availability' | 'price'].set(r.product_id, JSON.parse(r.body));
   }
   for (const id of ids) {
@@ -124,7 +116,7 @@ async function replayOffers(env: Env, ids: string[]): Promise<Pick<Offers, 'avai
     rows.availability.set(id, withIsoOffsets(av));
     rows.price.set(id, withIsoOffsets(price));
   }
-  return { ...rows, timeNow: withIsoOffsets(timeNow) };
+  return rows;
 }
 
 /**
@@ -159,13 +151,11 @@ export async function fetchOffers(env: Env, ids: string[], date: string, fetchFn
   }
   const availability = new Map<string, AvailabilityRow>();
   const price = new Map<string, PriceRow>();
-  let timeNow = '';
   for (let i = 0; i < unique.length; i += BATCH) {
     const batch = unique.slice(i, i + BATCH);
     const [a, p] = await Promise.all([post(env, 'availability', batch, date, fetchFn), post(env, 'price', batch, date, fetchFn)]);
-    timeNow ||= a.timeNow;
     for (const x of a.products as AvailabilityRow[]) availability.set(x.productId, x);
     for (const x of p.products as PriceRow[]) price.set(x.productId, x);
   }
-  return { availability, price, calls, liveCalls: calls, replay: false, timeNow, ids: unique };
+  return { availability, price, calls, liveCalls: calls, replay: false, ids: unique };
 }

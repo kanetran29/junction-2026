@@ -93,11 +93,28 @@ function claimWordsLost(text: string, claims: string[], claimIds: Set<string>): 
   return CLAIM_WORDS.some(([re, id]) => claimIds.has(id) && re.test(text) && !claims.includes(id));
 }
 
-/** Reads the reference lists the prompt and the validation share: category codes with names, and the claim ids in the index. */
-async function lists(env: Env) {
-  const cats = await env.DB.prepare('SELECT category, names FROM category_names ORDER BY category').all<{ category: string; names: string }>();
-  const claims = await env.DB.prepare("SELECT DISTINCT value AS id FROM products, json_each(products.claims) WHERE products.claims IS NOT NULL ORDER BY 1").all<{ id: string }>();
-  return { categories: cats.results, claimIds: claims.results.map((r) => r.id) };
+type Lists = { categories: { category: string; names: string }[]; claimIds: string[] };
+let listsCache: Promise<Lists> | undefined;
+
+/** Forgets the memoised reference lists (tests that reload the catalogue call this; a deploy starts a fresh isolate). */
+export function clearListsCache(): void {
+  listsCache = undefined;
+}
+
+/**
+ * Reads the reference lists the prompt and the validation share: category codes with names, and the claim ids in the index.
+ * The catalogue is static per deploy, so they are read once per isolate (a failed read is not kept).
+ */
+function lists(env: Env): Promise<Lists> {
+  listsCache ??= (async () => {
+    const cats = await env.DB.prepare('SELECT category, names FROM category_names ORDER BY category').all<{ category: string; names: string }>();
+    const claims = await env.DB.prepare("SELECT DISTINCT value AS id FROM products, json_each(products.claims) WHERE products.claims IS NOT NULL ORDER BY 1").all<{ id: string }>();
+    return { categories: cats.results, claimIds: claims.results.map((r) => r.id) };
+  })().catch((err) => {
+    listsCache = undefined;
+    throw err;
+  });
+  return listsCache;
 }
 
 /**

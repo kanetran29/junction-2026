@@ -38,7 +38,6 @@ describe('fetchOffers live', () => {
     expect(r).toMatchObject({ calls: 2, liveCalls: 2, replay: false, ids: ['T0001', 'T0004'] });
     expect(r.availability.get('T0001')?.closingTime).toBe('2026-11-15T17:00:00+02:00');
     expect(r.price.get('T0004')?.catalogPrice?.validFrom).toBe('2026-01-13T00:00:00+02:00');
-    expect(r.timeNow).toBe('2026-11-13T21:10:00+02:00');
   });
 
   it('splits 1,200 ids into two calls per endpoint', async () => {

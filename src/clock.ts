@@ -3,9 +3,9 @@ import type { Env } from './env';
 const REPLAY_FROM = Date.parse('2026-11-15T15:00:00Z');
 
 /**
- * Reads one row of the key/value `settings` table (clock override, replay flag, recording, variant).
+ * Reads one row of the key/value `settings` table (clock override, replay flag, recording, variant); null when unset.
  */
-async function getSetting(env: Env, key: string): Promise<string | null> {
+export async function getSetting(env: Env, key: string): Promise<string | null> {
   const row = await env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first<{ value: string }>();
   return row?.value ?? null;
 }

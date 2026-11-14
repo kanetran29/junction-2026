@@ -37,7 +37,6 @@ describe('fetchOffers in replay', () => {
     expect(r).toMatchObject({ replay: true, liveCalls: 0, calls: 2, ids: ['T0004', 'T0001'] });
     expect(r.availability.get('T0004')?.scheduleLines).toEqual([{ salesBlock: false, availableAmount: 384, availableDate: '2026-11-16', salesUnit: 'ST' }]);
     expect(r.price.get('T0004')?.catalogPrice?.value).toBe(4.5);
-    expect(r.timeNow).toBe('2026-11-13T21:10:00+02:00');
   });
 
   it('an id missing from the recording behaves like the mock unknown product', async () => {
