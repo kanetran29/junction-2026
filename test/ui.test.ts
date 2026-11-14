@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { insertStatements } from '../scripts/build-index';
 import { setClock } from '../src/clock';
 import type { Env } from '../src/env';
@@ -8,6 +8,7 @@ import { approverInbox, placeOrder } from '../src/orders/store';
 import { sha256Hex } from '../src/util';
 import { createQuote } from '../src/quote/store';
 import { uiRoutes } from '../src/ui/approve';
+import { clearValioBlock } from '../src/valio/client';
 import { fakeValio, product, type Row } from './quote-helpers';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'test-key' };
@@ -25,6 +26,8 @@ async function hold(id: string, agentReason = 'Cheapest <script>alert(1)</script
   const p = (await approverInbox(e, 'ak-a')).pending.find((x) => x.orderId === r.orderId)!;
   return { token: p.token, orderId: r.orderId };
 }
+
+afterEach(() => clearValioBlock());
 
 beforeAll(async () => {
   const names = (id: string) => [{ language: 'fi', value: `Maito <i>${id}</i>` }];
@@ -69,6 +72,24 @@ describe('GET /approve/:token', () => {
   it('says unlimited lines are not stock-limited', async () => {
     const { token } = await hold('QU');
     expect(await (await get(`/approve/${token}`)).text()).toContain('not stock-limited');
+  });
+
+  it('while Valio rate-limits it says availability is unknown and makes no Valio call; approve answers 503 VALIO_RATE_LIMITED', async () => {
+    const { token } = await hold('QS');
+    clearValioBlock();
+    let calls = 0;
+    const limited = uiRoutes((async () => { calls++; return new Response('slow', { status: 429 }); }) as unknown as typeof fetch);
+    const page = (t: string) => limited.request(`/approve/${t}`, { headers: { Accept: 'text/html' } }, e);
+    expect(await (await page(token)).text()).toContain('availability unknown right now');
+    const callsAfterFirst = calls;
+    expect(await (await page(token)).text()).toContain('availability unknown right now');
+    expect(calls).toBe(callsAfterFirst);
+    const res = await limited.request(`/approve/${token}`, { method: 'POST', headers: { Accept: 'application/json' } }, e);
+    clearValioBlock();
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Retry-After')).toMatch(/^\d+$/);
+    expect(await res.json()).toMatchObject({ error: 'VALIO_RATE_LIMITED', retryAfter: expect.any(Number) });
+    expect(calls).toBe(callsAfterFirst);
   });
 
   it('after the cut-off it says expired and has no forms; an unknown token is 404', async () => {

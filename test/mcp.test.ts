@@ -1,8 +1,9 @@
 import { env } from 'cloudflare:workers';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { insertStatements } from '../scripts/build-index';
 import type { Env } from '../src/env';
 import { createApp } from '../src/http/routes';
+import { clearValioBlock } from '../src/valio/client';
 import * as S from '../src/http/schemas';
 import { mcpRoutes } from '../src/mcp/tools';
 import { z } from 'zod';
@@ -23,6 +24,8 @@ const rpc = async (key: string | undefined, method: string, params?: unknown) =>
 const callTool = async (key: string, name: string, args: unknown) => (await rpc(key, 'tools/call', { name, arguments: args })).result;
 const reset = async (body: Record<string, unknown> = {}) =>
   (await (await post('/admin/reset', 'adm', { clock: '2026-11-13T21:10:00+02:00', replay: null, replayVariant: {}, mandate: { perOrder: { auto: 500, hard: 5000 }, perDay: { auto: 500, hard: 10000 }, reliabilityFloor: 0.9, approver: 'Kitchen manager' }, ...body })).json()) as any;
+
+afterEach(() => clearValioBlock());
 
 beforeAll(async () => {
   await e.DB.batch(insertStatements([product('P1', { names: [{ language: 'fi', value: 'Maito' }] })]).map((s) => e.DB.prepare(s)));
@@ -97,6 +100,18 @@ describe('mcp', () => {
     const db = { prepare: (sql: string) => (sql.includes('api_keys') ? e.DB.prepare(sql) : (() => { throw new TypeError('secret internals'); })()), batch: e.DB.batch.bind(e.DB) } as unknown as D1Database;
     const masked = (await (await app.request('/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${key}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_families', arguments: {} } }) }, { ...e, DB: db })).json()) as any;
     expect(masked.result).toMatchObject({ isError: true, content: [{ text: JSON.stringify({ error: 'INTERNAL_ERROR', detail: 'unexpected failure' }) }] });
+  });
+
+  it('a Valio 429 is an isError refusal whose text JSON carries retryAfter', async () => {
+    clearValioBlock();
+    const keys = await reset();
+    const limited = createApp((async () => new Response('slow', { status: 429 })) as unknown as typeof fetch);
+    limited.route('/', mcpRoutes((async () => new Response('slow', { status: 429 })) as unknown as typeof fetch));
+    const res = await limited.request('/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${keys.agentKeys['hotel-a']}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_quote', arguments: need } }) }, e);
+    clearValioBlock();
+    const r = ((await res.json()) as any).result;
+    expect(r.isError).toBe(true);
+    expect(JSON.parse(r.content[0].text)).toEqual({ error: 'VALIO_RATE_LIMITED', detail: expect.any(String), retryAfter: 30 });
   });
 
   it('an SDK client lists tools and receives a refusal as an isError result, not a thrown error', async () => {

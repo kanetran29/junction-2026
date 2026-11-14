@@ -104,7 +104,7 @@ export const toolDefinitions = tools.map((t) => ({ name: t.name, description: t.
 const result = (body: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(body) }], structuredContent: body as Record<string, unknown>, isError: false });
 
 /** A refusal: the JSON as text only, because it does not match the tool's `outputSchema` and clients validate `structuredContent` against it. */
-const refusal = (error: string, detail: string) => ({ content: [{ type: 'text' as const, text: JSON.stringify({ error, detail }) }], isError: true });
+const refusal = (error: string, detail: string, retryAfter?: number) => ({ content: [{ type: 'text' as const, text: JSON.stringify({ error, detail, ...(retryAfter ? { retryAfter } : {}) }) }], isError: true });
 
 /**
  * Serves one stateless MCP request for an authenticated buyer: a fresh server and transport per call, tools run the same
@@ -123,7 +123,7 @@ export async function handleMcp(req: Request, who: { env: Env; buyerId: string; 
       return tool.failed?.(reply) ? { ...result(reply), isError: true } : result(reply);
     } catch (err) {
       const known = errorBody(err);
-      if (known) return refusal(known.code, known.detail);
+      if (known) return refusal(known.code, known.detail, known.retryAfter);
       console.error(err);
       return refusal('INTERNAL_ERROR', 'unexpected failure');
     }

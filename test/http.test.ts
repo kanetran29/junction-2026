@@ -1,8 +1,9 @@
 import { env } from 'cloudflare:workers';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { insertStatements } from '../scripts/build-index';
 import type { Env } from '../src/env';
 import { createApp } from '../src/http/routes';
+import { clearValioBlock } from '../src/valio/client';
 import { sha256Hex } from '../src/util';
 import { fakeValio, product } from './quote-helpers';
 
@@ -33,6 +34,8 @@ const json = async (r: Response) => (await r.json()) as any;
 /** Resets the gateway through the admin route with the default case state (overridable) and returns the minted keys. */
 const reset = async (body: Record<string, unknown> = {}) =>
   json(await call('/admin/reset', { key: 'adm', body: { clock: '2026-11-13T21:10:00+02:00', replay: null, replayVariant: {}, mandate: { perOrder: { auto: 500, hard: 5000 }, perDay: { auto: 500, hard: 10000 }, reliabilityFloor: 0.9, approver: 'Kitchen manager' }, ...body } }));
+
+afterEach(() => clearValioBlock());
 
 beforeAll(async () => {
   await e.DB.batch(insertStatements([product('P1', { names: [{ language: 'fi', value: 'Maito' }] })]).map((s) => e.DB.prepare(s)));
@@ -279,6 +282,19 @@ describe('buyer routes', () => {
     const r = await call('/v1/interpret', { key: keys.agentKeys['hotel-a'], body: { text: 'milk' }, env: { ...e, GEMINI_API_KEY: undefined } });
     expect(r.status).toBe(503);
     expect(await json(r)).toMatchObject({ error: 'MODEL_UNAVAILABLE' });
+  });
+});
+
+describe('Valio 429', () => {
+  it('answers 503 VALIO_RATE_LIMITED with a Retry-After header and retryAfter in the body, and lists 503 on the quote route', async () => {
+    clearValioBlock();
+    const keys = await reset();
+    const limited = createApp((async () => new Response('slow', { status: 429, headers: { 'Retry-After': '7' } })) as unknown as typeof fetch);
+    const r = await limited.request('/v1/quotes', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${keys.agentKeys['hotel-a']}` }, body: JSON.stringify({ draft: { category: '10400', claims: [], quantity: { value: 5, unit: 'l' }, deliverBy: '2026-11-16' } }) }, e);
+    clearValioBlock();
+    expect(r.status).toBe(503);
+    expect(r.headers.get('Retry-After')).toBe('7');
+    expect(await json(r)).toEqual({ error: 'VALIO_RATE_LIMITED', detail: expect.any(String), retryAfter: 7 });
   });
 });
 

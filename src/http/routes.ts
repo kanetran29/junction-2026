@@ -12,6 +12,7 @@ import { InterpretError, confirmDraft, interpret } from '../interpret/gemini';
 import { OrderError, createBasket, getOrder, placeOrder } from '../orders/store';
 import { QuoteError, createQuote, getQuote, type QuoteInput } from '../quote/store';
 import { productName } from '../receipt/render';
+import { ValioRateLimited } from '../valio/client';
 import { uiRoutes, receiptText } from '../ui/approve';
 import { adminRoutes } from './admin';
 import { HttpError, authenticate, rateLimit, requireBuyer } from './auth';
@@ -40,7 +41,7 @@ const ok = <T extends z.ZodType>(schema: T) => ({
   422: json(S.ErrorBody, 'Unprocessable'),
   429: json(S.ErrorBody, 'Rate limited'),
   502: json(S.ErrorBody, 'Upstream failure'),
-  503: json(S.ErrorBody, 'Model unavailable'),
+  503: json(S.ErrorBody, 'Model unavailable, or Valio rate-limited (VALIO_RATE_LIMITED, with a Retry-After header)'),
 });
 
 /** The required JSON request body of a route, as the zod schema describes it. */
@@ -98,7 +99,8 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
 
   app.onError((err, c) => {
     const known = errorBody(err);
-    if (known) return c.json({ error: known.code, detail: known.detail }, known.status);
+    if (known?.retryAfter) c.header('Retry-After', String(known.retryAfter));
+    if (known) return c.json({ error: known.code, detail: known.detail, ...(known.retryAfter ? { retryAfter: known.retryAfter } : {}) }, known.status);
     console.error(err);
     return c.json({ error: 'INTERNAL_ERROR', detail: 'unexpected failure' }, 500);
   });
@@ -212,8 +214,9 @@ export async function searchReply(env: Env, buyerId: string, q: { category: stri
   return { products, valioCalls: 0 };
 }
 
-/** Maps a thrown error from any module onto an HTTP status, machine-readable code and message; null for a bug. */
-export function errorBody(err: unknown): { status: 400 | 401 | 403 | 404 | 409 | 415 | 422 | 429 | 502 | 503; code: string; detail: string } | null {
+/** Maps a thrown error from any module onto an HTTP status, machine-readable code and message (plus the wait in seconds for a Valio rate limit); null for a bug. */
+export function errorBody(err: unknown): { status: 400 | 401 | 403 | 404 | 409 | 415 | 422 | 429 | 502 | 503; code: string; detail: string; retryAfter?: number } | null {
+  if (err instanceof ValioRateLimited) return { status: 503, code: 'VALIO_RATE_LIMITED', detail: err.message, retryAfter: err.retryAfter };
   if (err instanceof HttpError || err instanceof OrderError || err instanceof InterpretError) return { status: err.status, code: err.code, detail: err.message };
   if (err instanceof QuoteError) {
     const status = err.code === 'DRAFT_NOT_FOUND' ? 404 : err.code === 'UPSTREAM_ERROR' ? 502 : 409;

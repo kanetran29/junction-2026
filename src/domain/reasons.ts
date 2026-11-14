@@ -38,6 +38,7 @@ export const REASONS = {
   QUOTE_EXPIRED: r('The quote has expired; request a new one.', 'recoverable', true),
   APPROVAL_EXPIRED: r('The approval was not given in time and has expired.', 'recoverable', true),
   UPSTREAM_ERROR: r('Valio did not answer correctly; try again shortly.', 'recoverable', true),
+  VALIO_RATE_LIMITED: r('Valio asked us to slow down; nothing to change, retry after the wait.', 'recoverable', true),
   TEMP_CLASS_CHANGED: r('The storage temperature class differs from the original product.', 'requires_buyer_review'),
   ALLERGEN_UNKNOWN: r('The allergen information for the product is missing, so it cannot be checked.', 'requires_buyer_review'),
   MANDATE_INVALID: r('The buyer mandate is missing or its signature does not verify.', 'requires_buyer_input'),

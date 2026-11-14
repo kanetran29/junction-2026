@@ -17,6 +17,8 @@ export interface BuyerOptions {
   /** How often and how many times a HELD order is re-read while the human decides. */
   pollMs?: number;
   pollMax?: number;
+  /** Waits out a Valio rate limit; injected so tests need no real sleep. */
+  sleep?: (ms: number) => Promise<void>;
   log?: (line: string) => void;
 }
 
@@ -155,7 +157,12 @@ export async function runBuyer(opts: BuyerOptions): Promise<Trace> {
       log(`    reason sent: ${args.agentReason ?? '(none)'}`);
     }
     log(`> ${name} ${JSON.stringify(args)}`);
-    const reply = await mcp.call(name, args);
+    let reply = await mcp.call(name, args);
+    if (reply.error === 'VALIO_RATE_LIMITED' && reply.retryAfter <= 60) {
+      log(`    Valio asked us to slow down: waiting ${reply.retryAfter} s, then retrying ${name} once`);
+      await (opts.sleep ?? ((ms) => new Promise<void>((r) => setTimeout(r, ms))))(reply.retryAfter * 1000);
+      reply = await mcp.call(name, args);
+    }
     if (name === 'interpret_request' && reply.draft) lastDraft = reply.draft;
     if (name === 'get_quote' && reply.offers) {
       const pick = chooseWithinMandate(reply.offers as (PlanOffer & Json)[], profile);
@@ -192,7 +199,7 @@ export async function runBuyer(opts: BuyerOptions): Promise<Trace> {
       body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt(profile) }] }, contents, tools: [{ functionDeclarations: declarations }], generationConfig: { temperature: 0 } }),
     });
     if (!res.ok) throw new Error(`gemini ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    const content = (await res.json()).candidates?.[0]?.content;
+    const content = ((await res.json()) as Json).candidates?.[0]?.content;
     if (!content?.parts?.length) throw new Error('gemini returned no content');
     contents.push(content);
     const calls = content.parts.filter((p: Json) => p.functionCall);

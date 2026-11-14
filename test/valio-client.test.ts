@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../src/env';
-import { fetchOffers, ValioError } from '../src/valio/client';
+import { fetchOffers, ValioError, ValioRateLimited, clearValioBlock } from '../src/valio/client';
 import { setClock } from '../src/clock';
 import fixture from './fixtures/valio-replies.json';
 
@@ -61,5 +61,64 @@ describe('fetchOffers live', () => {
     await expect(fetchOffers(e, ['T0001'], '2026-11-16', html)).rejects.toBeInstanceOf(ValioError);
     const bare = vi.fn(async () => new Response(JSON.stringify({ timeNow: 'x' }), { status: 200 })) as unknown as typeof fetch;
     await expect(fetchOffers(e, ['T0001'], '2026-11-16', bare)).rejects.toBeInstanceOf(ValioError);
+  });
+});
+
+describe('fetchOffers honours Valio 429', () => {
+  const limited = (retryAfter?: string) => vi.fn(async () => new Response('slow down', { status: 429, headers: retryAfter ? { 'Retry-After': retryAfter } : {} })) as unknown as typeof fetch;
+  beforeEach(async () => {
+    await e.DB.prepare("DELETE FROM settings WHERE key IN ('replay', 'clock')").run();
+    clearValioBlock();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-14T10:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    clearValioBlock();
+  });
+
+  it('a 429 is a ValioRateLimited with 30 s, and the next call within 30 s makes no fetch', async () => {
+    const first = limited();
+    const err = await fetchOffers(e, ['T0001'], '2026-11-16', first).catch((x) => x);
+    expect(err).toBeInstanceOf(ValioRateLimited);
+    expect(err.retryAfter).toBe(30);
+    const calls = (first as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+    vi.setSystemTime(new Date('2026-11-14T10:00:10Z'));
+    const second = fakeValio();
+    const again = await fetchOffers(e, ['T0001'], '2026-11-16', second.fn).catch((x) => x);
+    expect(again).toBeInstanceOf(ValioRateLimited);
+    expect(again.retryAfter).toBe(20);
+    expect(second.calls).toEqual([]);
+    expect(calls).toBeGreaterThan(0);
+  });
+
+  it('after 30 s it fetches again', async () => {
+    await fetchOffers(e, ['T0001'], '2026-11-16', limited()).catch(() => undefined);
+    vi.setSystemTime(new Date('2026-11-14T10:00:30Z'));
+    const v = fakeValio();
+    await fetchOffers(e, ['T0001'], '2026-11-16', v.fn);
+    expect(v.calls).toHaveLength(2);
+  });
+
+  it('a Retry-After of 5 seconds blocks 5 s, and an HTTP date is read too', async () => {
+    const err = await fetchOffers(e, ['T0001'], '2026-11-16', limited('5')).catch((x) => x);
+    expect(err.retryAfter).toBe(5);
+    vi.setSystemTime(new Date('2026-11-14T10:00:05Z'));
+    const v = fakeValio();
+    await fetchOffers(e, ['T0001'], '2026-11-16', v.fn);
+    expect(v.calls).toHaveLength(2);
+    clearValioBlock();
+    const date = new Date('2026-11-14T10:00:50Z').toUTCString();
+    const byDate = await fetchOffers(e, ['T0001'], '2026-11-16', limited(date)).catch((x) => x);
+    expect(byDate.retryAfter).toBe(45);
+  });
+
+  it('is not tied to the demo clock', async () => {
+    await setClock(e, '2020-01-01T00:00:00Z');
+    await fetchOffers(e, ['T0001'], '2026-11-16', limited()).catch(() => undefined);
+    const v = fakeValio();
+    const err = await fetchOffers(e, ['T0001'], '2026-11-16', v.fn).catch((x) => x);
+    expect(err).toBeInstanceOf(ValioRateLimited);
+    expect(v.calls).toEqual([]);
   });
 });

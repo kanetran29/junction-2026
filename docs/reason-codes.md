@@ -34,6 +34,7 @@ The same table is served live at `GET /v1/reason-codes`.
 | `QUOTE_EXPIRED` | The quote has expired; request a new one. | `recoverable` | yes |
 | `APPROVAL_EXPIRED` | The approval was not given in time and has expired. | `recoverable` | yes |
 | `UPSTREAM_ERROR` | Valio did not answer correctly; try again shortly. | `recoverable` | yes |
+| `VALIO_RATE_LIMITED` | Valio asked us to slow down; nothing to change, retry after the wait. | `recoverable` | yes |
 | `TEMP_CLASS_CHANGED` | The storage temperature class differs from the original product. | `requires_buyer_review` | no |
 | `ALLERGEN_UNKNOWN` | The allergen information for the product is missing, so it cannot be checked. | `requires_buyer_review` | no |
 | `MANDATE_INVALID` | The buyer mandate is missing or its signature does not verify. | `requires_buyer_input` | no |

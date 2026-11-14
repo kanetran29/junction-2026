@@ -8,6 +8,7 @@ import { identify } from '../http/auth';
 import { OrderError, approve, approverInbox, freeStock, getOrder, limitKey, reject, type ApproveReply, type OrderView } from '../orders/store';
 import type { Draft, OfferLine } from '../quote/build';
 import { getQuote } from '../quote/store';
+import { ValioRateLimited } from '../valio/client';
 import { lineNet } from '../domain/money';
 import { eur, productName, qty, renderReceipt } from '../receipt/render';
 
@@ -55,7 +56,7 @@ async function pageStock(env: Env, lines: OfferLine[], fetchFn: typeof fetch): P
   try {
     return await freeStock(env, lines, await now(env), fetchFn);
   } catch (err) {
-    if (err instanceof OrderError && err.status === 502) return new Map();
+    if ((err instanceof OrderError && err.status === 502) || err instanceof ValioRateLimited) return new Map();
     throw err;
   }
 }
@@ -149,10 +150,13 @@ export function uiRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }>
   const wantsJson = (accept: string | undefined) => Boolean(accept?.includes('application/json'));
 
   ui.onError((err, c) => {
-    if (!(err instanceof OrderError)) throw err;
-    const status = err.status as 400 | 401 | 403 | 404 | 409 | 422 | 502;
-    if (!c.req.header('Accept')?.includes('text/html')) return c.json({ error: err.code, detail: err.message }, status);
-    return c.html(page('Lazydoor – approval result', `<h1>${escapeHtml(err.code)}</h1><p>${escapeHtml(err.message)}</p>`), status);
+    if (!(err instanceof OrderError) && !(err instanceof ValioRateLimited)) throw err;
+    const limited = err instanceof ValioRateLimited;
+    const code = limited ? 'VALIO_RATE_LIMITED' : err.code;
+    const status = limited ? 503 : (err.status as 400 | 401 | 403 | 404 | 409 | 422 | 502);
+    if (limited) c.header('Retry-After', String(err.retryAfter));
+    if (!c.req.header('Accept')?.includes('text/html')) return c.json({ error: code, detail: err.message, ...(limited ? { retryAfter: err.retryAfter } : {}) }, status);
+    return c.html(page('Lazydoor – approval result', `<h1>${escapeHtml(code)}</h1><p>${escapeHtml(err.message)}</p>`), status);
   });
 
   ui.get('/approve/:token', async (c) => {

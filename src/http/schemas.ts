@@ -1,8 +1,8 @@
 import { z } from '@hono/zod-openapi';
 import { draftSchema } from '../quote/store';
 
-/** The `{ error, detail }` body every failed request answers with. */
-export const ErrorBody = z.object({ error: z.string(), detail: z.string() }).openapi('ErrorBody');
+/** The `{ error, detail }` body every failed request answers with; `retryAfter` (seconds) comes only with VALIO_RATE_LIMITED. */
+export const ErrorBody = z.object({ error: z.string(), detail: z.string(), retryAfter: z.number().optional() }).openapi('ErrorBody');
 
 /** The typed need (category, reference product or product list) shared by quotes, baskets and the MCP tools. */
 export const Draft = draftSchema.openapi('Draft');
