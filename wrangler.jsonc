@@ -15,7 +15,7 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "00000000000000000000000000000000",
+      "id": "21b9cce92554495198bb02c3d2cb226b",
       "localConnectionString": "postgres://postgres:lazydoor@localhost:54329/lazydoor"
     }
   ],

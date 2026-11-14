@@ -4,15 +4,7 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 
 ## Cần Kane quyết định
 
-**1. Token Cloudflare hackathon chưa có quyền Hyperdrive (cần Kane sửa token, 1 phút).**
-- Phần ghi đã chuyển sang Aiven PostgreSQL và chạy xanh trên máy (Postgres 18 trong Docker). Bản deploy cần một Hyperdrive config đứng
-  trước Aiven, nhưng API trả **403 (code 10000)** khi tạo Hyperdrive, và cả khi upload CA của Aiven.
-- Không đi đường TCP thẳng được: cert của Aiven do "Project CA" riêng ký, mà Worker không cho cài CA riêng. Đã thử: dùng CA công khai →
-  `SELF_SIGNED_CERT_IN_CHAIN`; dùng `aiven-ca.pem` → OK (PostgreSQL 18.7, có `aiven_extras`).
-- Cách sửa: dashboard → My Profile → API Tokens → sửa token hackathon, thêm **Account › Hyperdrive › Edit**. Nếu muốn Hyperdrive kiểm CA
-  của Aiven (verify-full) thì thêm **Account › SSL and Certificates › Edit**. Chỉ sửa quyền thì giá trị token giữ nguyên, `cf.env` không
-  phải đổi. Có quyền rồi thì mình tạo Hyperdrive, deploy, chạy nghiệm thu trên URL thật, rồi reset và mint judge key.
-- Hạn mức ghi D1 (mục cũ) không còn chặn gì: D1 giờ chỉ còn danh mục, chỉ đọc.
+Hiện không có gì. (Quyền Hyperdrive đã được thêm; Aiven + Gemma đã deploy, xem C3 ở cuối file.)
 
 ## Nhật ký
 
@@ -233,4 +225,20 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
   `unavailable` (đã thiết kế để không chặn đặt hàng). Muốn chắc chắn Gemma luôn đọc thì cần quota cao hơn (gắn billing cho key) hoặc
   rút gọn danh mục trong prompt của Gemma.
 - Deploy cả hai phần chờ quyền Hyperdrive (mục đầu file).
+
+### C3. Deploy Aiven + Gemma (xong)
+- Kane thêm quyền Hyperdrive cho token. Upload CA của Aiven vẫn 403 (token chưa có quyền SSL and Certificates), nên Hyperdrive dùng
+  `sslmode=require`: kết nối vẫn mã hoá, chỉ không kiểm CA riêng của Aiven.
+- Hyperdrive `lazydoor-pg` (id `21b9cce92554495198bb02c3d2cb226b`, tắt cache, tối đa 10 kết nối tới Aiven); tạo qua API bằng script
+  đọc URL từ `aiven.env` ngay trong tiến trình, không in ra, không đi qua dòng lệnh. Không cần secret mới cho Worker.
+- Deploy phiên bản **`b134f073-d863-4998-a66b-1019cbd10aa1`** ở https://lazydoor.lazydoor.workers.dev.
+- Kiểm trên URL thật:
+  - `/health`: `"store":"aiven-postgres"`; đổi `/admin/clock` rồi đọc `/health` thấy giờ mới ngay (Hyperdrive không cache).
+  - Nghiệm thu **49/49**, scenarios **11/11** (gồm hai agent tranh 6 đơn vị: một ACCEPTED, một STOCK_TAKEN, chạy trên Aiven).
+  - Gemma thật: "1,000 litres of lactose-free milk by Monday" → `crossCheck: agreed`; "40 kg of chicken breast fillet for Friday,
+    Atria only" → `needs_input`, `missing: ["deliverBy"]`, Gemini đọc 13/11, Gemma đọc 20/11. Event `draft.created` mang `crossCheck`.
+- Trạng thái demo cuối: reset với clock `2026-11-13T21:10:00+02:00`, replay `replies_2026-11-16` (`/health`: `replay: true`).
+- Judge key đã mint (vai judge, buyer hotel-b, đọc được mọi event: thử `/v1/events` → 200). Key nằm ở
+  `.data/valio/keys/judge-key.json` (gitignore, quyền 600), không in ra.
+- D1 giờ chỉ còn danh mục, chỉ đọc; hạn mức ghi D1 không còn ảnh hưởng demo.
 
