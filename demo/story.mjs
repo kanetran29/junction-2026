@@ -5,7 +5,7 @@ import { initialState, reduce } from "./model.mjs";
 import fixture from "./fixtures/story-v2.json" with { type: "json" };
 
 /** Seconds per scene: each is its narration line plus a short pause (scene 10 also holds for the delivery and receipt). */
-const SCENES = [15.6, 6.2, 16.6, 13.2, 12.8, 8, 5.2, 6.8, 13, 7, 5.6];
+const SCENES = [19.6, 6.2, 16.6, 13.2, 12.8, 8, 5.2, 6.8, 13, 7, 5.6];
 /** Second at which each scene starts. */
 const START_OF = SCENES.reduce((acc, len, i) => [...acc, Math.round((acc[i] + len) * 100) / 100], [0]);
 export const DURATION = START_OF.at(-1);
@@ -52,15 +52,25 @@ const SCRIPT = [
   [0, 9.5, ...caption("It orders 50 cases: 1,565.50 €. No one is asked.")],
   [0, 12.5, "story.naive", { step: "stuck" }],
   [0, 12.5, "story.list", RAW(true)],
-  [0, 12.5, ...caption("Closed Thu 15:00. Monday: no milk.")],
-  [0, 12.5, "story.card", card("The agent's order · never ships", ["50 cases × 31.31 € = 1,565.50 €", "Past the Thu 15:00 cut-off", "Monday: no milk in the kitchen"], { tone: "reject", link: "agent" })],
+  [0, 12.5, ...caption("The same reply also said: closed Thu 15:00.")],
+  [0, 12.5, "story.card", card("The agent's order · never ships", ["50 cases × 31.31 € = 1,565.50 €", "Past the Thu 15:00 cut-off"], { tone: "reject", link: "agent" })],
   [0, 13.2, "story.agent", { at: "home", carry: null }],
-  [0, 13.2, "story.nomilk", { on: true }],
+  // Flash-forward to Monday: no milk arrives. Then rewind to Friday, before the door goes up.
+  [0, 15, "story.warp", { to: "2026-11-16T07:00:00+02:00", dur: 0.9 }],
+  [0, 15, "story.naive", { step: "gone" }],
+  [0, 15, "story.list", {}],
+  [0, 15.5, "story.nomilk", { on: true }],
+  [0, 15.5, ...caption("Monday 07:00: no milk for breakfast.")],
+  [0, 15.5, "story.card", card("Monday 16 Nov · 07:00", ["No milk: the 50 cases never shipped", "Nobody checked, nobody approved"], { tone: "reject", link: "terminal" })],
+  [0, 17.6, "story.nomilk", { on: false }],
+  [0, 17.6, "story.card", {}],
+  [0, 17.6, "story.warp", { to: "2026-11-13T16:30:00+02:00", dur: 1.8 }],
+  [0, 18.5, ...caption("Rewind to Friday. This time, there is a door.")],
 
   // 2 · Friday evening: the door goes up and the kitchen manager's phone sends it the kitchen's signed rules.
   [1, 0, "story.reset", { truck: true, agent: true }],
-  [1, 0, "story.clock", { now: "2026-11-13T19:40:00+02:00" }],
-  [1, 0.1, ...caption("One door at Valio. Each kitchen brings its own signed rules.")],
+  [1, 0, "story.warp", { to: "2026-11-13T19:40:00+02:00", dur: 1.2 }],
+  [1, 1.9, ...caption("One door at Valio. Each kitchen brings its own signed rules.")],
   [1, 0.3, "story.gate", { built: true }],
   [1, 2.2, "story.mandates", {}],
   [1, 2.2, "story.card", card("One door, each kitchen's own rules", ["Hotel Aurora · signed by its kitchen", "Kitchen B · its own signed rules", "Kitchen C · its own signed rules"], { link: "rack" })],

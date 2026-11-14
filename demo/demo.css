@@ -63,6 +63,11 @@ body { background: radial-gradient(ellipse at 50% -10%, #0d4654 0%, #031419 62%)
 .hud-big[data-closed] { color: var(--reject); }
 .caption { position: absolute; left: 50%; bottom: 1.6cqw; transform: translateX(-50%); width: max-content; max-width: 90cqw; text-align: center; font: 600 2.25cqw/1.2 var(--sans); color: #fff; background: rgb(3 20 25 / .9); border: 1px solid #1d5e6c; padding: .6cqw 1.6cqw .7cqw; border-radius: var(--radius); text-wrap: balance; letter-spacing: -.01em; }
 .caption:empty { display: none; }
+/* Story's rewind from Monday back to Friday: a label in the sky between the ticker and the clock, the scene a little washed out. */
+.rewind { position: absolute; top: 2.2cqw; left: 50%; transform: translateX(-50%); font: 800 2.4cqw/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: #fff; background: rgb(3 20 25 / .88); border: 2px solid #5ff4ff; border-radius: var(--radius); padding: .7cqw 1.6cqw; }
+.rewind[hidden] { display: none; }
+.rewind span { color: #5ff4ff; margin-right: .4em; }
+.stage[data-rewind] #scene { filter: saturate(.45) brightness(.92); }
 .endcard { position: absolute; inset: 0; display: grid; place-content: center; gap: 2.2cqw; text-align: center; background: radial-gradient(circle at 50% 45%, rgb(13 70 84 / .96), rgb(3 20 25 / .98)); color: #fff; animation: fade .8s both; }
 .endcard[hidden] { display: none; }
 .endcard .brands { display: flex; align-items: center; justify-content: center; gap: 1.6cqw; }

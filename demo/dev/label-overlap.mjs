@@ -71,6 +71,7 @@ const collect = () => {
   html(".hud-events", "event ticker");
   html(".hud-clock", "cut-off clock");
   html("#caption", "caption");
+  html("#rewind", "rewind label");
   const s = document.querySelector(".stage").getBoundingClientRect();
   return { items, stage: { x: s.left, y: s.top, w: s.width, h: s.height } };
 };

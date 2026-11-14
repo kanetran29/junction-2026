@@ -46,7 +46,21 @@ export function initialState() {
     split: null,
     nomilk: false,
     mandates: null,
+    warp: null,
   };
+}
+
+/**
+ * The time to show at scene time t: during a story time jump (story.warp) the clock runs from the old time to the new one,
+ * forward to Monday or backward on the rewind, with an ease in and out; otherwise the state's own time.
+ */
+export function shownNow(state, t) {
+  const w = state.warp;
+  if (!w || !(t < w.since + w.dur)) return state.now;
+  const u = Math.max(0, (t - w.since) / w.dur);
+  const e = u * u * (3 - 2 * u);
+  const from = Date.parse(w.from);
+  return new Date(from + (Date.parse(w.to) - from) * e).toISOString();
 }
 
 /** Crates one accepted order puts on the dock pallet or the truck: a few per order, at least one. */
@@ -253,6 +267,11 @@ export function reduce(state, ev, t) {
       break;
     case "story.mail":
       s.mail = d.kind ? { kind: d.kind, from: d.from, to: d.to, since: t } : null;
+      break;
+    case "story.warp":
+      if (!d.to) break;
+      s.warp = { from: s.now ?? d.to, to: d.to, since: t, dur: d.dur ?? 1, back: Date.parse(d.to) < Date.parse(s.now ?? d.to) };
+      Object.assign(s, { now: d.to, clockSet: true });
       break;
     case "story.nomilk":
       s.nomilk = d.on !== false;

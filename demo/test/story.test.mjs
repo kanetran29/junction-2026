@@ -18,8 +18,8 @@ const words = () => STORY.flatMap(({ ev }) => {
   return [];
 }).join("\n");
 
-test("story: at most 1:50 so the pitch video stays under the hard 2:00 limit; sorted; seq strictly increasing", () => {
-  assert.ok(DURATION >= 100 && DURATION <= 110, `DURATION ${DURATION}`);
+test("story: at most 1:54 so the pitch video stays under the hard 2:00 limit; sorted; seq strictly increasing", () => {
+  assert.ok(DURATION >= 100 && DURATION <= 114, `DURATION ${DURATION}`);
   STORY.forEach((item, i) => i && assert.ok(item.at >= STORY[i - 1].at));
   assert.ok(STORY.at(-1).at <= DURATION);
   STORY.forEach((item, i) => i && assert.ok(item.ev.seq > STORY[i - 1].ev.seq));
@@ -151,11 +151,23 @@ test("story: every caption stays up at least 3 s and long enough to read at 17 c
 
 test("story: Kane's fixes (SCRIPT.md 16): no milk on Monday, one door for every kitchen, accepted orders ship Monday", () => {
   const all = words();
-  assert.ok(all.includes("Closed Thu 15:00. Monday: no milk."));
-  assert.equal(stateAt(14).nomilk, true);
+  assert.ok(all.includes("Monday 07:00: no milk for breakfast."));
+  assert.equal(stateAt(16).nomilk, true);
   assert.equal(stateAt(START_OF_2 + 0.01).nomilk, false);
   assert.ok(all.includes("One door at Valio. Each kitchen brings its own signed rules."));
   assert.ok(stateAt(START_OF_2 + 3).mandates, "the kitchens' signed cards go into the door's rack in scene 2");
   assert.ok(all.includes("Accepted Fri · ships Mon 16 Nov") && all.includes("Accepted Sat · ships Mon 16 Nov"));
   assert.ok(all.includes("Another hotel: same door, its own rules."));
+});
+
+test("story: scene 1 jumps to Monday 07:00 with no milk, then rewinds to Friday 16:30 before the door goes up", () => {
+  const warps = STORY.filter((item) => item.ev.type === "story.warp");
+  const built = firstAt((ev) => ev.type === "story.gate" && ev.data.built === true);
+  assert.deepEqual(warps.slice(0, 2).map((w) => w.ev.data.to), ["2026-11-16T07:00:00+02:00", "2026-11-13T16:30:00+02:00"]);
+  assert.ok(warps[1].at < built);
+  const monday = stateAt(warps[0].at + 1);
+  assert.deepEqual([monday.now, monday.truck.status, monday.truck.crates, monday.pallet.crates, monday.agent.at], ["2026-11-16T07:00:00+02:00", "parked", 0, 0, "home"]);
+  assert.equal(stateAt(warps[1].at + 0.01).warp.back, true);
+  assert.equal(stateAt(warps[1].at + warps[1].ev.data.dur).now, "2026-11-13T16:30:00+02:00");
+  assert.ok(STORY.some((item) => item.ev.type === "story.caption" && item.ev.data.text.startsWith("Rewind to Friday")));
 });

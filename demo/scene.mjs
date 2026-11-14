@@ -3,7 +3,7 @@
 // are driven from model state and scene time (no wall clock), so Story mode renders the same frames every time.
 import * as k from "./kit/iso-kit.mjs";
 import { glCamera, glLayer } from "./kit/gl.mjs";
-import { euro, countdown, dayTotal, CUTOFF } from "./model.mjs";
+import { euro, countdown, dayTotal, shownNow, CUTOFF } from "./model.mjs";
 import { ICONS } from "./icons.mjs";
 
 export const W = 1600;
@@ -887,13 +887,13 @@ ${dockFlag()}
     drawMandates(state, t, calm);
     drawRules(state, t, dt, snap, calm);
     drawPallet(state, t, calm);
-    drawClock(state.now);
+    drawClock(shownNow(state, t));
     drawDoor(state, t, calm);
     drawTruck(state, t, dt, snap, calm);
     flushBursts(t, calm);
     const typed = drawZones(state, t, calm, story, ax, ay);
     drawChef(state, t, typed, calm);
-    drawSky(state, dt, snap || calm);
+    drawSky(state, shownNow(state, t), dt, snap || calm);
   }
 
   /** The door is not there in Story scene 1; once it is built its parts lower into place one after another, the fence and sign fade in where they stand. */
@@ -1274,7 +1274,7 @@ ${dockFlag()}
    */
   function drawPallet(state, t, calm) {
     const p = state.pallet;
-    setAttr(el.palletsign, "style", state.hold && !state.truck.fromPallet ? null : "opacity:0");
+    setAttr(el.palletsign, "style", state.hold && state.gate.built && !state.truck.fromPallet ? null : "opacity:0");
     setAttr(el.dockflag, "style", state.hold && state.gate.built ? null : "opacity:0");
     setText(el.dockflagtext, state.truck.fromPallet ? "Delivery day · Mon 16 Nov" : "Next delivery Mon 16 Nov");
     const added = p.added ?? 0;
@@ -1344,7 +1344,8 @@ ${dockFlag()}
     });
     counterCrates.forEach((node, i) => {
       const on = run.accepted && i < Math.min(n, SLOTS.length) && age >= run.arrive + i * 0.16 + 0.42;
-      setAttr(node, "style", on ? null : "opacity:0");
+      // Monday without the door: the milk's place on the counter stays a pale, empty crate.
+      setAttr(node, "style", on ? null : state.nomilk && i === SLOTS.length - 1 ? "opacity:.3" : "opacity:0");
     });
     live.happy = run.accepted && age >= run.unloadDone - 0.2 && age < run.unloadDone + 3.4;
     const delivered = run.accepted && age >= run.arrive && age < run.home + 1.5;
@@ -1473,8 +1474,8 @@ ${dockFlag()}
   }
 
   /** Sky follows the clock: petrol night, a warming horizon toward the cut-off, red after an expiry. Lamps rise with it. */
-  function drawSky(state, dt, snap) {
-    const left = state.now ? (Date.parse("2026-11-15T17:00:00+02:00") - Date.parse(state.now)) / 3.6e6 : 31;
+  function drawSky(state, now, dt, snap) {
+    const left = now ? (Date.parse("2026-11-15T17:00:00+02:00") - Date.parse(now)) / 3.6e6 : 31;
     const warm = Math.pow(clamp01((30.75 - left) / 30.75), 1.2);
     live.warm = follow(live.warm, warm, dt, 0.9, snap);
     live.red = follow(live.red, state.phone.status === "expired" ? 1 : 0, dt, 0.9, snap);

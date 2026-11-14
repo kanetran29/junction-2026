@@ -1,5 +1,5 @@
 // Wires the scene to its two sources: the story timeline and the live gateway (or a recorded file).
-import { initialState, reduce, countdown } from "./model.mjs";
+import { initialState, reduce, countdown, shownNow } from "./model.mjs";
 import { STORY, DURATION, VOICE, stateAt } from "./story.mjs";
 import { connectLive, replayFile, sendRequest } from "./live.mjs";
 import { buildScene, clockText } from "./scene.mjs";
@@ -51,8 +51,8 @@ function setPlaying(on) {
 
 const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
-/** Updates the HTML overlays from state: caption, ticker, replay badge, end card. */
-function overlays(state) {
+/** Updates the HTML overlays from state at scene time t: caption, ticker, clock, rewind label, replay badge, end card. */
+function overlays(state, t = 0) {
   const caption = mode === "story" ? state.caption : state.log.at(-1) ? `${state.log.at(-1).type} · ${state.log.at(-1).text}` : "Waiting for gateway events…";
   const ending = mode === "story" && state.close;
   const shown = ending ? "" : caption;
@@ -67,15 +67,20 @@ function overlays(state) {
       return li;
     }));
   }
-  const left = countdown(state.now);
+  const clockNow = mode === "story" ? shownNow(state, t) : state.now;
+  const warp = mode === "story" && state.warp;
+  const rewinding = Boolean(warp?.back && t >= warp.since && t < warp.since + warp.dur + 0.3);
+  $("rewind").hidden = !rewinding;
+  $("stage").toggleAttribute("data-rewind", rewinding);
+  const left = countdown(clockNow);
   const big = $("hud-countdown");
   $("hud-rule").hidden = !state.gate.built;
   big.hidden = !state.gate.built;
-  const remaining = !state.now ? "-" : left === "closed" ? "Closed" : left;
+  const remaining = !clockNow ? "-" : left === "closed" ? "Closed" : left;
   if (big.textContent !== remaining) big.textContent = remaining;
   big.toggleAttribute("data-closed", left === "closed");
-  const time = state.now ? clockText(state.now).replace(/ \d+ \w+ /, " ") : "";
-  const now = !time ? "" : state.gate.built ? `Cut-off Sun 17:00 · now ${time}` : `Now ${time}`;
+  const time = clockNow ? clockText(clockNow).replace(/ \d+ \w+ /, " ") : "";
+  const now = !time ? "" : state.gate.built ? `Cut-off Sun 17:00 · now ${time}` : `Now ${clockText(clockNow)}`;
   if ($("hud-now").textContent !== now) $("hud-now").textContent = now;
   $("replay").hidden = !state.replay;
   $("endcard").hidden = !ending;
@@ -89,7 +94,7 @@ function render(dt) {
     syncVoice();
     scene.draw(story.state, story.t, dt, { snap: story.snap, calm: still.matches, story: true });
     story.snap = false;
-    overlays(story.state);
+    overlays(story.state, story.t);
     const scrub = $("scrub");
     if (document.activeElement !== scrub) scrub.value = story.t.toFixed(1);
     $("time").textContent = `${clock(story.t)} / ${clock(DURATION)}`;

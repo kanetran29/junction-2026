@@ -521,3 +521,10 @@ Giọng đọc (11 đoạn đã duyệt) và mốc `VOICE` giữ nguyên; Story 
    - Caption 0:15,7 đổi thành "One door at Valio. Each kitchen brings its own signed rules."
    - Đổi tên hai bảng: Z2 "Valio's rules · same for every buyer" (dòng dưới "Cut-off Sun 17:00 · now …"); bảng ở Z6 "Hotel Aurora's rules · signed by its kitchen".
    - Danh sách Z4 lúc khách sạn kia thua cuộc tranh hàng có thêm ghi chú "Another hotel: same door, its own rules."; tiêu đề gộp thành "470746 Chicken breast fillet 5 kg · 6 left" để thẻ vẫn nằm trên nóc thùng xe tải.
+4. **Cảnh 1 nhảy tới Thứ Hai rồi tua về Thứ Sáu**. Cảnh 1 dài thêm 4 s (15,6 → 19,6 s), Story thành **1:54** (114,0 s). Các cảnh sau và mốc bắt đầu của `VOICE` lùi đúng 4 s; 11 file giọng và thứ tự không đổi.
+   - 0:12,5: caption "The same reply also said: closed Thu 15:00."; thẻ Z3 "The agent's order · never ships".
+   - 0:15: đồng hồ chạy tới **Mon 16 Nov 07:00** trong 0,9 s, lịch lật SAT → SUN → MON 16, Z2 ghi "Now Mon 16 Nov 07:00". Xe ở bến và pallet đều trống, chef nhún vai cạnh chỗ thùng sữa trống trên quầy, lịch có dấu đỏ "NO MILK".
+   - 0:15,5: caption "Monday 07:00: no milk for breakfast."; thẻ Z3 "Monday 16 Nov · 07:00" với hai dòng "No milk: the 50 cases never shipped" và "Nobody checked, nobody approved".
+   - 0:17,6: nhãn "◀◀ Rewind" giữa trời và cảnh nhạt màu. Đồng hồ tường quay ngược, lịch lật MON → SUN → SAT → FRI 13, Z2 chạy lùi về "Fri 13 Nov 16:30" (1,8 s).
+   - 0:18,5: caption "Rewind to Friday. This time, there is a door."
+   - Cảnh 2 bắt đầu với đồng hồ chạy tới Fri 19:40. Caption "One door at Valio. Each kitchen brings its own signed rules." dời tới 1,9 s sau đầu cảnh để caption tua ngược đủ 3 s. Không thêm lời đọc.
