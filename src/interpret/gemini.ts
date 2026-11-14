@@ -158,6 +158,7 @@ function validate(raw: Raw, today: string, categories: Set<string>, claimIds: Se
     else unclear.push('brand');
   }
   if (typeof raw.packLitres === 'number' && raw.packLitres > 0) out.packLitres = raw.packLitres;
+  else if (raw.packLitres != null) unclear.push('packLitres');
   return { fields: out, unclear };
 }
 
@@ -211,7 +212,7 @@ type Fields = ReturnType<typeof validate>['fields'];
 
 /** A field's value in comparable form: claims as a set, brand names without case or order, absent as null. */
 function comparable(field: string, v: unknown): string {
-  if (field === 'claims') return JSON.stringify([...((v as string[]) ?? [])].sort());
+  if (field === 'claims') return JSON.stringify([...new Set((v as string[]) ?? [])].sort());
   if (field === 'brand' && v) {
     const b = v as NonNullable<InterpretedDraft['brand']>;
     return JSON.stringify({ rule: b.rule, names: b.names.map((n) => n.toLowerCase()).sort() });
@@ -234,9 +235,10 @@ async function save(env: Env, buyerId: string, d: InterpretedDraft, createdAt: s
 /**
  * Turns one buyer sentence into a validated draft. The model only translates; the rules in `validate` decide what stands.
  * No product type in the text gives `needs_input` listing every missing field; a missing quantity or date alongside a
- * category is `unclear` instead. Gemma reads the same text independently (same prompt and schema, in parallel): when the
- * two validated readings differ on any field, the draft is `needs_input`, those fields are left out and listed in
- * `missing` and `disagreement`, and the buyer decides; neither reading is picked. When Gemma does not answer, the draft
+ * category is `unclear` instead. Gemma reads the same text independently (same prompt and schema, in parallel; stopped
+ * when Gemini fails): when the two validated readings of a product request differ on any field, the draft is
+ * `needs_input`, those fields are left out and listed in `missing` and `disagreement` (with what each model wrote), and
+ * the buyer decides; neither reading is picked. When Gemma does not answer, the draft
  * stands as Gemini read it with `crossCheck.result = 'unavailable'`. The raw text is stored on the draft and never read
  * by policy. Appends `draft.created`.
  */
@@ -248,10 +250,14 @@ export async function interpret(
   const at = await now(env);
   const today = helsinkiIso(at).slice(0, 10);
   const ref = await lists(env);
+  const stop = new AbortController();
   const [raw, second] = await Promise.all([
-    askModel(env, env.GEMINI_MODEL, input.text, today, ref, deps.fetch),
+    askModel(env, env.GEMINI_MODEL, input.text, today, ref, deps.fetch).catch((err) => {
+      stop.abort();
+      throw err;
+    }),
     // ponytail: a Gemma outage or quota (its tokens-per-minute cap is low) leaves the draft unchecked, not refused; fail closed here if that ever matters more than uptime
-    askModel(env, env.GEMMA_MODEL, input.text, today, ref, deps.fetch, AbortSignal.timeout(SECOND_READER_MS)).catch(() => null),
+    askModel(env, env.GEMMA_MODEL, input.text, today, ref, deps.fetch, AbortSignal.any([stop.signal, AbortSignal.timeout(SECOND_READER_MS)])).catch(() => null),
   ]);
   const categories = new Set(ref.categories.map((c) => c.category));
   const claimIds = new Set(ref.claimIds);
@@ -268,14 +274,14 @@ export async function interpret(
     d.unclear = [...new Set([...modelUnclear, ...unclear, ...(fields.category ? [] : ['category']), ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy']), ...(claimWordsLost(input.text, fields.claims, claimIds) ? ['claims'] : [])])];
   }
   d.crossCheck = { model: env.GEMMA_MODEL, result: !other ? 'unavailable' : differ.length ? 'disagreed' : 'agreed' };
-  if (other && differ.length) {
+  if (second && differ.length && d.status === 'draft') {
     d.status = 'needs_input';
     d.missing = [...new Set([...d.missing, ...differ])];
     d.disagreement = differ.map((field) => ({
       field,
       readings: [
-        { model: env.GEMINI_MODEL, value: fields[field as keyof Fields] ?? null },
-        { model: env.GEMMA_MODEL, value: other[field as keyof Fields] ?? null },
+        { model: env.GEMINI_MODEL, value: raw[field as keyof Raw] ?? null },
+        { model: env.GEMMA_MODEL, value: second[field as keyof Raw] ?? null },
       ],
     }));
     for (const f of differ) delete (d as unknown as Record<string, unknown>)[f];

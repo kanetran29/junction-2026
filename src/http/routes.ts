@@ -48,8 +48,8 @@ const ok = <T extends z.ZodType>(schema: T) => ({
 /** The required JSON request body of a route, as the zod schema describes it. */
 const body = <T extends z.ZodType>(schema: T) => ({ body: { content: { 'application/json': { schema } }, required: true as const } });
 
-const interpretRoute = createRoute({ method: 'post', path: '/v1/interpret', summary: 'Turn one sentence into a typed draft need (Gemini translates, policy never reads it)', request: body(S.InterpretBody), security: SECURITY, responses: ok(S.InterpretReply) });
-const confirmRoute = createRoute({ method: 'post', path: '/v1/drafts/{id}/confirm', summary: 'Fill what is unclear and confirm a draft', request: { params: S.IdParam, ...body(S.ConfirmBody) }, security: SECURITY, responses: ok(S.ConfirmReply) });
+const interpretRoute = createRoute({ method: 'post', path: '/v1/interpret', summary: 'Turn one sentence into a typed draft need (Gemini translates, Gemma re-reads independently; a different reading is needs_input; policy never reads it)', request: body(S.InterpretBody), security: SECURITY, responses: ok(S.InterpretReply) });
+const confirmRoute = createRoute({ method: 'post', path: '/v1/drafts/{id}/confirm', summary: 'Fill what is unclear (and every field in missing after a disagreement) and confirm a draft', request: { params: S.IdParam, ...body(S.ConfirmBody) }, security: SECURITY, responses: ok(S.ConfirmReply) });
 const searchRoute = createRoute({ method: 'post', path: '/v1/search', summary: 'Find products by category and claims, from the catalogue only (no Valio call)', request: body(S.SearchBody), security: SECURITY, responses: ok(S.SearchReply) });
 const quoteRoute = createRoute({ method: 'post', path: '/v1/quotes', summary: 'Quote a need: ranked offers, rejections with reason codes, one Valio call per endpoint', request: body(S.QuoteBody), security: SECURITY, responses: ok(S.Quote) });
 const getQuoteRoute = createRoute({ method: 'get', path: '/v1/quotes/{id}', summary: "Read the buyer's own quote", request: { params: S.IdParam }, security: SECURITY, responses: ok(S.Quote) });

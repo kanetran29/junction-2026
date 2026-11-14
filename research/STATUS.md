@@ -225,5 +225,12 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 - Key không vào repo: test dùng stub; `check-secrets` vẫn chạy trước mỗi commit.
 - Kiểm chứng local: vitest **325/325**; nghiệm thu **49/49** với Gemini + Gemma thật (AC01, AC24, AC44 PASS); scenarios **11/11**.
 - Codex: không dùng, nên không ghi vào bài nộp.
-- Đang chạy: review Opus cho commit Gemma. Deploy cả hai phần chờ quyền Hyperdrive (mục đầu file).
+- Review Opus cho commit Gemma: không có lỗi nghiêm trọng hay quan trọng; 6 điểm nhỏ đã sửa (commit sau `b94bd60`): claims so như tập
+  hợp thật (bỏ trùng); điền `packLitres` sai (chuỗi, 0, âm) giờ bị giữ lại là unclear thay vì lặng lẽ bỏ; khi Gemini không thấy loại hàng
+  thì draft vẫn là `needs_input` thường, không kèm disagreement không thể giải; `readings` hiện đúng chữ mỗi model viết; Gemini lỗi thì
+  huỷ luôn lời gọi Gemma (đỡ tốn quota); mô tả OpenAPI cập nhật. Vitest **328/328**.
+- Lưu ý demo: quota Gemma ~4 lời gọi đầy đủ/phút cho cả Worker, nên khi nhiều agent cùng chạy thì `crossCheck` sẽ hay là
+  `unavailable` (đã thiết kế để không chặn đặt hàng). Muốn chắc chắn Gemma luôn đọc thì cần quota cao hơn (gắn billing cho key) hoặc
+  rút gọn danh mục trong prompt của Gemma.
+- Deploy cả hai phần chờ quyền Hyperdrive (mục đầu file).
 

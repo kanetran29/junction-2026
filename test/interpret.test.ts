@@ -164,6 +164,7 @@ describe('confirmDraft', () => {
     await expect(confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: { deliverBy: '2026-01-01' } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
     const v = await interpret(e, { buyerId: 'b1', text: 'party' }, stub({ unclear: [], needs: [] }).deps);
     await expect(confirmDraft(e, { buyerId: 'b1', draftId: v.id, fill: { needs: ['x'] } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
+    await expect(confirmDraft(e, { buyerId: 'b1', draftId: v.id, fill: { category: '10400', quantity: { value: 1, unit: 'l' }, deliverBy: '2026-11-16' } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
     await expect(confirmDraft(e, { buyerId: 'b1', draftId: 'nope', fill: {} })).rejects.toMatchObject({ code: 'DRAFT_NOT_FOUND', status: 404 });
   });
 
@@ -228,6 +229,36 @@ describe('second reader (Gemma)', () => {
     expect(diff.missing).toEqual(['claims', 'quantity']);
     expect(diff.claims).toEqual([]);
     expect(diff.quantity).toBeUndefined();
+  });
+
+  it('claims compare as a set, an invalid pack size fill stays unclear, and readings show what each model wrote', async () => {
+    expect((await interpret(e, { buyerId: 'b1', text: MILK }, stub(milk, { ...milk, claims: ['FREE_FROM_LACTOSE', 'FREE_FROM_LACTOSE'] }).deps)).crossCheck?.result).toBe('agreed');
+    const pack = await interpret(e, { buyerId: 'b1', text: MILK }, stub({ ...milk, packLitres: 10 }, { ...milk, packLitres: 1, quantity: { value: 1000, unit: 'litres' } }).deps);
+    expect(pack.missing).toEqual(['quantity', 'packLitres']);
+    expect(pack.disagreement?.[0].readings).toEqual([{ model: 'gemini-test', value: { value: 1000, unit: 'l' } }, { model: 'gemma-test', value: { value: 1000, unit: 'litres' } }]);
+    for (const packLitres of ['10', 0, -1]) {
+      await expect(confirmDraft(e, { buyerId: 'b1', draftId: pack.id, fill: { quantity: { value: 1000, unit: 'l' }, packLitres } })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
+    }
+    expect((await confirmDraft(e, { buyerId: 'b1', draftId: pack.id, fill: { quantity: { value: 1000, unit: 'l' }, packLitres: 10 } })).packLitres).toBe(10);
+  });
+
+  it('a request Gemini finds no product in stays a plain needs_input, with no disagreement to settle', async () => {
+    const d = await interpret(e, { buyerId: 'b1', text: 'party' }, stub({ unclear: [], needs: [] }, milk).deps);
+    expect(d).toMatchObject({ status: 'needs_input', missing: ['needs', 'quantity', 'deliverBy'], crossCheck: { result: 'disagreed' } });
+    expect(d.disagreement).toBeUndefined();
+  });
+
+  it('stops the Gemma call when Gemini fails', async () => {
+    let gemmaSignal: AbortSignal | undefined;
+    const fetch = (async (url: string, init: RequestInit) => {
+      if (url.includes('gemma-test')) {
+        gemmaSignal = init.signal ?? undefined;
+        return new Promise<Response>(() => {});
+      }
+      return new Response('down', { status: 500 });
+    }) as unknown as typeof globalThis.fetch;
+    await expect(interpret(e, { buyerId: 'b1', text: MILK }, { fetch })).rejects.toMatchObject({ code: 'MODEL_UNAVAILABLE' });
+    expect(gemmaSignal?.aborted).toBe(true);
   });
 
   it('reads a reply wrapped in a Markdown fence', async () => {
