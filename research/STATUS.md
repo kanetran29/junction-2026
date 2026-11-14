@@ -436,3 +436,19 @@ Kane duyệt cả 3 phần ("làm cả 3, k cần lo thời gian, làm cho tốt
   - Lần gọi thứ 4 trong một phút trả 429 kèm `Retry-After`; text 201 ký tự trả 400.
 - `proof.json` cập nhật 60/60, 11/11, 390 test trên `eec84341`; deploy lại assets thành **`bc85188d`**.
 - Commit `075f486`, `50a6c67`. Đã reset demo chuẩn.
+
+### C10. Merge bản thiết kế lại của demo (Try it, Inside, Compare) và deploy (xong, **chưa push**)
+- Đã merge demo `c13c2ae` (gồm panel Try it `b7a4398`), merge `06fe9b6`. `proof.json` tự merge sạch: giữ số đã xác nhận
+  (60/60, 11/11, 390 test, `eec84341`, 14/11) cùng trường `poster` mới. Không còn trường nào `confirmed: false`, nên chip
+  "pending final deploy" không còn hiện.
+- Số cũ "49 acceptance cases" nằm ở ba chỗ: thẻ kết của Story, footer Compare và dòng connect. Giờ cả ba đọc từ `proof.json`
+  qua `data-proof` (giá trị dự phòng 60). Không file đã publish nào còn ghi 49 hay 55.
+- `build-demo.mjs` publish thêm `try.mjs` và `try-view.mjs`. Ảnh tĩnh, logo và poster mới nằm sẵn trong `assets/`.
+  `dev/`, `test/`, `shots/`, ghi chú và `story.mp4` vẫn 404.
+- Test demo 58 pass, 0 fail; tsc sạch; check-secrets OK. Bộ test Worker không chạy lại vì chỉ đổi file demo và Docker đang tắt;
+  file đã publish được kiểm live bằng curl.
+- Commit `1d1dfbf`. Deploy **`1a601ae5-1fe0-49e9-b2c1-9fa415e808b3`**. Kiểm live:
+  - `?mode=inside`, `?mode=compare`, `?mode=live` đều 200.
+  - 4 ảnh tĩnh, 3 logo, poster, `try*.mjs` và `proof.json` đều 200. Vài giây đầu sau deploy có hai file trả 404, sau đó 200.
+  - `/v1/try` cho ra `decided` / ACCEPTED.
+- Đã reset demo chuẩn.
