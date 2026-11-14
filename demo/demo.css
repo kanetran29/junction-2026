@@ -173,15 +173,12 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .toque-fold { fill: none; stroke: #b8a888; stroke-width: 1.2px; }
 .pocket { fill: none; stroke: #b8a888; stroke-width: 1px; }
 .thumb { stroke: #f2c09a; stroke-width: 5px; stroke-linecap: round; }
-.chest { fill: #0d1a20; }
-.chest-led { fill: var(--auto); }
-.chest-bar { fill: #ffcc33; }
 .visor { fill: #0d1a20; }
 .eye-lit { fill: #6ff7ff; }
 .antenna { fill: var(--hold); stroke: #fff; stroke-width: 1px; }
 .card-face { fill: #fffaf0; }
-.card-line { fill: #8aa3ab; }
 .card-stamp { fill: none; }
+.card-flap { fill: none; stroke: #8aa3ab; stroke-width: .8px; stroke-linejoin: round; }
 .card[data-carry="rejected"] .card-face { fill: var(--reject); }
 .card[data-carry="receipt"] .card-face { fill: var(--auto); }
 .card[data-carry="question"] .card-face { fill: var(--hold); }

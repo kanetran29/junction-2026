@@ -9,7 +9,7 @@ Story mới theo `demo/SCRIPT.md` (Kane duyệt "như đề xuất"), có giọn
 - Dài **1:48,8** (108,8 s), 9 cảnh: 0:00 yêu cầu · 0:07 không có door · 0:23,8 tua lại, dựng cổng · 0:28,8 cùng câu qua Lazydoor · 0:45,8 giữ chờ duyệt, duyệt, giao hàng · 1:02,8 guardrail (AC13, AC30, AC29) · 1:16,3 ngoại lệ (AC17, AC31, AC20) · 1:31,3 giỏ hàng AC36 và "Which Friday?" · 1:41,8 màn kết.
 - Giọng: Gemini TTS, giọng Charon (`voice.js` của skill hackathon-pitch), 9 đoạn `demo/assets/voice/01–09.mp3` (95,8 s lời). Mỗi đoạn bắt đầu 0,3 s sau đầu cảnh; cảnh = độ dài đoạn + nghỉ (cảnh 5 giữ thêm cho xe giao hàng). Story phát đúng đoạn theo thời gian, tua vẫn khớp.
 - Chữ chỉ ở các vùng của mục 3: Z1 sự kiện, Z2 đồng hồ, Z3 thẻ trên trời phía bếp (chữ chef gõ, yêu cầu có kiểu, phiếu báo giá, hộp duyệt của Kitchen manager, thẻ case; đường mảnh nối tới robot hoặc màn hình), Z4 danh sách trên trời phía phải (reply thô, hàng bị từ chối; đường mảnh nối tới kệ), Z5 con dấu, Z6 biên nhận, Z7 phụ đề. Không còn nhãn nổi, bong bóng hay chip trong cảnh.
-- Robot hút bụi to hơn (khoảng 1,6 lần), đỗ khít trên dock sạc liền với chân màn hình bếp; đèn dock xanh khi robot đỗ, tắt khi đi vắng. Cổng quyết định xong là robot về dock, không chờ xe.
+- Agent là robot đưa thư nhỏ (bốn bánh, thân san hô, đầu vàng có màn hình mặt hai mắt, ăng-ten có đèn, phong thư trong túi trước ngực), cỡ vừa dock; đỗ khít trên dock sạc liền chân màn hình bếp, đèn dock xanh khi đỗ, tắt khi đi vắng. Cổng quyết định xong là robot về dock, không chờ xe.
 - Điện thoại dọc: lớp phủ "Rotate for the full scene" che sân khấu và giữ Story lại; xoay ngang thì tự bỏ, hoặc bấm "Watch anyway".
 - Số và chữ theo mục 12–13: câu chef "…in 10-litre boxes if you can.", 7 offer / 28 bị từ chối (20 CUTOFF_PASSED), "+18 more", "Stock unknown: Valio does not stock this product", "CO₂e 1,100 kg (product-group average)", biên nhận "Net 1,010.00 € · Gross 1,146.35 € · Approved by Kitchen manager · Accepted (simulated)", "gluten (AW)" thay "wheat".
 
@@ -175,6 +175,11 @@ Vấn đề tìm thấy:
 - Robot phóng 1,6 lần, chạy nhanh hơn (tối đa 190 đơn vị/giây) cho montage; dock sạc liền đế màn hình với đèn.
 - `main.mjs`: phát giọng theo đồng hồ Story (không phát khi `?manual=1` để quay), nút tắt/bật tiếng nhớ lựa chọn, lớp phủ xoay ngang. `index.html`: màn kết mới.
 - Test Story viết lại theo kịch bản mới (độ dài, giọng nằm trong cảnh, thứ tự cảnh, số đã kiểm trên door, không còn "wheat"/"unlimited"/"Only 384 left"/"2 rejected", phụ đề đủ thời gian đọc).
+
+### 20. Agent là robot đưa thư (Kane: "nhìn giống robot hút bụi quá")
+- Thay robot hút bụi bằng robot đưa thư nhỏ: khung gầm trên bốn bánh, thân san hô có đường ghép và khe thông gió, cổ, đầu vàng có màn hình mặt tối với hai mắt sáng, ăng-ten có đèn tín hiệu; phong thư (màu theo thứ nó mang: nháp, báo giá, biên nhận, bị từ chối, câu hỏi) nằm trong túi trước ngực, thư bay vào khe cổng từ đó.
+- Giữ bề ngang cũ để vừa dock; cao tới đỉnh ăng-ten khoảng 34 đơn vị, thấp hơn đáy màn hình bếp nên khi đỗ không che màn hình (bản cao hơn bị test overlap bắt). Đèn dock dời ra mép trước tấm dock, thấy được khi robot đỗ.
+- Hành vi, timeline Story và giọng đọc không đổi. `label overlaps: 0`, 37 test pass.
 
 ## Còn lại / cần làm sau
 - Quay `demo/story.mp4` khi Kane duyệt Story mới (ghép giọng từ `VOICE`).
