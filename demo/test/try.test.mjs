@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { viewOf, postTry, EXAMPLES, dayLabel } from "../try.mjs";
+import { viewOf, postTry, EXAMPLES, dayLabel, CACHED_NOTE, questionFor } from "../try.mjs";
 
 const SERVER = fileURLToPath(new URL("../dev/fake-gateway.mjs", import.meta.url));
 const PORT = 8795;
@@ -12,6 +12,9 @@ test("try: each step of the door's reply renders as the panel shows it", () => {
   const q = viewOf(ok({ step: "needs_input", question: { field: "deliverBy", readings: [{ model: "gemini-3.8-flash", value: "2026-11-13" }, { model: "gemma-4-31b-it", value: "2026-11-20" }] } }));
   assert.equal(q.kind, "question");
   assert.equal(q.lines[0], "Gemini read Fri 13 Nov, Gemma read Fri 20 Nov. The door asks, never guesses.");
+  const when = viewOf(ok({ step: "needs_input", draft: { id: "d-beans" }, question: { field: "deliverBy", readings: [] } }));
+  assert.deepEqual([when.kind, when.title, when.choices, when.draftId], ["question", "When should it arrive?", [], "d-beans"]);
+  assert.deepEqual(["quantity", "category", "needs", "brand", "somethingNew"].map(questionFor), ["How much?", "Which product?", "Which product?", "Which brand?", "One more detail: somethingNew?"]);
   assert.deepEqual(q.choices.map((c) => [c.label, c.value]), [["Fri 13 Nov", "2026-11-13"], ["Fri 20 Nov", "2026-11-20"]]);
 
   const none = viewOf(ok({ step: "no_offer", quote: { rejections: [{ code: "NEW_ALLERGEN" }, { code: "NOT_ORDERABLE" }, { code: "NEW_ALLERGEN" }] } }), { NEW_ALLERGEN: "The substitute adds an allergen." });
@@ -35,11 +38,20 @@ test("try: each step of the door's reply renders as the panel shows it", () => {
   assert.match(viewOf(ok({ order: { state: "REJECTED", reasons: [{ code: "PRICE_CHANGED" }] } })).lines[0], /^PRICE_CHANGED/);
 });
 
-test("try: errors read plainly; 429 says when to try again, 404 hides the panel", async () => {
-  assert.equal(viewOf({ status: 429, body: { error: "TRY_RATE_LIMITED", retryAfter: 12 }, retryAfter: 12 }).title, "Busy: try again in 12 s");
+test("try: errors read plainly; 429 counts down, models busy points at the examples, 404 hides the panel", async () => {
+  const limited = viewOf({ status: 429, body: { error: "TRY_RATE_LIMITED", retryAfter: 12 }, retryAfter: 12 });
+  assert.deepEqual([limited.title, limited.wait], ["Busy: try again in 12 s", 12]);
+  assert.equal(viewOf({ status: 429, body: { error: "TRY_RATE_LIMITED" }, retryAfter: null }).wait, 30);
+  const full = viewOf({ status: 429, body: { error: "TRY_SANDBOXES_FULL", retryAfter: 60 }, retryAfter: 60 });
+  assert.deepEqual([full.title, full.wait], ["Too many visitors right now, try again in a minute.", undefined]);
+  const models = viewOf({ status: 503, body: { error: "MODELS_BUSY", retryAfter: 20 }, retryAfter: 20 });
+  assert.deepEqual([models.title, models.examples, models.wait], ["The models are busy right now. Try one of the examples, they work instantly.", true, undefined]);
+  for (const status of [0, 502, 503]) assert.equal(viewOf({ status, body: null, retryAfter: null }).title, "The door did not answer. Try again.");
   assert.equal(viewOf({ status: 400, body: null, retryAfter: null }).title, "Type a request of 1 to 200 characters.");
-  assert.equal(viewOf({ status: 404, body: null, retryAfter: null }).kind, "hide");
-  assert.equal(viewOf({ status: 0, body: null, retryAfter: null }).kind, "error");
+  assert.equal(viewOf({ status: 404, body: { error: "TRY_DISABLED" }, retryAfter: null }).kind, "hide");
+  assert.equal(viewOf(ok({ draft: { id: "d1", cached: true }, step: "decided", order: { state: "ACCEPTED", netCents: 15400, reasons: [] } })).cached, true);
+  assert.equal(viewOf(ok({ draft: { id: "d1" }, step: "decided", order: { state: "ACCEPTED", netCents: 15400, reasons: [] } })).cached, undefined);
+  assert.equal(CACHED_NOTE, "Example: readings recorded from Gemini and Gemma");
   const busy = await postTry("http://door", "/v1/try", { text: "x" }, async () => new Response(JSON.stringify({ error: "TRY_RATE_LIMITED" }), { status: 429, headers: { "Retry-After": "7" } }));
   assert.deepEqual([busy.status, busy.retryAfter], [429, 7]);
   assert.equal((await postTry("http://door", "/v1/try", {}, async () => { throw new TypeError("Failed to fetch"); })).status, 0);

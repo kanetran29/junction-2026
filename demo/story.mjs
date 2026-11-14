@@ -103,7 +103,7 @@ const SCRIPT = [
   [2, 6.8, ...gw("valio.called")],
   [2, 7, ...gw("valio.called")],
   [2, 9.6, ...gw("quote.created")],
-  [2, 9.7, "story.list", { product: "463038", rows: [{ text: "✕ 463038 Valio 10 l box · CUTOFF_PASSED", tone: "reject" }, { text: "✕ 464179 Arla 10 l box · CUTOFF_PASSED", tone: "reject" }, { text: "+18 more closed for Monday", tone: "dim" }], note: "The order cut-off for this product has passed for the requested delivery." }],
+  [2, 9.7, "story.list", { title: "20 candidates not offered", product: "463038", rows: [{ text: "✕ 463038 Valio 10 l box · CUTOFF_PASSED", tone: "dim" }, { text: "✕ 464179 Arla 10 l box · CUTOFF_PASSED", tone: "dim" }, { text: "+18 more closed for Monday", tone: "dim" }] }],
   [2, 9.7, ...caption("20 are past their cut-off. Each refusal has a reason code.")],
   [2, 13.1, "story.card", card("Best offer · quote", ["464306 Valio Eila 1 l", "1,000 × 1.01 € = 1,010.00 €", "Fixed for 30 min · reliability 1", "CO₂e 1,100 kg (product-group average)", "Stock unknown: Valio does not stock this product"], { link: "agent" })],
   [2, 13.2, ...caption("Best offer: 1 l cartons, 1,010.00 €, fixed for 30 minutes.")],
