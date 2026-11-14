@@ -1,11 +1,11 @@
 import type { Context } from 'hono';
 import type { Env } from '../env';
-import { listEvents, type Event } from '../events/log';
+import { recentEvents, type Event } from '../events/log';
 import { HttpError, identify, keylessDemo } from './auth';
 
 type Ctx = Context<{ Bindings: Env }>;
 
-const POLL_MS = 1000;
+const POLL_MS = 2000;
 const PING_MS = 15_000;
 const CLOSE_MS = 60_000;
 
@@ -26,15 +26,15 @@ async function scope(c: Ctx): Promise<{ since: number; buyerId?: string }> {
   return { since, buyerId: who.role === 'agent' ? (who.buyerId ?? undefined) : asked };
 }
 
-/** `GET /v1/events`: one page of events (at most 500) and `next`, the last seq returned or `since` when none. */
+/** `GET /v1/events`: one page of events (at most 500) and `next`, the last seq returned or `since` when none (from the shared tail). */
 export async function readEvents(c: Ctx): Promise<{ events: Event[]; next: number }> {
   const q = await scope(c);
-  const events = await listEvents(c.env, q);
+  const events = await recentEvents(c.env, q);
   return { events, next: events.length ? events[events.length - 1].seq : q.since };
 }
 
 /**
- * `GET /v1/events/stream`: Server-Sent Events built on a ReadableStream that polls `listEvents` (Hyperdrive pools in transaction mode, so no LISTEN/NOTIFY push).
+ * `GET /v1/events/stream`: Server-Sent Events built on a ReadableStream that reads the shared event tail (`recentEvents`) every 2 s (Hyperdrive pools in transaction mode, so no LISTEN/NOTIFY push).
  * Sends `: ping` every 15 s and closes after about 60 s; the client resumes with `since` or `Last-Event-ID`.
  */
 export async function streamEvents(c: Ctx): Promise<Response> {
@@ -48,7 +48,7 @@ export async function streamEvents(c: Ctx): Promise<Response> {
       let lastWrite = started;
       try {
         while (open && Date.now() - started < CLOSE_MS) {
-          for (const e of await listEvents(c.env, { since, buyerId: q.buyerId })) {
+          for (const e of await recentEvents(c.env, { since, buyerId: q.buyerId })) {
             ctl.enqueue(enc.encode(`id: ${e.seq}\nevent: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`));
             since = e.seq;
             lastWrite = Date.now();

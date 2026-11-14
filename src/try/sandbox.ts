@@ -4,23 +4,28 @@ import { DEFAULT_MANDATE_EXP, SANDBOX_BUYER_PREFIX } from '../domain/constants';
 import { REASONS, type ReasonCode } from '../domain/reasons';
 import type { Env } from '../env';
 import { HttpError, countUse, identify } from '../http/auth';
-import { confirmDraft, interpret, type InterpretedDraft } from '../interpret/gemini';
+import { InterpretError, confirmDraft, interpret, type InterpretedDraft, type Readings } from '../interpret/gemini';
 import { seedMandate } from '../mandate/jws';
 import { approve, getOrder, placeOrder, reject, type OrderView } from '../orders/store';
 import type { Offer, Rejection } from '../quote/build';
 import { createQuote } from '../quote/store';
 import { b64u, sha256Hex } from '../util';
+import { RECORDED } from './recorded';
 
-/** Calls a minute from one client address (both Try it routes count). */
-export const TRY_PER_ADDRESS_PER_MINUTE = 3;
-/** `/v1/try` calls a minute from all visitors together: each one may call Gemini and Gemma, whose quota is small. */
-export const TRY_ALL_PER_MINUTE = 12;
-/** Sandbox kitchens open at once; `/admin/reset` ends them all. */
-export const MAX_SANDBOXES = 50;
-/** Open sandbox kitchens one client address may hold. */
-export const SANDBOXES_PER_ADDRESS = 3;
-/** A sandbox nobody used for this long is freed when a new one opens. */
-export const SANDBOX_IDLE_MS = 30 * 60_000;
+/** Calls a minute with one visitor token (both Try it routes count): the per-person limit, so a venue behind one address works. */
+export const TRY_PER_VISITOR_PER_MINUTE = 3;
+/** Calls a minute from one client address: a loose flood guard, since a whole venue may share one public address. */
+export const TRY_PER_ADDRESS_PER_MINUTE = 60;
+/** Free-text tries a minute for everyone: each asks Gemini and Gemma (the example sentences are recorded and ask neither). */
+export const TRY_FREE_TEXT_PER_MINUTE = 6;
+/** `/v1/try` calls a minute for everyone that do real work (database, Valio replay, signing). */
+export const TRY_ALL_PER_MINUTE = 240;
+/** Sandbox kitchens kept at once; past it the least recently used is recycled, so no new visitor is turned away. */
+export const MAX_SANDBOXES = 500;
+/** Sandbox kitchens one client address keeps; past it that address's least recently used one is recycled. */
+export const SANDBOXES_PER_ADDRESS = 200;
+/** A sandbox nobody used for this long is removed, with its orders, quotes and drafts, when a new one opens. */
+export const SANDBOX_IDLE_MS = 20 * 60_000;
 /** The approver every sandbox mandate names: the visitor is the kitchen manager of their own sandbox. */
 export const TRY_APPROVER = 'You (kitchen manager)';
 /** The reason the door gives on every Try it order, as an agent would. */
@@ -69,66 +74,51 @@ export function addressBucket(ip: string): string {
   return `${groups.slice(0, 4).map((g) => parseInt(g || '0', 16).toString(16)).join(':')}::/64`;
 }
 
-/** Counts one call from a client address: 3 a minute, else 429 TRY_RATE_LIMITED with the seconds to wait. */
-async function limitAddress(env: Env, address: string): Promise<void> {
-  if ((await countUse(env, `try-address:${addressBucket(address)}`)) > TRY_PER_ADDRESS_PER_MINUTE) {
-    throw new HttpError(429, 'TRY_RATE_LIMITED', `at most ${TRY_PER_ADDRESS_PER_MINUTE} Try it calls a minute from one address`, untilNextMinute());
-  }
+/** Counts one call in a rate bucket and refuses it with 429 TRY_RATE_LIMITED (and the seconds to the next minute) past `max`. */
+async function limit(env: Env, bucket: string, max: number, detail: string): Promise<void> {
+  if ((await countUse(env, bucket)) > max) throw new HttpError(429, 'TRY_RATE_LIMITED', detail, untilNextMinute());
 }
 
-/** Counts one call that is about to ask the models against all visitors: 12 a minute, else 429 TRY_RATE_LIMITED. */
-async function limitShared(env: Env): Promise<void> {
-  if ((await countUse(env, 'try-all')) > TRY_ALL_PER_MINUTE) {
-    throw new HttpError(429, 'TRY_RATE_LIMITED', `Try it is busy: at most ${TRY_ALL_PER_MINUTE} calls a minute for all visitors together`, untilNextMinute());
-  }
-}
+/** The flood guard for a client address: 60 calls a minute. */
+const limitAddress = (env: Env, address: string) => limit(env, `try-address:${addressBucket(address)}`, TRY_PER_ADDRESS_PER_MINUTE, `at most ${TRY_PER_ADDRESS_PER_MINUTE} Try it calls a minute from one address`);
+/** The per-person limit, keyed on the visitor token: 3 calls a minute. */
+const limitVisitor = (env: Env, visitor: string) => limit(env, `try-visitor:${visitor}`, TRY_PER_VISITOR_PER_MINUTE, `at most ${TRY_PER_VISITOR_PER_MINUTE} Try it calls a minute for this visitor`);
 
-/** Removes a sandbox kitchen: its visitor row, signed mandate and buyer key (orders and events stay). */
+/** The tables a sandbox's buyer id appears in, children first (events stay: removing them would break the hash chain). */
+const SANDBOX_TABLES = ['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'mandates', 'buyer_keys', 'try_visitors'];
+
+/** Removes a sandbox kitchen and everything it ordered, quoted and drafted (its events stay in the chain). */
 async function closeSandbox(env: Env, buyerId: string): Promise<void> {
   const s = db(env);
-  await s.batch(['try_visitors', 'mandates', 'buyer_keys'].map((t) => s.prepare(`DELETE FROM ${t} WHERE buyer_id = ?`).bind(buyerId)));
+  await s.batch(SANDBOX_TABLES.map((t) => s.prepare(`DELETE FROM ${t} WHERE buyer_id = ?`).bind(buyerId)));
 }
 
 /**
  * Opens a sandbox kitchen: a random `visitor-<8 hex>` buyer with the sandbox mandate (seeded first, so a reset racing this
  * leaves a sandbox that can order nothing), and a visitor token of 24 random bytes of which only the sha256 is stored. In one
- * batch under the write lock it frees sandboxes idle for 30 minutes, then inserts only while fewer than 50 are open and the
- * client address holds fewer than 3; a refused open removes its mandate again and is 429 TRY_SANDBOXES_FULL.
+ * batch under the write lock it first makes room, removing with all their rows the sandboxes idle for 20 minutes, then the
+ * least recently used ones past 500 in all or past 200 for this address, so a new visitor is never turned away.
  */
 async function openSandbox(env: Env, address: string): Promise<{ visitor: string; buyerId: string }> {
   const visitor = b64u(crypto.getRandomValues(new Uint8Array(24)));
   const buyerId = `${SANDBOX_BUYER_PREFIX}${[...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
   const addressHash = await sha256Hex(`try-address:${addressBucket(address)}`);
-  const idle = Date.now() - SANDBOX_IDLE_MS;
   await seedMandate(env, buyerId, SANDBOX_MANDATE);
+  const oldest = (where: string, keep: number) =>
+    `SELECT buyer_id FROM (SELECT buyer_id FROM try_visitors ${where} ORDER BY COALESCE(last_used, 0), buyer_id LIMIT GREATEST(0, (SELECT COUNT(*) FROM try_visitors ${where}) - ${keep - 1})) x`;
+  const victims = `SELECT buyer_id FROM try_visitors WHERE COALESCE(last_used, 0) < ?1::bigint UNION ${oldest('', MAX_SANDBOXES)} UNION ${oldest('WHERE address_hash = ?2::text', SANDBOXES_PER_ADDRESS)}`;
   const s = db(env);
-  const stale = 'SELECT buyer_id FROM try_visitors WHERE COALESCE(last_used, 0) < ?1::bigint';
-  const [, , , ins, mine] = await s.batch([
-    s.prepare(`DELETE FROM mandates WHERE buyer_id IN (${stale})`).bind(idle),
-    s.prepare(`DELETE FROM buyer_keys WHERE buyer_id IN (${stale})`).bind(idle),
-    s.prepare('DELETE FROM try_visitors WHERE COALESCE(last_used, 0) < ?1::bigint').bind(idle),
-    s.prepare(
-      `INSERT INTO try_visitors(token_hash, buyer_id, address_hash, created_at, last_used) SELECT ?1::text, ?2::text, ?3::text, ?4::text, ?5::bigint
-       WHERE (SELECT COUNT(*) FROM try_visitors) < ${MAX_SANDBOXES} AND (SELECT COUNT(*) FROM try_visitors WHERE address_hash = ?3::text) < ${SANDBOXES_PER_ADDRESS}`,
-    ).bind(await sha256Hex(visitor), buyerId, addressHash, helsinkiIso(await now(env)), Date.now()),
-    s.prepare('SELECT COUNT(*) AS n FROM try_visitors WHERE address_hash = ?1::text').bind(addressHash),
+  await s.batch([
+    ...SANDBOX_TABLES.map((t) => s.prepare(`DELETE FROM ${t} WHERE buyer_id IN (${victims})`).bind(Date.now() - SANDBOX_IDLE_MS, addressHash)),
+    s.prepare('INSERT INTO try_visitors(token_hash, buyer_id, address_hash, created_at, last_used) VALUES (?1::text, ?2::text, ?3::text, ?4::text, ?5::bigint)').bind(await sha256Hex(visitor), buyerId, addressHash, helsinkiIso(await now(env)), Date.now()),
   ]);
-  if (!ins.meta.changes) {
-    await closeSandbox(env, buyerId);
-    const perAddress = (mine.results[0] as { n: number }).n >= SANDBOXES_PER_ADDRESS;
-    throw new HttpError(
-      429,
-      'TRY_SANDBOXES_FULL',
-      perAddress ? `this address already holds ${SANDBOXES_PER_ADDRESS} open sandbox kitchens: keep using your visitor token` : `all ${MAX_SANDBOXES} sandbox kitchens are in use; one frees after ${SANDBOX_IDLE_MS / 60_000} idle minutes or at the next demo reset`,
-    );
-  }
   return { visitor, buyerId };
 }
 
-/** The sandbox buyer of a visitor token (and marks it used now); an unknown one (ended by a reset or idle) is 404 VISITOR_UNKNOWN. */
+/** The sandbox buyer of a visitor token (and marks it used now); an unknown one (a reset, 20 idle minutes, or recycled) is 404 VISITOR_UNKNOWN. */
 async function sandboxOf(env: Env, visitor: string): Promise<string> {
   const row = await db(env).prepare('UPDATE try_visitors SET last_used = ?2::bigint WHERE token_hash = ?1 RETURNING buyer_id').bind(await sha256Hex(visitor), Date.now()).first<{ buyer_id: string }>();
-  if (!row) throw new HttpError(404, 'VISITOR_UNKNOWN', 'no such visitor: sandboxes end at a demo reset or after 30 idle minutes, so start again without one');
+  if (!row) throw new HttpError(404, 'VISITOR_UNKNOWN', 'no such visitor: sandboxes end at a demo reset, after 20 idle minutes or when recycled, so start again without one');
   return row.buyer_id;
 }
 
@@ -148,7 +138,8 @@ function reasonsOf(v: OrderView): ShownReason[] {
 
 /**
  * Runs one Try it step for a visitor, server-side, the way the reference agent orders but with no model choosing anything:
- * opens a sandbox on the first call; interprets the text (Gemini, with Gemma's independent reading) or loads the draft the
+ * opens a sandbox on the first call; reads the text (an example sentence from its recorded readings, any other text with
+ * Gemini and Gemma; MODELS_BUSY with retryAfter when Gemini is over quota) or loads the draft the
  * visitor is answering; fills the agent's profile default (fat level "any") and the answer; stops with `needs_input` and a
  * question while any field is still open; otherwise confirms, quotes and places offer 0 (the cheapest covering offer) with
  * its JWS and a fresh idempotency key. A HELD order comes back with its approval token, because the visitor is the approver
@@ -156,21 +147,29 @@ function reasonsOf(v: OrderView): ShownReason[] {
  */
 export async function tryIt(env: Env, req: TryRequest, address: string, fetchFn: typeof fetch): Promise<TryReply> {
   await limitAddress(env, address);
+  if (req.visitor) await limitVisitor(env, req.visitor);
   const known = req.visitor ? await sandboxOf(env, req.visitor) : null;
-  if (!req.draftId) await limitShared(env);
+  await limit(env, 'try-all', TRY_ALL_PER_MINUTE, `Try it is busy: at most ${TRY_ALL_PER_MINUTE} calls a minute for everyone`);
+  const recorded = req.draftId ? undefined : RECORDED[req.text!];
+  if (!req.draftId && !recorded) {
+    await limit(env, 'try-free-text', TRY_FREE_TEXT_PER_MINUTE, `the models are shared: at most ${TRY_FREE_TEXT_PER_MINUTE} free-text tries a minute for everyone; pick one of the example sentences, they need no model call`);
+  }
   const { visitor, buyerId } = req.visitor && known ? { visitor: req.visitor, buyerId: known } : await openSandbox(env, address);
   try {
-    return await step(env, req, visitor, buyerId, fetchFn);
+    return await step(env, req, visitor, buyerId, fetchFn, recorded);
   } catch (err) {
     // the visitor never got the token of a sandbox whose first call failed, so free its slot
     if (!known) await closeSandbox(env, buyerId);
+    if (err instanceof InterpretError && err.code === 'MODELS_BUSY') {
+      throw new HttpError(503, 'MODELS_BUSY', `${err.message}: try again in ${err.retryAfter} s, or pick one of the example sentences (they need no model call)`, err.retryAfter);
+    }
     throw err;
   }
 }
 
-/** The steps of `tryIt` after the sandbox is known: interpret or load the draft, ask, confirm, quote, place. */
-async function step(env: Env, req: TryRequest, visitor: string, buyerId: string, fetchFn: typeof fetch): Promise<TryReply> {
-  const draft = req.draftId ? await storedDraft(env, buyerId, req.draftId) : await interpret(env, { buyerId, text: req.text! }, { fetch: fetchFn });
+/** The steps of `tryIt` after the sandbox is known: interpret (or use the recorded readings) or load the draft, ask, confirm, quote, place. */
+async function step(env: Env, req: TryRequest, visitor: string, buyerId: string, fetchFn: typeof fetch, recorded?: Readings): Promise<TryReply> {
+  const draft = req.draftId ? await storedDraft(env, buyerId, req.draftId) : await interpret(env, { buyerId, text: req.text! }, { fetch: fetchFn, recorded });
   const fill: Record<string, unknown> = { ...(draft.unclear.includes('fatLevel') ? { fatLevel: 'any' } : {}), ...(req.answer ? { [req.answer.field]: req.answer.value } : {}) };
   const open = [...new Set([...(draft.status === 'needs_input' ? draft.missing : []), ...draft.unclear])].filter((f) => !Object.hasOwn(fill, f));
   if (open.length) {
@@ -203,6 +202,7 @@ export async function tryDecision(
   const who = await identify(env, ctx.authorization);
   if (who?.role === 'agent' || who?.role === 'judge') throw new HttpError(403, 'AGENT_CANNOT_APPROVE', 'an agent key can never approve or reject an order');
   await limitAddress(env, ctx.address);
+  await limitVisitor(env, req.visitor);
   const buyerId = await sandboxOf(env, req.visitor);
   const row = await db(env).prepare('SELECT id FROM orders WHERE approval_token = ? AND buyer_id = ?').bind(req.token, buyerId).first<{ id: string }>();
   if (!row) throw new HttpError(404, 'TOKEN_UNKNOWN', 'no order of this sandbox kitchen has this approval token');

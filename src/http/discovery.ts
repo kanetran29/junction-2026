@@ -39,7 +39,7 @@ export function discovery(origin: string, demo: boolean) {
             decision: `${origin}/v1/try/decision`,
             demoOnly: true,
             auth: 'none',
-            note: "POST; a visitor orders as the chef of a sandbox kitchen (its own stock world) and approves its held orders as that kitchen's manager; 3 calls a minute per address, 12 for all visitors, 50 sandboxes, 3 per address",
+            note: "POST; a visitor orders as the chef of a sandbox kitchen (its own stock world) and approves its held orders as that kitchen's manager; example sentences use recorded readings; 3 calls a minute per visitor, 60 per address, 6 free-text tries a minute for everyone",
           },
         }
       : {}),

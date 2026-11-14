@@ -10,9 +10,11 @@ import { db } from '../db';
 /** A buyer-facing failure: MODEL_UNAVAILABLE (503), DRAFT_NOT_FOUND (404), DRAFT_UNCLEAR or DRAFT_ALREADY_CONFIRMED (409). */
 export class InterpretError extends Error {
   constructor(
-    public code: 'MODEL_UNAVAILABLE' | 'DRAFT_NOT_FOUND' | 'DRAFT_UNCLEAR' | 'DRAFT_ALREADY_CONFIRMED',
+    public code: 'MODEL_UNAVAILABLE' | 'MODELS_BUSY' | 'DRAFT_NOT_FOUND' | 'DRAFT_UNCLEAR' | 'DRAFT_ALREADY_CONFIRMED',
     public status: 503 | 404 | 409,
     message: string,
+    /** Seconds to wait, for MODELS_BUSY (from Gemini's RetryInfo when it gives one). */
+    public retryAfter?: number,
   ) {
     super(message);
     this.name = 'InterpretError';
@@ -39,12 +41,21 @@ export interface InterpretedDraft {
   needs: string[];
   /** The second, independent reading: whether Gemma read the text the same way (`unavailable` when it did not answer). */
   crossCheck?: { model: string; result: 'agreed' | 'disagreed' | 'unavailable' };
+  /** Set when both readings were recorded earlier for this exact text (Try it's example sentences) instead of asked now. */
+  cached?: true;
   /** Set when the readings differ: per field, what each model read. The field itself is left out for the buyer to fill. */
   disagreement?: { field: string; readings: { model: string; value: unknown }[] }[];
 }
 
 /** The model's raw answer: every field optional and possibly null, nothing trusted until `validate` has run. */
-interface Raw {
+/** Both models' raw readings of one sentence: Gemini's, and Gemma's (null when Gemma did not answer). */
+export interface Readings {
+  gemini: Raw;
+  gemma: Raw | null;
+}
+
+/** One model's raw reading of a sentence, before the rules in `validate` decide what stands. */
+export interface Raw {
   category?: string | null;
   subtype?: string | null;
   claims?: string[] | null;
@@ -196,6 +207,10 @@ async function askModel(env: Env, model: string, text: string, today: string, re
         generationConfig: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA, temperature: 0 },
       }),
     });
+    if (res.status === 429) {
+      const delay = /"retryDelay":\s*"(\d+)s"/.exec(await res.text().catch(() => ''));
+      throw new InterpretError('MODELS_BUSY', 503, `${model} is over its request quota for now`, Math.min(120, Math.max(1, Number(delay?.[1] ?? 30))));
+    }
     if (!res.ok) throw new Error(`model ${res.status}`);
     const j = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
     const parsed = jsonObject(j.candidates![0].content!.parts!.filter((x) => !x.thought).map((x) => x.text ?? '').join(''));
@@ -233,32 +248,44 @@ async function save(env: Env, buyerId: string, d: InterpretedDraft, createdAt: s
 }
 
 /**
+ * Asks Gemini and Gemma for their raw readings of one sentence, in parallel with the same prompt and schema. Gemma is
+ * stopped when Gemini fails and given 20 s; its failure gives `gemma: null`. A Gemini failure throws (MODELS_BUSY when it is
+ * over quota). Also used to record readings for Try it's example sentences.
+ */
+export async function readTwice(env: Env, text: string, today: string, fetchFn: typeof fetch): Promise<Readings> {
+  const ref = await lists(env);
+  const stop = new AbortController();
+  const [gemini, gemma] = await Promise.all([
+    askModel(env, env.GEMINI_MODEL, text, today, ref, fetchFn).catch((err) => {
+      stop.abort();
+      throw err;
+    }),
+    // ponytail: a Gemma outage or quota (its tokens-per-minute cap is low) leaves the draft unchecked, not refused; fail closed here if that ever matters more than uptime
+    askModel(env, env.GEMMA_MODEL, text, today, ref, fetchFn, AbortSignal.any([stop.signal, AbortSignal.timeout(SECOND_READER_MS)])).catch(() => null),
+  ]);
+  return { gemini, gemma };
+}
+
+/**
  * Turns one buyer sentence into a validated draft. The model only translates; the rules in `validate` decide what stands.
  * No product type in the text gives `needs_input` listing every missing field; a missing quantity or date alongside a
  * category is `unclear` instead. Gemma reads the same text independently (same prompt and schema, in parallel; stopped
  * when Gemini fails): when the two validated readings of a product request differ on any field, the draft is
  * `needs_input`, those fields are left out and listed in `missing` and `disagreement` (with what each model wrote), and
  * the buyer decides; neither reading is picked. When Gemma does not answer, the draft
- * stands as Gemini read it with `crossCheck.result = 'unavailable'`. The raw text is stored on the draft and never read
+ * stands as Gemini read it with `crossCheck.result = 'unavailable'`. With `deps.recorded` (readings recorded earlier for
+ * this exact text) no model is asked and the draft is marked `cached`. The raw text is stored on the draft and never read
  * by policy. Appends `draft.created`.
  */
 export async function interpret(
   env: Env,
   input: { buyerId: string; text: string },
-  deps: { fetch: typeof fetch } = { fetch },
+  deps: { fetch: typeof fetch; recorded?: Readings } = { fetch },
 ): Promise<InterpretedDraft> {
   const at = await now(env);
   const today = helsinkiIso(at).slice(0, 10);
   const ref = await lists(env);
-  const stop = new AbortController();
-  const [raw, second] = await Promise.all([
-    askModel(env, env.GEMINI_MODEL, input.text, today, ref, deps.fetch).catch((err) => {
-      stop.abort();
-      throw err;
-    }),
-    // ponytail: a Gemma outage or quota (its tokens-per-minute cap is low) leaves the draft unchecked, not refused; fail closed here if that ever matters more than uptime
-    askModel(env, env.GEMMA_MODEL, input.text, today, ref, deps.fetch, AbortSignal.any([stop.signal, AbortSignal.timeout(SECOND_READER_MS)])).catch(() => null),
-  ]);
+  const { gemini: raw, gemma: second } = deps.recorded ?? (await readTwice(env, input.text, today, deps.fetch));
   const categories = new Set(ref.categories.map((c) => c.category));
   const claimIds = new Set(ref.claimIds);
   const { fields, unclear } = validate(raw, today, categories, claimIds);
@@ -274,6 +301,7 @@ export async function interpret(
     d.unclear = [...new Set([...modelUnclear, ...unclear, ...(fields.category ? [] : ['category']), ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy']), ...(claimWordsLost(input.text, fields.claims, claimIds) ? ['claims'] : [])])];
   }
   d.crossCheck = { model: env.GEMMA_MODEL, result: !other ? 'unavailable' : differ.length ? 'disagreed' : 'agreed' };
+  if (deps.recorded) d.cached = true;
   if (second && differ.length && d.status === 'draft') {
     d.status = 'needs_input';
     d.missing = [...new Set([...d.missing, ...differ])];
@@ -288,7 +316,7 @@ export async function interpret(
     d.claims ??= [];
   }
   await save(env, input.buyerId, d, helsinkiIso(at));
-  await logEvent(env, { type: 'draft.created', buyerId: input.buyerId, draftId: d.id, data: { text: d.text, category: d.category ?? null, claims: d.claims, quantity: d.quantity ?? null, unclear: d.unclear, crossCheck: { ...d.crossCheck, fields: differ } } });
+  await logEvent(env, { type: 'draft.created', buyerId: input.buyerId, draftId: d.id, data: { text: d.text, category: d.category ?? null, claims: d.claims, quantity: d.quantity ?? null, unclear: d.unclear, crossCheck: { ...d.crossCheck, fields: differ }, ...(d.cached ? { cached: true } : {}) } });
   return d;
 }
 

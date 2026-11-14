@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { setClock } from '../src/clock';
 import { db } from '../src/db';
 import type { Env } from '../src/env';
-import { GENESIS, listEvents, logEvent, verifyChain, type Event } from '../src/events/log';
+import { GENESIS, TAIL_MS, listEvents, logEvent, recentEvents, verifyChain, type Event } from '../src/events/log';
 import { createApp } from '../src/http/routes';
 import { AUD, verifyJws } from '../src/sign/door';
 import { canonicalJson, sha256Hex } from '../src/util';
@@ -87,6 +87,34 @@ describe('hash-chained event log', () => {
 
   it('is valid and empty with no events (head is the genesis)', async () => {
     expect(await verifyChain(e)).toEqual({ count: 0, firstSeq: null, headSeq: null, headHash: GENESIS, valid: true });
+  });
+});
+
+describe('the shared tail of recent events (one per isolate, so many Live viewers cost few database reads)', () => {
+  beforeEach(async () => {
+    await db(e).prepare('DELETE FROM events').run();
+    await setClock(e, '2026-11-13T19:10:00Z');
+  });
+
+  it('never keeps events a reset wiped', async () => {
+    for (let i = 0; i < 3; i++) await logEvent(e, { type: 'draft.confirmed', buyerId: 'hotel-a', data: { i } });
+    expect(((await (await call('/v1/events')).json()) as { events: Event[] }).events).toHaveLength(3);
+    expect((await call('/admin/reset', { key: 'adm', body: { clock: '2026-11-13T21:10:00+02:00' } })).status).toBe(200);
+    expect(((await (await call('/v1/events')).json()) as { events: Event[] }).events.map((x) => x.type)).toEqual(['clock.set']);
+  });
+
+  it('answers reads between refreshes from the tail, and refreshes within TAIL_MS', async () => {
+    for (let i = 0; i < 2; i++) await logEvent(e, { type: 'draft.confirmed', buyerId: 'hotel-a', data: { i } });
+    expect(((await (await call('/v1/events')).json()) as { events: Event[] }).events).toHaveLength(2);
+    await db(e).prepare('DELETE FROM events').run();
+    expect(((await (await call('/v1/events')).json()) as { events: Event[] }).events).toHaveLength(2);
+    await new Promise((r) => setTimeout(r, TAIL_MS + 100));
+    expect(((await (await call('/v1/events')).json()) as { events: Event[] }).events).toEqual([]);
+  });
+
+  it('still reads the database for a reader further back than the tail', async () => {
+    const first = await logEvent(e, { type: 'draft.confirmed', buyerId: 'hotel-a', data: {} });
+    expect(await recentEvents(e, { since: first - 1 })).toHaveLength(1);
   });
 });
 

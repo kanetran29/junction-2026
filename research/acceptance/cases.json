@@ -1407,6 +1407,27 @@
         {"call": "try_raw", "input": {"text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}, "expect": [["httpStatus", "=", 400], ["error", "=", "INVALID_REQUEST"]]},
         {"call": "try_raw", "input": {"text": "   "}, "expect": [["httpStatus", "=", 400]]}
       ]
+    },
+    {
+      "id": "AC61",
+      "tier": 1,
+      "title": "Try it: an example sentence is served from recorded Gemini and Gemma readings, with no model call",
+      "rubric": ["openness 15", "e2e 30"],
+      "steps": [
+        {"call": "try", "input": {"text": "40 kg of chicken breast fillet for Friday, Atria only"}, "expect": [["step", "=", "needs_input"], ["draft.cached", "=", true], ["question.field", "=", "deliverBy"], ["question.readings", "count=", 2]]}
+      ]
+    },
+    {
+      "id": "AC62",
+      "tier": 1,
+      "title": "Try it can be switched off at once with the admin key, and on again",
+      "rubric": ["controls 20"],
+      "steps": [
+        {"call": "admin_try", "input": {"enabled": false}, "expect": [["tryIt", "=", false]]},
+        {"call": "try_raw", "input": {"text": "1,000 litres of lactose-free milk by Monday"}, "expect": [["httpStatus", "=", 404]]},
+        {"call": "admin_try", "input": {"enabled": true}, "expect": [["tryIt", "=", true]]},
+        {"call": "try", "input": {"text": "1,000 litres of lactose-free milk by Monday"}, "expect": [["step", "=", "decided"], ["draft.cached", "=", true], ["order.state", "=", "HELD"]]}
+      ]
     }
   ],
   "decisions": {
@@ -1419,6 +1440,7 @@
     "New steps: approve_as_agent (calls approve with the agent key), quote_basket, place_basket ({offers:[i,...]} picks offer i of need i; null skips a need), resolve, list_families, set_replay_variant, place_order_without_key, place_order_same_key_other_body.",
     "`as` on a step sets the buyer whose agent key is used (default hotel-a). `given.priorAccepted` seeds accepted order lines before the steps.",
     "Signing and audit steps (AC50-AC55): verify_offer_jws ({offer:i}) and verify_receipt_jws check a door JWS with only /.well-known/jwks.json; place_order_with_jws ({offer:i, tamper?:\"price\"}) sends the offer JWS back, optionally with a changed price; audit_verify checks /v1/audit/verify and its signed head; all_events reads every buyer's events with the admin key; tamper_and_verify calls /admin/tamper then verify; reset_and_verify resets with the case state and verifies the fresh chain.",
+    "AC61-AC62: admin_try ({enabled}) switches Try it with the admin key; an example sentence comes from recorded readings (draft.cached).",
     "Try it steps (AC56-AC60): try ({text} for a new request with the case's visitor, or {answer}); try_other_visitor opens a second sandbox; try_raw posts the body as given; try_decision ({decision, visitor?: \"other\"}) uses the first visitor's approval token; try_decision_as_agent sends the agent key. All Try it calls are keyless; each case resets, which clears the Try it rate counters.",
     "A case whose steps call `interpret` needs a live model: when GET /health reports models.gemini = false, the runner marks it BLOCKED_ON_GEMINI instead of running it."
   ]

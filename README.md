@@ -91,20 +91,28 @@ Gemma), confirm with the agent's profile default, quote, place the cheapest cove
   approval path, re-check included (`APPROVAL_EXPIRED`, `STOCK_TAKEN`, `PRICE_CHANGED` still apply), and answers
   `{ order: { orderId, state, reasons } }`. Only a token of the visitor's own sandbox works: any other is 404 `TOKEN_UNKNOWN`.
   An agent or judge key is 403 `AGENT_CANNOT_APPROVE`.
-- **Limits.**
-  - 3 calls a minute per client address, counting both routes. An IPv6 address counts by its /64.
-  - 12 calls a minute for all visitors together. Only calls that are about to ask the models count here: a new request,
-    not an answer and not a decision.
-  - Over either limit is 429 `TRY_RATE_LIMITED` with `retryAfter`.
-  - At most 50 open sandboxes, and at most 3 per address, else 429 `TRY_SANDBOXES_FULL`. A sandbox idle for 30 minutes is
-    freed when a new one opens.
-  - A first call that fails frees its sandbox again.
-  - Bodies over 4 KB get 413.
-  - A stale `visitor` is 404 `VISITOR_UNKNOWN`. `/admin/reset` ends every sandbox.
+- **Limits** (sized for a venue where everyone shares one public address):
+  - 3 calls a minute per visitor token (both routes).
+  - 60 calls a minute per client address, as a flood guard. An IPv6 address counts by its /64.
+  - 6 free-text tries a minute for everyone, because each asks Gemini and Gemma. The page's 4 example sentences are served
+    from recorded readings (`src/try/recorded.ts`, recorded with `scripts/record-readings.ts`), marked `cached: true` on the
+    draft and the event, and ask no model.
+  - 240 calls a minute for everyone. Over any limit is 429 `TRY_RATE_LIMITED` with `retryAfter`.
+  - When Gemini is over its quota, a free-text try gets 503 `MODELS_BUSY` with `retryAfter` and a pointer to the examples.
+  - No new visitor is turned away for space. A sandbox idle for 20 minutes is removed with its orders, quotes and drafts
+    (its events stay in the chain). Past 500 sandboxes, or 200 from one address, the least recently used one is recycled.
+    A removed visitor gets 404 `VISITOR_UNKNOWN` and starts again.
+  - A first call that fails frees its sandbox again. Bodies over 4 KB get 413.
   - Each new `text` is a new order: a retried text call orders again.
+- **Switching it off.** `node scripts/demo-admin.mjs try-off` (admin key) makes both routes 404 at once, so the page hides
+  the panel. `try-on` brings it back, and `node scripts/demo-admin.mjs reset` (the standard state for the next round)
+  switches it on too.
 - **Own stock world.** Sandbox orders count only against other sandbox orders. A visitor can never take the stock that the
   real buyers' quotes and orders are checked against, but visitors do compete with each other.
 - **Events.** Every step logs events under the sandbox's buyer id, so Live shows them.
+- **Many viewers.** Event reads and streams share one tail of recent events per Worker isolate. It is refreshed at most every
+  1.5 s, and at once after a write in that isolate. Streams read it every 2 s, so a hundred Live viewers cost a few database
+  reads a second, not a hundred.
 
 ## Quick start
 

@@ -271,6 +271,7 @@ const handlers: Record<string, Handler> = {
   },
   try_other_visitor: async (ctx, step) => (ctx.otherTry = await http('/v1/try', { body: { text: step.input.text } })),
   try_raw: (_ctx, step) => http('/v1/try', { body: step.input }),
+  admin_try: (_ctx, step) => admin('/admin/try', step.input),
   try_decision: (ctx, step) => {
     const visitor = step.input.visitor === 'other' ? ctx.otherTry?.visitor : ctx.tryReply?.visitor;
     return http('/v1/try/decision', { body: { visitor, token: ctx.tryReply?.approval?.token, decision: step.input.decision } });

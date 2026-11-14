@@ -20,6 +20,7 @@ const ResetBody = z.object({
   mandate: z.object({ perOrder: euros, perDay: euros, reliabilityFloor: z.number().min(0).max(1), approver: z.string().min(1), reliabilityUnknown: z.enum(['allow', 'approve']).optional() }).partial().nullish(),
   mandateTampered: z.boolean().nullish(),
   mandateExp: z.string().nullish(),
+  tryIt: z.boolean().nullish(),
   priorAcceptedNetCents: z.number().int().nonnegative().nullish(),
   priorAccepted: z.array(z.object({ buyer: z.string(), productId: z.string(), salesUnits: z.number().positive() })).nullish(),
 });
@@ -91,6 +92,7 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
     await setSetting(env, 'replay', b.replay ? '1' : null);
     await setSetting(env, 'recording', b.replay ?? null);
     await setSetting(env, 'variants', JSON.stringify(b.replayVariant ?? {}));
+    await setSetting(env, 'try_off', b.tryIt === false ? '1' : null);
 
     const m = b.mandate ?? {};
     const overrides = {
@@ -134,6 +136,14 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
       .first<{ id: number }>();
     if (!row) throw new HttpError(404, 'EVENT_NOT_FOUND', 'no such event');
     return c.json({ tampered: row.id });
+  });
+
+  /** Switches Try it on or off at once (off: both Try it routes answer 404, so the demo page hides the panel); a reset switches it on. */
+  admin.post('/admin/try', async (c) => {
+    const parsed = z.object({ enabled: z.boolean() }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) throw parsed.error;
+    await setSetting(c.env, 'try_off', parsed.data.enabled ? null : '1');
+    return c.json({ tryIt: parsed.data.enabled });
   });
 
   /**

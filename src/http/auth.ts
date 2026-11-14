@@ -14,7 +14,7 @@ export interface Caller {
 /** A refusal that maps straight onto a status and the `{ error, detail }` body (plus `retryAfter` seconds when given). */
 export class HttpError extends Error {
   constructor(
-    readonly status: 400 | 401 | 403 | 404 | 429,
+    readonly status: 400 | 401 | 403 | 404 | 429 | 503,
     readonly code: string,
     message: string,
     readonly retryAfter?: number,

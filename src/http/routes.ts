@@ -6,7 +6,7 @@ import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
 import { listFamilies, resolve } from '../catalog/open';
 import { searchProducts } from '../catalog/search';
-import { helsinkiIso, now, replayOn } from '../clock';
+import { getSetting, helsinkiIso, now, replayOn } from '../clock';
 import type { Env } from '../env';
 import { decisionRegister, reasonCodes } from '../domain/rules';
 import { logEvent, verifyChain } from '../events/log';
@@ -88,9 +88,9 @@ const auditRoute = createRoute({ method: 'get', path: '/v1/audit/verify', summar
 const tryRoute = createRoute({
   method: 'post',
   path: '/v1/try',
-  summary: 'Demo door only, no key: order as the chef of your own sandbox kitchen (interpret, confirm, quote, place offer 0); a HELD order comes with its approval token, because you are its kitchen manager. 3 calls a minute per address, 12 for all visitors, 50 sandboxes',
+  summary: 'Demo door only, no key: order as the chef of your own sandbox kitchen (interpret, confirm, quote, place offer 0); a HELD order comes with its approval token, because you are its kitchen manager. The example sentences use recorded readings (no model call). 3 calls a minute per visitor, 60 per address, 6 free-text tries a minute for everyone',
   request: body(S.TryBody),
-  responses: { 200: json(S.TryReply, 'OK'), 400: json(S.ErrorBody, 'Invalid request'), 404: json(S.ErrorBody, 'Not a demo door, or an unknown visitor or draft'), 409: json(S.ErrorBody, 'The draft is already confirmed or still unclear'), 429: json(S.ErrorBody, 'TRY_RATE_LIMITED (with retryAfter) or TRY_SANDBOXES_FULL'), 502: json(S.ErrorBody, 'Upstream failure'), 503: json(S.ErrorBody, 'Model unavailable or Valio rate-limited') },
+  responses: { 200: json(S.TryReply, 'OK'), 400: json(S.ErrorBody, 'Invalid request'), 404: json(S.ErrorBody, 'Not a demo door, Try it switched off, or an unknown visitor or draft'), 409: json(S.ErrorBody, 'The draft is already confirmed or still unclear'), 413: json(S.ErrorBody, 'Body over 4 KB'), 429: json(S.ErrorBody, 'TRY_RATE_LIMITED, with retryAfter'), 502: json(S.ErrorBody, 'Upstream failure'), 503: json(S.ErrorBody, 'MODELS_BUSY (Gemini over quota, with retryAfter; the example sentences still work), model unavailable, or Valio rate-limited') },
 });
 const tryDecisionRoute = createRoute({
   method: 'post',
@@ -137,9 +137,9 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   const eventsCors = cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'], allowHeaders: ['Authorization', 'Last-Event-ID'] });
   app.use('/v1/events', eventsCors);
   app.use('/v1/events/stream', eventsCors);
-  /** Try it exists only on a demo door: elsewhere it is 404 before any validation, like the admin routes. */
+  /** Try it exists only on a demo door, and only while not switched off (`/admin/try`): else 404 before any validation. */
   const demoOnly: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
-    if (c.env.DEMO_MODE !== '1') throw new HttpError(404, 'NOT_FOUND', 'no such route');
+    if (c.env.DEMO_MODE !== '1' || (await getSetting(c.env, 'try_off')) === '1') throw new HttpError(404, 'NOT_FOUND', 'no such route');
     await next();
   };
   const tryCors = cors({ origin: '*', allowMethods: ['POST', 'OPTIONS'], allowHeaders: ['Content-Type'] });
@@ -299,7 +299,7 @@ export async function searchReply(env: Env, buyerId: string, q: { category: stri
 /** Maps a thrown error from any module onto an HTTP status, machine-readable code and message (plus the wait in seconds for a Valio rate limit); null for a bug. */
 export function errorBody(err: unknown): { status: 400 | 401 | 403 | 404 | 409 | 415 | 422 | 429 | 502 | 503; code: string; detail: string; retryAfter?: number } | null {
   if (err instanceof ValioRateLimited) return { status: 503, code: 'VALIO_RATE_LIMITED', detail: err.message, retryAfter: err.retryAfter };
-  if (err instanceof HttpError && err.retryAfter) return { status: err.status, code: err.code, detail: err.message, retryAfter: err.retryAfter };
+  if ((err instanceof HttpError || err instanceof InterpretError) && err.retryAfter) return { status: err.status, code: err.code, detail: err.message, retryAfter: err.retryAfter };
   if (err instanceof HttpError || err instanceof OrderError || err instanceof InterpretError) return { status: err.status, code: err.code, detail: err.message };
   if (err instanceof QuoteError) {
     const status = err.code === 'DRAFT_NOT_FOUND' ? 404 : err.code === 'UPSTREAM_ERROR' ? 502 : 409;

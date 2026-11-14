@@ -85,7 +85,65 @@ export async function logEvent(env: Env, e: NewEvent): Promise<number> {
       .bind(event.seq, event.orderId ?? null, event.buyerId, event.draftId ?? null, event.quoteId ?? null, event.type, JSON.stringify(event.data), ts, prevHash, await chainHash(prevHash, event))
       .run();
     return event.seq;
+  }).finally(() => {
+    tail.at = 0;
   });
+}
+
+/** How long the shared tail answers reads before the next read refreshes it. */
+export const TAIL_MS = 1500;
+/** Events the shared tail keeps; a reader further back reads the database. */
+const TAIL_MAX = 2000;
+
+/**
+ * The recent events of every buyer, shared by all requests in this isolate: it holds every event with seq above `base`,
+ * up to `head`. Plain data only, so requests share it without sharing any I/O.
+ */
+const tail = { loaded: false, refreshing: false, at: 0, base: 0, head: 0, events: [] as Event[] };
+
+/**
+ * Brings the shared tail up to date with two reads: the log's bounds (an empty log or a lower top seq means a reset or a
+ * restart, so the tail starts again; events below the lowest seq were wiped and are dropped), then every event above `head`.
+ */
+async function refreshTail(env: Env): Promise<void> {
+  tail.refreshing = true;
+  try {
+    const b = await db(env).prepare('SELECT MIN(id) AS floor, MAX(id) AS top FROM events').first<{ floor: number | null; top: number | null }>();
+    if (b?.floor == null || b.top! < tail.head) Object.assign(tail, { base: 0, head: 0, events: [] });
+    else if (tail.events.length && tail.events[0].seq < b.floor) tail.events = tail.events.filter((e) => e.seq >= b.floor!);
+    for (;;) {
+      const page = await listEvents(env, { since: tail.head, limit: 500 });
+      tail.events.push(...page);
+      if (page.length) tail.head = page[page.length - 1].seq;
+      if (page.length < 500) break;
+    }
+    if (tail.events.length > TAIL_MAX) {
+      const cut = tail.events.length - TAIL_MAX;
+      tail.base = tail.events[cut - 1].seq;
+      tail.events = tail.events.slice(cut);
+    }
+    tail.loaded = true;
+    tail.at = Date.now();
+  } finally {
+    tail.refreshing = false;
+  }
+}
+
+/**
+ * Events after `since` (optionally one buyer's), oldest first, at most `limit`, as the event routes serve them. Read from the
+ * shared tail, refreshed at most every TAIL_MS (and at once after an event is written in this isolate), so a hundred Live
+ * viewers cost a few database reads a second instead of one each. While another request refreshes, the slightly older tail
+ * answers; before the first load, or for a reader further back than the tail, the database answers.
+ */
+export async function recentEvents(env: Env, q: { since: number; buyerId?: string; limit?: number }): Promise<Event[]> {
+  if (!tail.refreshing && Date.now() - tail.at >= TAIL_MS) await refreshTail(env);
+  if (!tail.loaded || q.since < tail.base) return listEvents(env, q);
+  const out: Event[] = [];
+  for (const e of tail.events) {
+    if (e.seq > q.since && (!q.buyerId || e.buyerId === q.buyerId)) out.push(e);
+    if (out.length >= (q.limit ?? 500)) break;
+  }
+  return out;
 }
 
 /** Events with seq greater than `since` (optionally one buyer's), oldest first, at most `limit` (default 500), with their hashes. */

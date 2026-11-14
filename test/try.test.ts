@@ -11,6 +11,7 @@ import { sha256Hex } from '../src/util';
 import { clearValioBlock } from '../src/valio/client';
 import { fakeValio, product } from './quote-helpers';
 import { addressBucket } from '../src/try/sandbox';
+import { RECORDED } from '../src/try/recorded';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'vk', ADMIN_KEY: 'adm', GEMINI_API_KEY: 'gk', GEMINI_MODEL: 'gemini-test', GEMMA_MODEL: 'gemma-test' };
 const valio = fakeValio({ P1: { price: 3, stock: 5000 } }).fn;
@@ -21,13 +22,16 @@ let gemma: Record<string, unknown> | undefined;
 const draftFor = (litres: number) => ({ category: '10400', claims: ['FREE_FROM_LACTOSE'], quantity: { value: litres, unit: 'l' }, deliverBy: '2026-11-16', unclear: [], needs: ['lactose-free milk'] });
 let modelCalls = 0;
 let geminiDown = false;
+/** Gemini answers 429 with a RetryInfo of 17 s (its over-quota reply). */
+let geminiOverQuota = false;
 
 /** Gemini and Gemma answer from the variables above; everything else goes to the fake Valio. */
 const upstream = (async (url: string | URL | Request, init?: RequestInit) => {
   const u = String(url);
   if (!u.includes('generativelanguage')) return valio(url, init);
   modelCalls++;
-  if (geminiDown) return new Response('quota', { status: 429 });
+  if (geminiDown) return new Response('down', { status: 500 });
+  if (geminiOverQuota) return new Response(JSON.stringify({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', details: [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '17s' }] } }), { status: 429 });
   const body = u.includes('gemma-test') && gemma ? gemma : gemini;
   return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(body) }] } }] }));
 }) as typeof fetch;
@@ -38,6 +42,8 @@ const json = async (r: Response) => (await r.json()) as any;
 const post = (path: string, body: unknown, o: { ip?: string; key?: string; env?: Env } = {}) =>
   app.request(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': o.ip ?? '198.51.100.1', ...(o.key ? { Authorization: `Bearer ${o.key}` } : {}) }, body: JSON.stringify(body) }, o.env ?? e);
 const tryIt = (body: unknown, o: { ip?: string } = {}) => post('/v1/try', body, o);
+/** The first example sentence of the page; its readings are recorded, so it needs no model call. */
+const RECORDED_TEXT = '1,000 litres of lactose-free milk by Monday';
 const decide = (body: unknown, o: { ip?: string; key?: string } = {}) => post('/v1/try/decision', body, o);
 
 /** A fresh demo door: everything wiped (sandboxes and rate counters too), clock Friday 21:10. */
@@ -58,6 +64,7 @@ beforeEach(async () => {
   gemma = undefined;
   modelCalls = 0;
   geminiDown = false;
+  geminiOverQuota = false;
 });
 
 describe('POST /v1/try (demo door only, no key)', () => {
@@ -124,27 +131,94 @@ describe('POST /v1/try (demo door only, no key)', () => {
     expect((await tryIt({ visitor: 'v', draftId: 'd', answer: { field: 'deliverBy', value: 'Friday' } })).status).toBe(400);
   });
 
-  it('limits each client address to 3 calls a minute and all visitors to 12', async () => {
-    for (let i = 0; i < 3; i++) expect((await tryIt({ text: 'milk' }, { ip: '203.0.113.1' })).status).toBe(200);
-    const limited = await tryIt({ text: 'milk' }, { ip: '203.0.113.1' });
+  it('limits each visitor to 3 calls a minute, so a whole venue behind one address still gets in', async () => {
+    const first = await json(await tryIt({ text: 'milk' }, { ip: '203.0.113.1' }));
+    for (let i = 0; i < 3; i++) expect((await tryIt({ visitor: first.visitor, text: 'milk' }, { ip: '203.0.113.1' })).status).toBe(200);
+    const limited = await tryIt({ visitor: first.visitor, text: 'milk' }, { ip: '203.0.113.1' });
     expect(limited.status).toBe(429);
     expect(Number(limited.headers.get('Retry-After'))).toBeGreaterThan(0);
-    expect(await json(limited)).toMatchObject({ error: 'TRY_RATE_LIMITED', retryAfter: expect.any(Number) });
-    for (let i = 2; i <= 10; i++) expect((await tryIt({ text: 'milk' }, { ip: `203.0.113.${i}` })).status, `ip ${i}`).toBe(200);
-    const busy = await tryIt({ text: 'milk' }, { ip: '203.0.113.11' });
-    expect(busy.status).toBe(429);
-    expect(await json(busy)).toMatchObject({ error: 'TRY_RATE_LIMITED', detail: expect.stringContaining('all visitors') });
+    expect(await json(limited)).toMatchObject({ error: 'TRY_RATE_LIMITED', detail: expect.stringContaining('this visitor'), retryAfter: expect.any(Number) });
+    expect((await tryIt({ text: RECORDED_TEXT }, { ip: '203.0.113.1' })).status).toBe(200);
   });
 
-  it('opens at most 50 sandboxes; reset ends them all', async () => {
-    for (let i = 0; i < 50; i++) await db(e).prepare('INSERT INTO try_visitors(token_hash, buyer_id, address_hash, created_at, last_used) VALUES (?, ?, ?, ?, ?)').bind(`h${i}`, `visitor-${String(i).padStart(8, '0')}`, `a${i}`, 'x', Date.now()).run();
-    const full = await tryIt({ text: 'milk' });
-    expect(full.status).toBe(429);
-    expect(await json(full)).toMatchObject({ error: 'TRY_SANDBOXES_FULL' });
-    expect(await db(e).prepare("SELECT COUNT(*) AS n FROM mandates WHERE buyer_id LIKE 'visitor-%'").first()).toEqual({ n: 0 });
+  it('guards against floods: 60 calls a minute from one address', async () => {
+    for (let i = 0; i < 60; i++) expect((await tryIt({ visitor: `stale-${i}`, text: 'milk' }, { ip: '203.0.113.2' })).status, `call ${i}`).toBe(404);
+    expect(await json(await tryIt({ visitor: 'stale-x', text: 'milk' }, { ip: '203.0.113.2' }))).toMatchObject({ error: 'TRY_RATE_LIMITED', detail: expect.stringContaining('one address') });
+  });
+
+  it('limits free text (which calls the models) to 6 a minute for everyone, and points to the examples', async () => {
+    for (let i = 0; i < 6; i++) expect((await tryIt({ text: 'milk' }, { ip: `203.0.113.${10 + i}` })).status, `free ${i}`).toBe(200);
+    const busy = await tryIt({ text: 'milk' }, { ip: '203.0.113.30' });
+    expect(busy.status).toBe(429);
+    expect(await json(busy)).toMatchObject({ error: 'TRY_RATE_LIMITED', detail: expect.stringContaining('example') });
+    expect((await tryIt({ text: RECORDED_TEXT }, { ip: '203.0.113.31' })).status).toBe(200);
+  });
+
+  it('never turns a new visitor away for space: past 500 sandboxes the least recently used one is recycled', async () => {
+    const t = Date.now();
+    await db(e).prepare("INSERT INTO try_visitors(token_hash, buyer_id, address_hash, created_at, last_used) SELECT 'h' || g, 'visitor-' || lpad(g::text, 8, '0'), 'a' || g, 'x', ?1::bigint + g FROM generate_series(1, 500) g").bind(t).run();
+    expect((await tryIt({ text: 'milk' })).status).toBe(200);
+    expect(await db(e).prepare('SELECT COUNT(*) AS n FROM try_visitors').first()).toEqual({ n: 500 });
+    expect(await db(e).prepare("SELECT 1 AS x FROM try_visitors WHERE token_hash = 'h1'").first()).toBeNull();
+  });
+
+  it('lets one address hold 200 sandboxes, recycling its own least recently used one after that', async () => {
+    const mine = await sha256Hex(`try-address:${addressBucket('198.51.100.60')}`);
+    const t = Date.now();
+    await db(e).prepare("INSERT INTO try_visitors(token_hash, buyer_id, address_hash, created_at, last_used) SELECT 'm' || g, 'visitor-m' || lpad(g::text, 7, '0'), ?1::text, 'x', ?2::bigint + g FROM generate_series(1, 200) g").bind(mine, t).run();
+    expect((await tryIt({ text: 'milk' }, { ip: '198.51.100.60' })).status).toBe(200);
+    expect(await db(e).prepare('SELECT COUNT(*) AS n FROM try_visitors WHERE address_hash = ?').bind(mine).first()).toEqual({ n: 200 });
+    expect(await db(e).prepare("SELECT 1 AS x FROM try_visitors WHERE token_hash = 'm1'").first()).toBeNull();
+  });
+
+  it('evicts a sandbox idle for 20 minutes with its orders, quotes and drafts; the event chain stays valid', async () => {
+    gemini = draftFor(200);
+    const old = await json(await tryIt({ text: '200 litres of lactose-free milk by Monday' }, { ip: '198.51.100.80' }));
+    expect(old.order.state).toBe('HELD');
+    await db(e).prepare('UPDATE try_visitors SET last_used = ?').bind(Date.now() - 21 * 60_000).run();
+    gemini = draftFor(20);
+    expect((await tryIt({ text: 'milk' }, { ip: '198.51.100.81' })).status).toBe(200);
+    for (const t of ['try_visitors', 'orders', 'order_lines', 'quotes', 'drafts', 'mandates', 'buyer_keys']) {
+      expect(await db(e).prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE buyer_id = ?`).bind(old.buyerId).first(), t).toEqual({ n: 0 });
+    }
+    expect(await json(await tryIt({ visitor: old.visitor, text: 'milk' }, { ip: '198.51.100.80' }))).toMatchObject({ error: 'VISITOR_UNKNOWN' });
+    expect((await json(await app.request('/v1/audit/verify', {}, e))).valid).toBe(true);
+  });
+
+  it('serves the example sentences from recorded readings: no model call, marked cached', async () => {
+    expect(Object.keys(RECORDED)).toHaveLength(4);
+    const b = await json(await tryIt({ text: RECORDED_TEXT }));
+    expect(modelCalls).toBe(0);
+    expect(b.draft).toMatchObject({ cached: true, status: 'confirmed', quantity: { value: 1000, unit: 'l' }, deliverBy: '2026-11-16' });
+    expect(b.order.state).toBe('HELD');
+    const created = (await listEvents(e, { since: 0, buyerId: b.buyerId })).find((x) => x.type === 'draft.created')!;
+    expect(created.data).toMatchObject({ cached: true });
+  });
+
+  it('answers 503 MODELS_BUSY with retryAfter when Gemini is over quota, points to the examples, and frees the sandbox', async () => {
+    geminiOverQuota = true;
+    const r = await tryIt({ text: '20 litres of lactose-free milk by Monday' });
+    expect(r.status).toBe(503);
+    expect(r.headers.get('Retry-After')).toBe('17');
+    expect(await json(r)).toMatchObject({ error: 'MODELS_BUSY', retryAfter: 17, detail: expect.stringContaining('example') });
+    expect(await db(e).prepare('SELECT COUNT(*) AS n FROM try_visitors').first()).toEqual({ n: 0 });
+  });
+
+  it('can be switched off at once with the admin key (404, like a door without Try it), and a reset switches it on', async () => {
+    const admin = (body: unknown) => app.request('/admin/try', { method: 'POST', headers: { Authorization: 'Bearer adm', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, e);
+    expect((await app.request('/admin/try', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"enabled":false}' }, e)).status).toBe(401);
+    expect(await json(await admin({ enabled: false }))).toEqual({ tryIt: false });
+    expect((await tryIt({ text: 'milk' })).status).toBe(404);
+    expect((await decide({ visitor: 'v', token: 't', decision: 'approve' })).status).toBe(404);
+    expect(await json(await admin({ enabled: true }))).toEqual({ tryIt: true });
+    expect((await tryIt({ text: 'milk' })).status).toBe(200);
+    await admin({ enabled: false });
     await reset();
+    expect((await tryIt({ text: 'milk' })).status).toBe(200);
+  });
+
+  it('ends every sandbox at a reset', async () => {
     const b = await json(await tryIt({ text: 'milk' }));
-    expect(b.step).toBe('decided');
     await reset();
     expect(await json(await tryIt({ visitor: b.visitor, text: 'milk' }))).toMatchObject({ error: 'VISITOR_UNKNOWN' });
   });
@@ -174,7 +248,7 @@ describe('Try it stays in its own world and cannot be exhausted by one person', 
     expect(second.quote.offers.map((o: any) => [o.lines[0].salesUnits, o.shortfall])).toEqual([[10, 10]]);
   });
 
-  it('frees the sandbox when its first call fails, so failures never fill the 50 slots', async () => {
+  it('frees the sandbox when its first call fails', async () => {
     geminiDown = true;
     const r = await tryIt({ text: '20 litres of lactose-free milk by Monday' });
     expect(r.status).toBe(503);
@@ -182,8 +256,8 @@ describe('Try it stays in its own world and cannot be exhausted by one person', 
     expect(await db(e).prepare("SELECT COUNT(*) AS n FROM mandates WHERE buyer_id LIKE 'visitor-%'").first()).toEqual({ n: 0 });
   });
 
-  it('counts a call against all visitors only when it is about to ask the models', async () => {
-    for (let i = 0; i < 12; i++) expect((await tryIt({ visitor: 'stale', text: 'milk' }, { ip: `192.0.2.${i}` })).status).toBe(404);
+  it('counts a call against the model budget only when it is about to ask the models', async () => {
+    for (let i = 0; i < 8; i++) expect((await tryIt({ visitor: `stale-${i}`, text: 'milk' }, { ip: `192.0.2.${i}` })).status).toBe(404);
     expect((await tryIt({ text: 'milk' }, { ip: '192.0.2.200' })).status).toBe(200);
   });
 
@@ -191,21 +265,8 @@ describe('Try it stays in its own world and cannot be exhausted by one person', 
     expect(addressBucket('2001:db8:1:2::1')).toBe(addressBucket('2001:0db8:0001:0002:ffff::9'));
     expect(addressBucket('2001:db8:1:2::1')).not.toBe(addressBucket('2001:db8:1:3::1'));
     expect(addressBucket('203.0.113.9')).toBe('203.0.113.9');
-    for (const ip of ['2001:db8:1:2::1', '2001:db8:1:2::2', '2001:db8:1:2::3']) expect((await tryIt({ text: 'milk' }, { ip })).status).toBe(200);
-    expect((await tryIt({ text: 'milk' }, { ip: '2001:db8:1:2::4' })).status).toBe(429);
-  });
-
-  it('lets one address hold at most 3 open sandboxes, and frees sandboxes idle for 30 minutes', async () => {
-    const mine = await sha256Hex(`try-address:${addressBucket('198.51.100.60')}`);
-    const fresh = Date.now();
-    for (let i = 0; i < 3; i++) await db(e).prepare('INSERT INTO try_visitors(token_hash, buyer_id, address_hash, created_at, last_used) VALUES (?, ?, ?, ?, ?)').bind(`m${i}`, `visitor-m000000${i}`, mine, 'x', fresh).run();
-    const full = await tryIt({ text: 'milk' }, { ip: '198.51.100.60' });
-    expect(full.status).toBe(429);
-    expect(await json(full)).toMatchObject({ error: 'TRY_SANDBOXES_FULL', detail: expect.stringContaining('this address') });
-    await db(e).prepare('UPDATE try_visitors SET last_used = ?').bind(fresh - 31 * 60_000).run();
-    for (let i = 0; i < 47; i++) await db(e).prepare('INSERT INTO try_visitors(token_hash, buyer_id, address_hash, created_at, last_used) VALUES (?, ?, ?, ?, ?)').bind(`o${i}`, `visitor-o${String(i).padStart(7, '0')}`, `a${i}`, 'x', fresh - 31 * 60_000).run();
-    expect((await tryIt({ text: 'milk' }, { ip: '198.51.100.60' })).status).toBe(200);
-    expect(await db(e).prepare('SELECT COUNT(*) AS n FROM try_visitors').first()).toEqual({ n: 1 });
+    for (let i = 0; i < 60; i++) expect((await tryIt({ visitor: `stale-${i}`, text: 'milk' }, { ip: `2001:db8:1:2::${(i + 1).toString(16)}` })).status).toBe(404);
+    expect((await tryIt({ visitor: 'stale-x', text: 'milk' }, { ip: '2001:db8:1:2::ffff' })).status).toBe(429);
   });
 
   it('asks again when a field is still open after an answer, instead of a dead end', async () => {
@@ -232,9 +293,10 @@ describe('Try it stays in its own world and cannot be exhausted by one person', 
 describe('Try it is written down', () => {
   it('in /v1/rules, /v1/reason-codes, the discovery document and /openapi.json', async () => {
     const rule = (await json(await app.request('/v1/rules', {}, e))).decisions.find((d: any) => d.id === 'tryIt');
-    expect(rule).toMatchObject({ owner: 'seller', model: false, constants: { perAddressPerMinute: 3, allVisitorsPerMinute: 12, maxSandboxes: 50, approver: 'You (kitchen manager)' } });
+    expect(rule).toMatchObject({ owner: 'seller', model: false, constants: { perVisitorPerMinute: 3, perAddressPerMinute: 60, freeTextPerMinute: 6, allCallsPerMinute: 240, maxSandboxes: 500, sandboxesPerAddress: 200, idleMinutes: 20, approver: 'You (kitchen manager)' } });
     const codes = (await json(await app.request('/v1/reason-codes', {}, e))).codes.map((c: any) => c.code);
-    expect(codes).toEqual(expect.arrayContaining(['TRY_RATE_LIMITED', 'TRY_SANDBOXES_FULL']));
+    expect(codes).toEqual(expect.arrayContaining(['TRY_RATE_LIMITED', 'MODELS_BUSY']));
+    expect(codes).not.toContain('TRY_SANDBOXES_FULL');
     const disc = await json(await app.request('https://door.example/.well-known/agent-gateway.json', {}, e));
     expect(disc.tryIt).toMatchObject({ url: 'https://door.example/v1/try', decision: 'https://door.example/v1/try/decision', demoOnly: true });
     const doc = await json(await app.request('/openapi.json', {}, e));
