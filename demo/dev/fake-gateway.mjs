@@ -2,6 +2,8 @@
 // Run: node demo/dev/fake-gateway.mjs [--port 8790] [--no-sse] [--replay [file]] [--pace 1]
 //   --no-sse   the stream endpoint answers 404, so the page falls back to polling
 //   --replay   replays a recorded run (default fixtures/story-v2.json) once a viewer reads the event log; --pace scales its gaps
+//   --door URL passes the door's public read routes (rules, reason codes, audit, keys, discovery, OpenAPI) through to that door,
+//              so the Inside tab shows real results locally; without it they answer 404 ("coming with the next deploy")
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, dirname } from "node:path";
@@ -133,8 +135,20 @@ function byteRange(header, size) {
   return start >= size || start > end ? "unsatisfiable" : { start, end };
 }
 
+/** The door's public read routes the Inside tab checks; with --door they are fetched from the real door, server side. */
+const DOOR_PATHS = new Set(["/v1/rules", "/v1/reason-codes", "/v1/audit/verify", "/.well-known/jwks.json", "/.well-known/agent-gateway.json", "/openapi.json"]);
+
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  if (req.method === "GET" && DOOR_PATHS.has(url.pathname) && option("--door")) {
+    try {
+      const upstream = await fetch(`${option("--door").replace(/\/+$/, "")}${url.pathname}`, { headers: { accept: "application/json" } });
+      res.writeHead(upstream.status, { "content-type": upstream.headers.get("content-type") ?? "application/json", "access-control-allow-origin": "*" });
+      return res.end(Buffer.from(await upstream.arrayBuffer()));
+    } catch (error) {
+      return json(res, 502, { error: "door unreachable", detail: error.message });
+    }
+  }
   if (req.method === "OPTIONS") {
     res.writeHead(204, { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization, content-type, idempotency-key, accept", "access-control-allow-methods": "GET, POST" });
     return res.end();

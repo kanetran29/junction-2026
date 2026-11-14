@@ -9,10 +9,10 @@ const PORT = 8798;
 /** playwright-core from PLAYWRIGHT_CORE (or the default resolution); the browser test is skipped when it is not installed. */
 const pw = await import(process.env.PLAYWRIGHT_CORE ?? "playwright-core").catch(() => null);
 
-test("compare: twelve rows, each Lazydoor line with its evidence; the webshop column never claims more than we know", () => {
+test("compare: thirteen rows, each Lazydoor line with its evidence; the webshop column never claims more than we know", () => {
   const rows = [...STRENGTHS, ...PAGE_ONLY];
   assert.equal(STRENGTHS.length, 8);
-  assert.equal(rows.length, 12);
+  assert.equal(rows.length, 13);
   for (const row of rows) {
     assert.ok(row.topic && row.without && row.with && row.evidence, row.topic);
     assert.ok(["—", "the person, if they notice"].includes(row.webshop), `${row.topic}: ${row.webshop}`);
@@ -35,7 +35,7 @@ test("compare page: no horizontal scroll at 375 px, and every row is on the page
     stage: document.getElementById("stage").hidden,
   }));
   assert.ok(scroll <= client, `page is ${scroll} px wide in a ${client} px viewport`);
-  assert.equal(rows, 12);
+  assert.equal(rows, 13);
   assert.equal(stage, true);
 });
 
