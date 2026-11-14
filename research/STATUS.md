@@ -146,7 +146,7 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 ### Tổng kết phiên build (Thứ Bảy 14/11, ~03:00)
 - **Xong**: Phase A (spec/plan/49 case/đổi tên) + Phase B (Task 0–13, 14a) trên `main`, mọi task qua review Opus (hoặc Sonnet cho phần nhỏ)
   với vòng sửa; review toàn nhánh (Opus) không có lỗi Critical; một đợt sửa cuối đã re-review sạch.
-- **Kiểm chứng local** (`wrangler dev`, replay bản ghi Thứ Sáu, Gemini thật): nghiệm thu **49/49** (11 lần chạy liên tiếp sau lần sửa
+- **Kiểm chứng local** (`wrangler dev`, replay bản ghi Thứ Sáu, Gemini thật): nghiệm thu **49/49** (9 lần chạy liên tiếp sau lần sửa
   interpret), **vitest 297/297**, **scenarios 11/11**, agent Gemini chạy thật ví dụ đề bài tới ACCEPTED sau khi người duyệt bấm.
 - **Deploy**: Worker đã lên, nhưng kiểm chứng trên URL bị chặn bởi hạn mức ghi D1 miễn phí — xem mục "Cần Kane quyết định" ở đầu file.
 - Chưa làm: phục vụ `/demo` (chờ nhánh `demo-animation` merge); các lỗi nhỏ đã hoãn có danh sách trong ledger local
