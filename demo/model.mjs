@@ -50,6 +50,7 @@ export function initialState() {
     mandates: null,
     warp: null,
     compare: null,
+    closeSince: null,
   };
 }
 
@@ -95,6 +96,22 @@ export function clockText(iso) {
  */
 export function liveState(buyer) {
   return { ...initialState(), buyer, hold: true, rules: true, rulesSince: -60, mandates: { since: -60 } };
+}
+
+/**
+ * How far a fade that starts at `since` and lasts `dur` seconds has come at story time t: 0 before, 1 after. Fades are a
+ * function of story time, not of the wall clock, so a seek shows exactly what continuous play shows at that second.
+ */
+export const fadeAt = (since, t, dur) => (since === null || since === undefined ? 0 : Math.min(1, Math.max(0, (t - since) / dur)));
+
+/** The closing comparison's fade-in (0.6 s), its rows' (one every 0.45 s from 0.4 s, 0.35 s each), and the end card's (0.8 s). */
+export function closingFades(state, t) {
+  const since = state.compare?.since ?? null;
+  return {
+    compare: state.close ? 0 : fadeAt(since, t, 0.6),
+    rows: Array.from({ length: 8 }, (_, i) => (since === null ? 0 : fadeAt(since + 0.4 + i * 0.45, t, 0.35))),
+    end: state.close ? fadeAt(state.closeSince, t, 0.8) : 0,
+  };
 }
 
 /** Formats integer cents as "1,010.00 €". */
@@ -400,6 +417,7 @@ export function reduce(state, ev, t) {
       break;
     case "story.close":
       s.close = true;
+      s.closeSince = t;
       break;
   }
   if (!ev.type.startsWith("story.")) s.log = [...s.log, logEntry(ev, Boolean(buyer && s.buyer && buyer !== s.buyer))].slice(-LOG_KEEP);

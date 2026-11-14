@@ -226,6 +226,10 @@ Vấn đề tìm thấy:
 - Tab "Compare" (`?mode=compare`): trang tĩnh "Why a door?", bảng ba cột 12 dòng có thẻ bằng chứng, cột webshop chỉ "the person, if they notice" hoặc "—", chân trang có door thật và GitHub; ≤ 760 px thì mỗi dòng là một thẻ. Dữ liệu chung ở `demo/compare.mjs` (dựng bằng `textContent`).
 - Test mới: Story ≤ 119 s, cảnh so sánh có đoạn 11 và màn kết đủ lâu, dữ liệu so sánh (12 dòng, cột webshop chỉ hai giá trị), trang Compare không cuộn ngang ở 375 px (cần `PLAYWRIGHT_CORE`, không có thì bỏ qua). 51 test pass khi có Playwright (50 + 1 bỏ qua khi không có); `label overlaps: 0`.
 
+### 29. Tua thẳng vào cảnh so sánh: độ mờ theo giờ Story
+- Lớp phủ so sánh, các dòng của nó và màn kết trước đây hiện bằng animation CSS theo đồng hồ thật, nên tua thẳng vào (?t=112, kéo thanh tua) có thể thấy bảng trên cảnh chưa bị phủ. Giờ độ mờ là hàm của giờ Story (`closingFades` trong `model.mjs`, `fadeAt`), nên tua và phát liền cho cùng một giá trị; bỏ `@keyframes fade` và transition của các dòng.
+- Test mới: độ mờ ở 112 s sau khi tua bằng độ mờ sau khi phát từng khung tới đó (model), và trong trình duyệt (tua tới 112 s so với phát từ 106 s, cả hai `opacity` 1). 53 test pass với Playwright.
+
 ## Còn lại / cần làm sau
 - Quay `demo/story.mp4` khi Kane duyệt Story mới (ghép giọng từ `VOICE`).
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.

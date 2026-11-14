@@ -1,5 +1,5 @@
 // Wires the scene to its two sources: the story timeline and the live gateway (or a recorded file).
-import { initialState, liveState, reduce, countdown, shownNow, clockText } from "./model.mjs";
+import { initialState, liveState, reduce, countdown, shownNow, clockText, closingFades } from "./model.mjs";
 import { STORY, DURATION, VOICE, SFX, stateAt } from "./story.mjs";
 
 /** Everything on the narration track, in time order: the voice lines and the rewind sound. */
@@ -125,7 +125,15 @@ function overlays(state, t = 0) {
   $("endcard").hidden = !ending;
   const comparing = mode === "story" && Boolean(state.compare) && !ending;
   $("compare").hidden = !comparing;
-  if (comparing) [...$("compare-rows").children].forEach((li, i) => li.toggleAttribute("data-on", t >= state.compare.since + 0.4 + i * 0.45));
+  if (mode === "story") {
+    const fades = closingFades(state, t);
+    $("endcard").style.opacity = ending ? fades.end.toFixed(3) : "";
+    $("compare").style.opacity = fades.compare.toFixed(3);
+    [...$("compare-rows").children].forEach((li, i) => {
+      li.style.opacity = fades.rows[i].toFixed(3);
+      li.style.transform = fades.rows[i] < 1 ? `translateY(${((1 - fades.rows[i]) * 0.6).toFixed(3)}cqw)` : "";
+    });
+  }
 }
 
 let last = performance.now();

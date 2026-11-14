@@ -68,22 +68,20 @@ body { background: radial-gradient(ellipse at 50% -10%, #0d4654 0%, #031419 62%)
 .rewind[hidden] { display: none; }
 .rewind span { color: #5ff4ff; margin-right: .4em; }
 .stage[data-rewind] #scene { filter: saturate(.45) brightness(.92); }
-.endcard { position: absolute; inset: 0; display: grid; place-content: center; gap: 2.2cqw; text-align: center; background: radial-gradient(circle at 50% 45%, rgb(13 70 84 / .96), rgb(3 20 25 / .98)); color: #fff; animation: fade .8s both; }
+.endcard { position: absolute; inset: 0; display: grid; place-content: center; gap: 2.2cqw; text-align: center; background: radial-gradient(circle at 50% 45%, rgb(13 70 84 / .96), rgb(3 20 25 / .98)); color: #fff; }
 .endcard[hidden] { display: none; }
 /* The Story's closing comparison: one row per strength, ✕ without the door (muted red), ✓ with Lazydoor (green), rows rising in turn. */
-.compare { position: absolute; inset: 0; display: grid; align-content: center; gap: 1.4cqw; padding: 0 5cqw; background: radial-gradient(circle at 50% 40%, #0d4654, #031419); color: #fff; animation: fade .6s both; }
+.compare { position: absolute; inset: 0; display: grid; align-content: center; gap: 1.4cqw; padding: 0 5cqw; background: radial-gradient(circle at 50% 40%, #0d4654, #031419); color: #fff; }
 .compare[hidden] { display: none; }
 .compare-head, .compare-rows li { display: grid; grid-template-columns: 1fr 1fr; gap: 2.4cqw; }
 .compare-head { font: 800 clamp(13px, 1.9cqw, 46px)/1.1 var(--sans); letter-spacing: .02em; text-transform: uppercase; padding-bottom: .6cqw; border-bottom: 1px solid #1d5e6c; }
 .compare-head .cmp-without { color: #e07a7a; }
 .compare-head .cmp-with { color: var(--auto); }
 .compare-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: .55cqw; }
-.compare-rows li { font: 600 clamp(11px, 1.55cqw, 38px)/1.25 var(--sans); opacity: 0; transform: translateY(.6cqw); transition: opacity .35s, transform .35s; }
-.compare-rows li[data-on] { opacity: 1; transform: none; }
+.compare-rows li { font: 600 clamp(11px, 1.55cqw, 38px)/1.25 var(--sans); }
 .compare-rows .cmp-without { color: #e8a3a3; }
 .compare-rows .cmp-with { color: #b9f5cf; }
 .compare-foot { font: 600 clamp(11px, 1.35cqw, 32px)/1.3 var(--anatomy-mono); color: var(--ink-dim); text-align: center; padding-top: .6cqw; border-top: 1px solid #1d5e6c; white-space: pre-wrap; }
-@media (prefers-reduced-motion: reduce) { .compare-rows li { transition: none; } }
 
 /* The Compare tab: a static page, a table that becomes one card per row on narrow screens (no horizontal scroll). */
 .stage[hidden], .compare-page[hidden] { display: none; }
@@ -123,7 +121,6 @@ body { background: radial-gradient(ellipse at 50% -10%, #0d4654 0%, #031419 62%)
 .endcard .line { max-width: 74cqw; margin: 0 auto; font: 700 clamp(17px, 2.9cqw, 70px)/1.2 var(--sans); letter-spacing: -.015em; text-wrap: balance; }
 .endcard .sub { max-width: 70cqw; margin: 0 auto; font: 500 clamp(12px, 1.6cqw, 38px)/1.35 var(--sans); color: var(--ink-dim); text-wrap: balance; }
 .endcard .small { font: 500 clamp(11px, 1.25cqw, 30px) var(--sans); color: var(--ink-dim); opacity: .85; }
-@keyframes fade { from { opacity: 0; } }
 
 .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .controls[hidden] { display: none; }

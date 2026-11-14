@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { STORY, DURATION, VOICE, SFX, stateAt, gatewayEvents } from "../story.mjs";
-import { dayTotal } from "../model.mjs";
+import { dayTotal, initialState, reduce, closingFades } from "../model.mjs";
 import fixture from "../fixtures/story-v2.json" with { type: "json" };
 
 const firstAt = (pred) => STORY.find((item) => pred(item.ev))?.at;
@@ -195,4 +195,17 @@ test("story: it closes on Without the door / With Lazydoor, with line 11 over it
   assert.ok(compare < last.at && last.at + last.dur <= close, "line 11 plays over the comparison");
   assert.ok(close - compare >= 8, "the eight rows stay up long enough to read");
   assert.ok(DURATION - close >= 2.5, "the end card stays up");
+});
+
+test("story: the closing comparison's dim at 112 s is the same after a seek as after playing there frame by frame", () => {
+  let played = initialState();
+  let next = 0;
+  for (let t = 100; t <= 112 + 1e-9; t += 1 / 30) {
+    while (next < STORY.length && STORY[next].at <= t) played = reduce(played, STORY[next].ev, STORY[next++].at);
+  }
+  const sought = stateAt(112);
+  assert.deepEqual(closingFades(sought, 112), closingFades(played, 112));
+  assert.equal(closingFades(sought, 112).compare, 1, "fully dimmed: the table covers the scene");
+  const since = sought.compare.since;
+  assert.ok(Math.abs(closingFades(stateAt(since + 0.3), since + 0.3).compare - 0.5) < 1e-9, "half way through its 0.6 s fade");
 });

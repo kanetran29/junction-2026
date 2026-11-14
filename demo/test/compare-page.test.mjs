@@ -38,3 +38,26 @@ test("compare page: no horizontal scroll at 375 px, and every row is on the page
   assert.equal(rows, 12);
   assert.equal(stage, true);
 });
+
+test("compare scene: seeking straight to 112 s shows the same dim as playing there", { skip: !pw && "playwright-core not installed (set PLAYWRIGHT_CORE)" }, async (t) => {
+  const child = spawn(process.execPath, [SERVER, "--port", String(PORT - 1)], { stdio: ["ignore", "pipe", "inherit"] });
+  t.after(() => child.kill());
+  await new Promise((resolve) => child.stdout.once("data", resolve));
+  const chromium = pw.chromium ?? pw.default.chromium;
+  const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, headless: true });
+  t.after(() => browser.close());
+  /** The comparison's opacity after loading at `from` and stepping `steps` frames of 1/30 s. */
+  const dim = async (from, steps) => {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    await page.goto(`http://localhost:${PORT - 1}/?kiosk=1&manual=1&autoplay=1&t=${from}`);
+    await page.waitForFunction(() => typeof window.__step === "function");
+    return page.evaluate((n) => {
+      for (let i = 0; i < n; i++) window.__step(1 / 30);
+      return getComputedStyle(document.getElementById("compare")).opacity;
+    }, steps);
+  };
+  const sought = await dim(112, 1);
+  const played = await dim(106, 180);
+  assert.equal(sought, played);
+  assert.equal(Number(sought), 1);
+});
