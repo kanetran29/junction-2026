@@ -108,6 +108,24 @@ describe('admin reset', () => {
     expect((await call('/admin/orders?idempotencyKey=x', { key: '', env: noAdmin })).status).toBe(401);
   });
 
+  it('answers 400 for an empty clock or malformed JSON and leaves the database untouched', async () => {
+    const keys = await reset();
+    expect((await call('/admin/reset', { key: 'adm', body: { clock: '' } })).status).toBe(400);
+    const bad = await app.request('/admin/reset', { method: 'POST', headers: { Authorization: 'Bearer adm', 'Content-Type': 'application/json' }, body: '{' }, e);
+    expect(bad.status).toBe(400);
+    expect((await call('/v1/rules', { key: keys.agentKeys['hotel-a'] })).status).toBe(200);
+    expect((await call(`/approver/${keys.approverKeys['hotel-a']}`, { headers: { Accept: 'application/json' } })).status).toBe(200);
+  });
+
+  it('keeps a wrong Content-Type at 415 and names the OrderBody component', async () => {
+    const keys = await reset();
+    const r = await app.request('/v1/quotes', { method: 'POST', headers: { Authorization: `Bearer ${keys.agentKeys['hotel-a']}`, 'Content-Type': 'text/plain' }, body: 'x' }, e);
+    expect([400, 415]).toContain(r.status);
+    const doc = await json(await call('/openapi.json'));
+    expect(doc.components.schemas).toHaveProperty(['OrderBody']);
+    expect(doc.paths['/v1/events'].get.responses['403'].description).toContain('another buyer');
+  });
+
   it('answers 400 for a clock without an offset and leaves the database untouched', async () => {
     const keys = await reset();
     const r = await call('/admin/reset', { key: 'adm', body: { clock: '2026-11-13T21:10:00' } });

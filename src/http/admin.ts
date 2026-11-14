@@ -70,11 +70,11 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
    * seeds both buyers' signed mandates from the given euro limits, books the prior accepted orders and mints fresh keys.
    */
   admin.post('/admin/reset', async (c) => {
-    const parsed = ResetBody.safeParse(await c.req.json().catch(() => ({})));
+    const parsed = ResetBody.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) throw parsed.error;
     const b = parsed.data;
     const env = c.env;
-    if (b.clock) {
+    if (b.clock != null) {
       try {
         normaliseClock(b.clock);
       } catch (err) {

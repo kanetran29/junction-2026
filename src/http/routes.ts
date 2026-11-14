@@ -65,7 +65,7 @@ const resolveRoute = createRoute({ method: 'post', path: '/v1/resolve', summary:
 const familiesRoute = createRoute({ method: 'get', path: '/v1/families', summary: 'The catalogue map by category, or with terms the families that mention them, with evidence (no products, no Valio call)', request: { query: S.FamiliesQuery }, security: SECURITY, responses: ok(S.FamiliesReply) });
 const rulesRoute = createRoute({ method: 'get', path: '/v1/rules', summary: 'The published decision register: who decides what, and the constants behind it', responses: { 200: json(S.RulesReply, 'OK') } });
 const reasonCodesRoute = createRoute({ method: 'get', path: '/v1/reason-codes', summary: 'Every reason code with its text, resolution and whether a retry may help', responses: { 200: json(S.ReasonCodesReply, 'OK') } });
-const eventsRoute = createRoute({ method: 'get', path: '/v1/events', summary: 'Events after `since` (exclusive), oldest first, at most 500; judge and admin keys read every buyer, an agent key only its own', request: { query: S.EventsQuery }, security: SECURITY, responses: ok(S.EventsReply) });
+const eventsRoute = createRoute({ method: 'get', path: '/v1/events', summary: 'Events after `since` (exclusive), oldest first, at most 500; judge and admin keys read every buyer, an agent key only its own', request: { query: S.EventsQuery }, security: SECURITY, responses: { ...ok(S.EventsReply), 403: json(S.ErrorBody, "An agent key asked for another buyer's events") } });
 const streamRoute = createRoute({
   method: 'get',
   path: '/v1/events/stream',
@@ -204,13 +204,13 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
 }
 
 /** Maps a thrown error from any module onto an HTTP status, machine-readable code and message; null for a bug. */
-export function errorBody(err: unknown): { status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 502 | 503; code: string; detail: string } | null {
+export function errorBody(err: unknown): { status: 400 | 401 | 403 | 404 | 409 | 415 | 422 | 429 | 502 | 503; code: string; detail: string } | null {
   if (err instanceof HttpError || err instanceof OrderError || err instanceof InterpretError) return { status: err.status, code: err.code, detail: err.message };
   if (err instanceof QuoteError) {
     const status = err.code === 'DRAFT_NOT_FOUND' ? 404 : err.code === 'UPSTREAM_ERROR' ? 502 : 409;
     return { status, code: err.code, detail: err.message };
   }
-  if (err instanceof HTTPException) return { status: 400, code: 'INVALID_REQUEST', detail: err.message };
+  if (err instanceof HTTPException) return { status: err.status as 400 | 415, code: 'INVALID_REQUEST', detail: err.message };
   if (err instanceof ZodError) return { status: 400, code: 'INVALID_REQUEST', detail: err.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ') };
   return null;
 }

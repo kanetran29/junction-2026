@@ -32,7 +32,7 @@ const Selection = z.object({ quoteId: z.string().min(1), offerId: z.string().min
 export const OrderBody = z.union([
   z.object({ quoteId: z.string().min(1), offerId: z.string().min(1), agentReason: z.string().optional() }),
   z.object({ basketId: z.string().min(1), selections: z.array(Selection).min(1), agentReason: z.string().optional() }),
-]).openapi('OrderRequest');
+]).openapi('OrderBody');
 export const Order = z.looseObject({
   orderId: z.string(),
   state: z.enum(['ACCEPTED', 'HELD', 'REJECTED', 'EXPIRED']),
