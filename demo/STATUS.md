@@ -6,14 +6,13 @@ Nhánh `demo-animation`, thư mục `demo/`. Mới nhất ở dưới.
 
 Mở http://localhost:8790/ (dev server đang chạy, phục vụ thẳng thư mục `demo/`), bấm Play hoặc kéo thanh thời gian. Chưa quay video mới: `demo/story.mp4` vẫn là bản cũ, sẽ quay lại sau khi Kane duyệt.
 
-Cần xem:
-1. 0:15 đến 0:26, agent ngây thơ: thùng của kệ hộp 10 l bị cổng bến từ chối (dấu ✕ đỏ ở bến, nhãn "Cut-off Thu 12 Nov 15:00"), xe không chất hàng, quầy bếp trống. Không còn mây mưa.
-2. 0:44 đến 0:47: cổng Lazydoor từ chối hộp 10 l đã đóng và hàng Arla thiếu (thùng bay tới cổng rồi bật lại, ✕ đỏ ở cổng, lý do "Cut-off passed", "Only 384 left" ngay cạnh cổng); hàng được chọn qua cổng với ✓.
-3. 1:00 đến 1:13, đơn được chấp nhận: thùng lên xe, cổng bến nâng, xe chạy tới bếp, dỡ thùng lên quầy, chef giơ ngón cái, thẻ hoá đơn 1,010.00 €, lịch lật sang MON 16, xe quay về.
-4. Xe tải cận cảnh 1080p: [shots/after-truck.png](shots/after-truck.png) (một khung xe, cabin và thùng cùng trục, bánh chạm đường dưới vòm).
-5. Chữ ở 50%: [shots/after-scene-50pct.png](shots/after-scene-50pct.png).
-6. 0:53 và 1:27 chờ duyệt ("Waiting for approval" ở cổng bến), 1:46 phê duyệt hết hạn: cổng bến đóng, "Approval expired".
-
+Cần xem (bản sửa theo nhận xét lúc 0:23):
+1. 0:01 đến 0:06: chef gõ yêu cầu vào màn hình bếp (màn hình sáng xanh, chữ hiện dần phía trên, tay chef gõ) ([ảnh](shots/after-chef-typing.png)).
+2. 0:10 đến 0:26: agent ngây thơ đi tới trước cổng rồi đứng ngoài; gọi API vòng qua cổng; thùng bị cổng bến từ chối ("Cut-off Thu 12 Nov 15:00"), thùng xe mở hông nhưng trống, chef nhún vai trước quầy trống ([ảnh](shots/after-dock-refusal.png), [xe trống](shots/after-truck-empty.png)).
+3. 0:33 đến 0:47: agent đi tới vạch quét trước cổng và đứng chờ ở đó, không vào kho; cổng từ chối hàng đóng và hàng thiếu ngay tại cổng ([ảnh](shots/after-door-refusal.png)).
+4. 0:53 đến 1:00: chef nhìn màn hình khi cần duyệt (màn hình vàng, chuông), rồi chạm để duyệt.
+5. 1:00 đến 1:13: thùng bay vào xe, nhìn thấy qua hông mở; xe chạy tới bếp, dỡ thùng, chef giơ ngón cái, hoá đơn, lịch MON 16; agent quay về chef ([xe có hàng](shots/after-truck.png), [giao hàng](shots/after-delivery.png)).
+6. 1:46 hết hạn duyệt: cổng bến đóng, chef nhún vai ([ảnh](shots/after-expired.png)).
 
 ## Nhật ký
 
@@ -106,6 +105,11 @@ Vấn đề tìm thấy:
   - Chờ duyệt: cổng bến đóng, đèn vàng, "Waiting for approval". Hết hạn: cổng bến đóng, "Approval expired", xe không chất hàng ([hết hạn](shots/after-expired.png)).
 - Thanh chắn chuyển từ hàng rào ra cổng bến trước đầu xe; bỏ khoá đỏ, đèn báo và dấu X trên kệ (kệ chỉ còn icon trạng thái trên bảng tên).
 - Bản quay 60 khung/giây làm trước nhận xét này nằm ngoài repo và không commit.
+
+### 12. Sửa theo nhận xét lúc 0:23 (chef hành động, thùng xe mở hông, agent đứng ngoài cổng)
+- Chef hành động: gõ yêu cầu vào màn hình bếp (màn hình sáng, chữ gõ dần, tay gõ), nhìn màn hình khi có yêu cầu duyệt và chạm để duyệt, giơ ngón cái khi hàng tới, nhún vai (hai tay ngửa) khi bến từ chối hoặc phê duyệt hết hạn. Màn hình bếp là thiết bị duyệt (chef là người được ủy quyền duyệt), phụ đề đổi theo.
+- Thùng xe: bỏ mặt hông phía người xem, kiểu xe rèm cuốn (rèm cuộn dưới mái, có chữ VALIO AIMO), thấy được 8 chỗ thùng bên trong. Thùng hàng bay vào đúng chỗ khi được chấp nhận, đi cùng xe tới bếp rồi được dỡ ra; khi bến từ chối, xe trống. Vẫn là một xe, một khung gầm.
+- Agent: chỉ đi giữa chef và vạch quét (vạch magenta trước cổng), đứng chờ ở đó, không bao giờ vào phía kho; khi đơn được chấp nhận thì quay về chef. Cánh cổng chỉ mở khi quyết định cho hàng qua. Agent ngây thơ cũng đi tới trước cổng rồi đứng ngoài.
 
 ## Còn lại / cần làm sau
 - Test Live với `wrangler dev` khi `main` có route `/v1/events`, `/v1/events/stream`, `/v1/interpret`; khi đó kiểm tra tên trường trong `sendRequest` (`demo/live.mjs`).

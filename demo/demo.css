@@ -313,8 +313,11 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .label[data-carry="receipt"] .label-box { stroke: var(--auto); }
 .label[data-carry="question"] .label-box { stroke: var(--hold); }
 .label-text { font-family: var(--sans); font-weight: 650; fill: #fff; text-anchor: middle; }
-.bubble-box { fill: #fffaf0; stroke: #13262e; stroke-width: 2px; }
-.bubble-text { fill: #13262e; font-family: var(--sans); font-weight: 600; }
+.typed-box { fill: rgb(3 20 25 / .94); stroke: #5ff4ff; stroke-width: 2.5px; }
+.typed-text { fill: #fff; font-family: var(--anatomy-mono); font-weight: 600; }
+.mouth { fill: none; stroke: #5a3420; stroke-width: 1.6px; stroke-linecap: round; }
+.stop-line { fill: none; stroke: var(--brand); stroke-width: 4px; stroke-dasharray: 8 6; }
+[data-id="phone"][data-typing] .phone-screen { fill: #5ff4ff; }
 
 @media (prefers-reduced-motion: reduce) { .neon-text { filter: none; } }
 @media (max-width: 640px) { .stage { aspect-ratio: 4 / 3.6; } .hud-events { display: none; } .caption { font-size: 15px; bottom: 2cqw; } .brand .for { display: none; } }

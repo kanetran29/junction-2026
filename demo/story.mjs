@@ -15,7 +15,7 @@ const why = (...codes) => codes.map((code) => ({ code }));
 const BEATS = [
   // 1. The chef asks.
   [0, "clock.set", { now: START }],
-  [0.2, "story.caption", { text: "Saturday 10:15. The hotel kitchen needs milk for Monday." }],
+  [0.2, "story.caption", { text: "Saturday 10:15. The hotel chef types an order into the kitchen terminal." }],
   [1.6, "story.say", { who: "chef", text: "1,000 litres of lactose-free milk by Monday. Bulk boxes if you can." }],
   [9.5, "story.say", {}],
 
@@ -43,9 +43,9 @@ const BEATS = [
   [50.5, "policy.decided", { outcome: "NEEDS_APPROVAL", reasons: why("OVER_ORDER_AUTO", "PACK_SIZE_CHANGED") }, "q"],
   [50.7, "story.caption", { text: "Over the 500 € limit, and boxes became cartons: NEEDS_APPROVAL." }],
   [53.5, "approval.requested", { orderId: "ord_1", expiresAt: CUTOFF }, "o"],
-  [53.7, "story.caption", { text: "The manager's phone buzzes. The link expires at the cut-off, Sun 17:00." }],
+  [53.7, "story.caption", { text: "The chef's terminal asks for approval. The link expires at the cut-off, Sun 17:00." }],
   [59, "approval.approved", {}, "o"],
-  [59.2, "story.caption", { text: "Approved on Saturday, 30 hours before the cut-off." }],
+  [59.2, "story.caption", { text: "The chef approves on Saturday, 30 hours before the cut-off." }],
   [60.5, "order.accepted", { lines: line(1000), netCents: 101000 }, "o"],
   [60.7, "story.caption", { text: "Accepted. 50 cases of 1 l cartons load for Monday 16 Nov." }],
   [66.6, "story.caption", { text: "Monday 16 Nov: the milk arrives at the kitchen. Receipt 1,010.00 €." }],

@@ -173,18 +173,22 @@ function chef() {
   const [x, y] = CHEF;
   const out = [`<path class="iso-halo" d="${k.haloOf({ x: x - 13, y: y - 11, w: 26, d: 22, r: 10 }, 0, 0.1, P)}" style="filter:blur(4px)"/>`];
   out.push(M("dark", slab({ x: x - 9, y: y - 3, w: 7, d: 11, r: 2 }, 0, 3, { tone: "mid" }, 2) + slab({ x: x + 2, y: y - 3, w: 7, d: 11, r: 2 }, 0, 3, { tone: "mid" }, 2) + cyl(x, y, 8, 3, 16, { tone: "mid" }, 28)));
-  out.push(`<g class="arms-down">${M("sun", slab({ x: x - 16, y: y - 4, w: 5, d: 8, r: 2 }, 26, 20, { tone: "hi" }, 2))}${skin(x - 13.5, y, 24, 2.6)}</g>`);
+  out.push(`<g class="arms-down arm-left">${M("sun", slab({ x: x - 16, y: y - 4, w: 5, d: 8, r: 2 }, 26, 20, { tone: "hi" }, 2))}${skin(x - 13.5, y, 24, 2.6)}</g>`);
+  out.push(`<g class="arm-type" style="opacity:0">${M("sun", slab({ x: x - 27, y: y + 1, w: 15, d: 6, r: 2 }, 38, 6, { tone: "hi" }, 2))}<g class="typing-hand">${skin(x - 28, y + 4, 41, 2.8)}</g></g>`);
   const jacket = cyl(x, y, 11, 19, 30, { tone: "hi" }, 36) + L(k.sideArc(x, y, 11, 30, P, 24), { tone: "lo" });
   out.push(M("sun", jacket + dots([[x - 3.5, y + 10.6, 46], [x - 3.5, y + 10.6, 41], [x + 3.5, y + 10.6, 46], [x + 3.5, y + 10.6, 41]], { size: 1.3, tone: "hi" })));
   const apron = { x: x - 8, y: y + 9.5, w: 16, d: 2.2, r: 1 };
   out.push(M("cream", slab(apron, 12, 18, { tone: "hi", crease: "lo" }, 2, 0) + `<g transform="${face(x - 4, y + 11.8, 24)}"><rect class="pocket" x="0" y="0" width="8" height="5" rx="1"/></g>`));
   out.push(`<g class="arms-down">${M("sun", slab({ x: x + 11, y: y - 4, w: 5, d: 8, r: 2 }, 26, 20, { tone: "hi" }, 2))}${skin(x + 13.5, y, 24, 2.6)}</g>`);
+  out.push(`<g class="arms-shrug" style="opacity:0">${M("sun", slab({ x: x - 25, y: y - 1, w: 12, d: 5, r: 2 }, 38, 5, { tone: "hi" }, 2) + slab({ x: x + 13, y: y - 1, w: 12, d: 5, r: 2 }, 38, 5, { tone: "hi" }, 2))}${skin(x - 26, y + 1, 45, 2.8)}${skin(x + 26, y + 1, 45, 2.8)}</g>`);
   out.push(`<g class="arms-up" style="opacity:0">${M("sun", slab({ x: x + 11, y: y - 2, w: 5, d: 6, r: 2 }, 44, 18, { tone: "hi" }, 2))}${skin(x + 13.5, y + 1, 65, 3.2)}${thumb(x + 13.5, y + 1, 68.5)}</g>`);
   out.push(M("red", cyl(x, y, 6.6, 49, 3, { tone: "mid" }, 24) + slab({ x: x - 2.5, y: y + 6, w: 5, d: 2, r: 1 }, 45, 5, { tone: "mid" }, 2, 0)));
   const head = at([x, y, 58]);
   out.push(`<circle class="skin" cx="${f1(head[0])}" cy="${f1(head[1])}" r="${f1(8.2 * KS)}"/>`);
   const p = (dx, dz) => at([x + dx, y + 7.6, 58 + dz]);
-  out.push(`<circle class="eye" cx="${f1(p(-3, 1.5)[0])}" cy="${f1(p(-3, 1.5)[1])}" r="${f1(1.05 * KS)}"/><circle class="eye" cx="${f1(p(3, 1.5)[0])}" cy="${f1(p(3, 1.5)[1])}" r="${f1(1.05 * KS)}"/>`);
+  out.push(`<g class="eyes"><circle class="eye" cx="${f1(p(-3, 1.5)[0])}" cy="${f1(p(-3, 1.5)[1])}" r="${f1(1.05 * KS)}"/><circle class="eye" cx="${f1(p(3, 1.5)[0])}" cy="${f1(p(3, 1.5)[1])}" r="${f1(1.05 * KS)}"/></g>`);
+  const mouth = (bend) => { const a = p(-2.6, -4.2); const b = p(2.6, -4.2); const c = p(0, -4.2 + bend); return `M${f1(a[0])} ${f1(a[1])}Q${f1(c[0])} ${f1(c[1])} ${f1(b[0])} ${f1(b[1])}`; };
+  out.push(`<path class="mouth mouth-smile" d="${mouth(-2.4)}" style="opacity:0"/><path class="mouth mouth-frown" d="${mouth(2)}" style="opacity:0"/>`);
   out.push(`<circle class="cheek" cx="${f1(p(-4.6, -1.5)[0])}" cy="${f1(p(-4.6, -1.5)[1])}" r="${f1(1.4 * KS)}"/><circle class="cheek" cx="${f1(p(4.6, -1.5)[0])}" cy="${f1(p(4.6, -1.5)[1])}" r="${f1(1.4 * KS)}"/>`);
   const m = [p(-4.5, -1.6), p(-1, -0.6), p(0, -1.4), p(1, -0.6), p(4.5, -1.6), p(0, -3)];
   out.push(`<path class="moustache" d="M${f1(m[0][0])} ${f1(m[0][1])}Q${f1(m[1][0])} ${f1(m[1][1])} ${f1(m[2][0])} ${f1(m[2][1])}Q${f1(m[3][0])} ${f1(m[3][1])} ${f1(m[4][0])} ${f1(m[4][1])}Q${f1(m[5][0])} ${f1(m[5][1])} ${f1(m[0][0])} ${f1(m[0][1])}Z"/>`);
@@ -335,7 +339,8 @@ function phone() {
 /**
  * A cab-over delivery truck built at the origin, cab front at x = 0 facing −x, body along +x, side at y = 38 facing the viewer:
  * chassis, bumper with plate and fog lamps, cab with windscreen, wipers, grille and headlights, roof deflector and lights,
- * side window, door, handle, steps and mirror, exhaust stack, fuel tank, box body with ribs, livery band and marker lights,
+ * side window, door, handle, steps and mirror, exhaust stack, fuel tank, an open-sided box (curtain rolled up under the roof,
+ * VALIO AIMO livery on it) with eight crate places inside, marker lights,
  * wheels with tyres, rims, hubs and nuts under arches, mudflap.
  */
 function truck() {
@@ -344,12 +349,22 @@ function truck() {
   out.push(`<path class="iso-halo" d="${k.haloOf({ x: 0, y: 0, w: T_LEN, d: D, r: 4 }, 0, 0.1, P)}" style="filter:blur(5px)"/>`);
   out.push(M("dark", slab({ x: 6, y: 5, w: 132, d: 28, r: 1 }, 8, 6, { tone: "mid" }, 2, 0.4)));
   const box = { x: 46, y: 0, w: 94, d: D, r: 2 };
-  const ribs = [];
-  for (let x = box.x + 11.75; x < box.x + box.w - 1; x += 11.75) ribs.push(seg([x, D, 14], [x, D, 70]));
-  const livery = `<g transform="${face(box.x, D + 0.1, 46)}"><rect class="livery-band" x="0" y="0" width="${box.w}" height="18"/><text class="livery-text" x="${box.w / 2}" y="13.4" font-size="13" text-anchor="middle">VALIO AIMO</text></g>`;
-  out.push(M("sun", slab(box, 14, 56, { tone: "mid" }, 2, 0.8) + L(ribs.join(""), { tone: "lo" }) + livery + L(k.sideSeam(box, 66, P, 2), { tone: "lo" })));
+  out.push(M("dark", slab({ x: box.x, y: 0, w: box.w, d: D, r: 1 }, 14, 3, { tone: "mid" }, 2, 0.4)));
+  out.push(M("deep", slab({ x: box.x, y: 0, w: box.w, d: 3, r: 0.6 }, 17, 53, { tone: "mid" }, 2, 0.4) + L([30, 44, 58].map((z) => seg([box.x, 3, z], [box.x + box.w, 3, z])).join(""), { tone: "lo" })));
+  out.push(M("sun", slab({ x: box.x, y: 0, w: 3, d: D, r: 0.6 }, 17, 53, { tone: "mid" }, 2, 0.4) + slab({ x: box.x + box.w - 3, y: 0, w: 3, d: D, r: 0.6 }, 17, 53, { tone: "mid" }, 2, 0.4)));
+  const load = [];
+  for (let i = 0; i < 8; i++) {
+    const plan = { x: box.x + 6 + (i % 4) * 21.5, y: 8, w: 18, d: 22, r: 1 };
+    const z = 17 + Math.floor(i / 4) * 16;
+    load.push(`<g class="tcrate" data-i="${i}" style="opacity:0">${M("crate2", slab(plan, z, 15, { tone: "hi" }, 2, 0.5) + L(k.sideSeam(plan, z + 11, P, 2), { tone: "mid" }))}</g>`);
+  }
+  out.push(`<g data-id="tcrates">${load.join("")}</g>`);
+  out.push(M("sun", [box.x, box.x + box.w - 3].map((px) => slab({ x: px, y: D - 3, w: 3, d: 3, r: 0.4 }, 17, 53, { tone: "mid" }, 2, 0)).join("")));
+  const curtain = { x: box.x, y: D - 4, w: box.w, d: 5, r: 2.4 };
+  const livery = `<g transform="${face(box.x, D + 1.1, 70)}"><text class="livery-text" x="${box.w / 2}" y="15.6" font-size="13" text-anchor="middle">VALIO AIMO</text></g>`;
+  out.push(M("cobalt", slab(curtain, 50, 20, { tone: "mid" }, 4, 0.4) + L(k.sideSeam(curtain, 54, P, 4), { tone: "lo" }) + livery));
   out.push(M("dark", slab({ x: box.x - 1, y: -1, w: box.w + 2, d: D + 2, r: 2 }, 70, 3, { tone: "mid" }, 2, 0.4)));
-  out.push(`<g class="markers">${dots([...Array(7)].map((_, i) => [box.x + 7 + i * 13.3, D + 0.2, 17]), { size: 1.6, tone: "hi" })}</g>`);
+  out.push(`<g class="markers">${dots([...Array(7)].map((_, i) => [box.x + 7 + i * 13.3, D + 0.2, 15.5]), { size: 1.6, tone: "hi" })}</g>`);
   out.push(M("dark", slab({ x: 42, y: 2, w: 4, d: D - 4, r: 1 }, 14, 48, { tone: "mid" }, 2, 0)));
   out.push(M("dark", slab({ x: 24, y: 28, w: 16, d: 9, r: 3 }, 6, 8, { tone: "mid" }, 3, 0.4) + L(k.sideSeam({ x: 24, y: 28, w: 16, d: 9, r: 3 }, 10, P, 3), { tone: "lo" })));
   out.push(M("steel", cyl(40, 33, 2.4, 14, 50, { tone: "mid" }, 14) + cyl(40, 33, 2.8, 62, 3, { tone: "hi" }, 14)));
@@ -455,7 +470,7 @@ export function truckRun(tr, age) {
     const load = n * 0.22 + 0.45;
     const go = load + 0.35;
     const arrive = go + 3.4;
-    const unloadDone = arrive + Math.min(n, SLOTS.length) * 0.2 + 0.45;
+    const unloadDone = arrive + Math.min(n, 8) * 0.16 + 0.45;
     const back = arrive + 3.8;
     const home = back + 3.2;
     let front = DOCK_X;
@@ -481,6 +496,7 @@ export function buildScene(host) {
   const front = `<svg class="iso-svg scene-front" viewBox="0 0 ${W} ${H}" aria-hidden="true">
 <defs><filter id="glow" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="7"/></filter></defs>
 <g>${logoSign()}${wallClock()}${LAMPS.map(lamp).join("")}${kitchen()}${[3, 2, 1, 0].map(rack).join("")}${fence(-120, -28)}${post(-28, true)}${phone()}</g>
+<path class="stop-line" d="${k.lineOnTop([GATE_X - 24, -12], [GATE_X - 24, 34], 0.7, P)}"/>
 <g data-id="asks" style="opacity:0">${asks()}</g>
 <path data-id="sneak" class="sneak" d="" style="opacity:0"/>
 <g data-id="leaf"></g>
@@ -505,7 +521,7 @@ ${truck()}
 <g data-id="receipt" class="receipt" style="opacity:0"><rect class="receipt-box" width="250" height="92" rx="12"/><g class="receipt-icon">${icon("receipt", 16, 16, 36)}</g><text class="receipt-amount" x="62" y="42"></text><text class="receipt-day" x="62" y="74">Mon 16 Nov</text></g>
 <g data-id="gateshock" style="opacity:0"><circle class="stamp-shock" r="20"/><circle class="stamp-shock s2" r="20"/></g>
 <g data-id="stampfx" style="opacity:0"><rect class="banner-box" x="0" y="0" width="398" height="250" rx="12"/><g class="stamp-badge" transform="translate(58 58)"><g class="badge-in"><circle class="stamp-disc" r="40"/><g class="stamp-icon"></g></g></g><g class="stamp-labels"></g></g>
-<g data-id="bubble" class="bubble" style="opacity:0"><path class="bubble-box"/><text class="bubble-text"></text></g>
+<g data-id="bubble" class="typed" style="opacity:0"><path class="typed-box"/><text class="typed-text"></text></g>
 <g data-id="label" class="label" style="opacity:0"><rect class="label-box" rx="10"/><text class="label-text"></text></g>
 </svg>`;
   host.innerHTML = `${back}<canvas class="scene-gl" aria-hidden="true"></canvas>${front}`;
@@ -516,10 +532,18 @@ ${truck()}
   const el = Object.fromEntries(ids.map((id) => [id, q(id)]));
   const racks = [...root.querySelectorAll(".rack")].sort((a, b) => a.dataset.rack - b.dataset.rack);
   const counterCrates = [...el.counter.querySelectorAll(".ccrate")];
+  const truckCrates = [...el.truck.querySelectorAll(".tcrate")];
   const cardEl = el.agent.querySelector(".card");
   const beacon = root.querySelector(".beacon");
   const armsDown = [...el.chef.querySelectorAll(".arms-down")];
   const armsUp = el.chef.querySelector(".arms-up");
+  const armLeft = el.chef.querySelector(".arm-left");
+  const armType = el.chef.querySelector(".arm-type");
+  const armsShrug = el.chef.querySelector(".arms-shrug");
+  const typingHand = el.chef.querySelector(".typing-hand");
+  const eyes = el.chef.querySelector(".eyes");
+  const smile = el.chef.querySelector(".mouth-smile");
+  const frown = el.chef.querySelector(".mouth-frown");
   const layer = glLayer({ canvas: host.querySelector(".scene-gl"), fragment: LAMP_FRAGMENT, view: [W, H], camera: glCamera(P), uniforms: ["uLamp"], onError: () => {} });
 
   const setText = (node, value) => {
@@ -567,7 +591,7 @@ ${truck()}
     setText(label, text);
   };
 
-  const ROUTE = [[-188, LANE], [-140, LANE], [-104, LANE], [-36, LANE], [62, 28], [118, 40]];
+  const ROUTE = [[-188, LANE], [-140, LANE], [-106, LANE]];
   const lengths = (route) => route.reduce((acc, p, i) => (i ? [...acc, acc[i - 1] + Math.hypot(p[0] - route[i - 1][0], p[1] - route[i - 1][1])] : [0]), []);
   const pointOn = (route, cum, s) => {
     const i = Math.max(1, cum.findIndex((c) => c >= s));
@@ -577,9 +601,9 @@ ${truck()}
     return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
   };
   const RC = lengths(ROUTE);
-  const STATION = { chef: RC[0], home: RC[1], door: RC[2], truck: RC[5] };
-  const NAIVE_AT = [-112, 42];
-  const live = { s: STATION.home, v: 0, leaf: 0, leafShown: "", warm: 0, red: 0, lampDrawn: -1, boom: 0, today: ["SAT", "14"] };
+  const STATION = { chef: RC[0], home: RC[1], door: RC[2], truck: RC[0] };
+  const NAIVE_AT = [-126, 44];
+  const live = { s: STATION.home, v: 0, leaf: 0, leafShown: "", warm: 0, red: 0, lampDrawn: -1, boom: 0, today: ["SAT", "14"], happy: false };
 
   /** Moves s toward target along a route with a speed limit and a short ease in and out. */
   const travel = (s, v, target, dt) => {
@@ -619,15 +643,10 @@ ${truck()}
     dt = Math.min(dt, 1 / 20);
     const stamp = STAMP[state.door.stamp] ? state.door.stamp : null;
     const target = STATION[state.agent.at] ?? STATION.home;
-    const inside = (s) => s > STATION.door + 20;
-    const crossing = inside(target) !== inside(live.s) || (live.s > STATION.door + 6 && live.s < RC[3] - 4);
-    const wantOpen = stamp === "AUTO" || crossing ? 1 : 0;
-    live.leaf = follow(live.leaf, wantOpen, dt, 0.2, snap || calm);
-    let goal = target;
-    if (live.leaf < 0.8 && inside(target) && !inside(live.s)) goal = Math.min(target, STATION.door);
-    if (live.leaf < 0.8 && !inside(target) && inside(live.s)) goal = Math.max(target, RC[3]);
+    const passes = stamp === "AUTO" || (stamp === "NEEDS_APPROVAL" && state.phone.status === "approved");
+    live.leaf = follow(live.leaf, passes ? 1 : 0, dt, 0.2, snap || calm);
     if (snap) [live.s, live.v] = [target, 0];
-    else [live.s, live.v] = travel(live.s, live.v, goal, dt);
+    else [live.s, live.v] = travel(live.s, live.v, target, dt);
     const leafKey = `${live.leaf.toFixed(3)}|${stamp}`;
     if (leafKey !== live.leafShown) {
       drawLeaf(live.leaf, stamp);
@@ -659,7 +678,8 @@ ${truck()}
     drawDoor(state, t, calm);
     drawTruck(state, t, dt, snap, calm);
     flushBursts(t, calm);
-    drawBubble(state, t);
+    const typed = drawTyped(state, t, calm);
+    drawChef(state, t, typed, calm);
     drawLabel(state, ax, ay, bob);
     drawSky(state, dt, snap || calm);
   }
@@ -672,7 +692,8 @@ ${truck()}
       return;
     }
     const op = naive.step === "gone" ? Math.max(0, 1 - (t - naive.since) / 1) : naive.step === "enter" ? Math.min(1, (t - naive.since) / 0.6) : 1;
-    setAttr(el.naive, "transform", k.translateAlong(P, [NAIVE_AT[0], NAIVE_AT[1], 0]));
+    const walk = naive.step === "enter" ? 1 - easeOut((t - naive.since) / 1.4) : 0;
+    setAttr(el.naive, "transform", k.translateAlong(P, [NAIVE_AT[0] - 50 * walk, NAIVE_AT[1], walk > 0.02 ? Math.abs(Math.sin(t * 13)) * 1.6 : 0]));
     setAttr(el.naive, "style", `opacity:${op.toFixed(3)}`);
     if (naive.step === "enter" || naive.step === "grab" || naive.step === "load") {
       const a = at([NAIVE_AT[0], NAIVE_AT[1], 62]);
@@ -840,8 +861,8 @@ ${truck()}
     if (!words && state.phone.status === "buzzing") words = ["Waiting for approval", "clock", "hold"];
     if (!words && state.phone.status === "expired") words = ["Approval expired", "clock", "reject"];
     if (!words) return setAttr(el.dockchip, "style", "opacity:0");
-    const [px, py] = at([BARRIER.x, BARRIER.post, 0]);
-    chip(el.dockchip, { x: px - 10, y: py + 52, text: words[0], iconName: words[1], tone: words[2], size: 23, anchor: "start" });
+    const [px, py] = at([BARRIER.x, BARRIER.post, 30]);
+    chip(el.dockchip, { x: px - 24, y: py + 4, text: words[0], iconName: words[1], tone: words[2], size: 23, anchor: "end" });
     setAttr(el.dockchip, "style", null);
   }
 
@@ -907,7 +928,7 @@ ${truck()}
     const words = {
       buzzing: [ph.cents !== null ? `Approve ${euro(ph.cents)}?` : "Approve?", "bell", "hold"],
       approved: [ph.cents !== null ? `Approved ${euro(ph.cents)}` : "Approved", "check", "auto"],
-      rejected: ["Rejected by manager", "cross", "reject"],
+      rejected: ["Rejected", "cross", "reject"],
       expired: ["Expired at cut-off", "clock", "muted"],
     }[ph.status];
     if (!words) return setAttr(el.phonechip, "style", "opacity:0");
@@ -954,10 +975,11 @@ ${truck()}
     const okRack = racks.findIndex((r) => r.dataset.status === "ok");
     const source = okRack >= 0 ? okRack : 2;
     const from = at([RACK_X[source] + RACK.w / 2, RACK.y + RACK.d + 4, 36]);
-    const truckTop = (front) => at([front + 100, TRUCK_Y + 19, 74]);
+    const slotAt = (i, front) => at([front + 46 + 6 + (i % 4) * 21.5 + 9, TRUCK_Y + 19, 17 + Math.floor(i / 4) * 16 + 7]);
+    const n = Math.min(run.n, 8);
     const flights = [];
-    if (run.accepted) for (let i = 0; i < Math.min(run.n, 8); i++) flights.push({ start: i * 0.22, dur: 0.45, a: from, b: truckTop(DOCK_X), fadeEnd: true });
-    if (run.accepted) for (let i = 0; i < Math.min(run.n, SLOTS.length); i++) flights.push({ start: run.arrive + i * 0.2, dur: 0.42, a: truckTop(BAY_X), b: at([SLOTS[i], -95, 48]), fadeEnd: false });
+    if (run.accepted) for (let i = 0; i < n; i++) flights.push({ start: i * 0.22, dur: 0.45, a: from, b: slotAt(i, DOCK_X), fadeEnd: false });
+    if (run.accepted) for (let i = 0; i < n; i++) flights.push({ start: run.arrive + i * 0.16, dur: 0.42, a: slotAt(i, BAY_X), b: at([SLOTS[i % SLOTS.length], -95, 48]), fadeEnd: i >= SLOTS.length });
     flying.forEach((node, i) => {
       const f = flights.find((fl, j) => j % 5 === i && age >= fl.start && age < fl.start + fl.dur) ?? null;
       if (!f || calm) return setAttr(node, "style", "opacity:0");
@@ -968,13 +990,15 @@ ${truck()}
       setAttr(node, "transform", `translate(${f1(x)} ${f1(y)})`);
       setAttr(node, "style", `opacity:${(f.fadeEnd ? 1 - clamp01((u - 0.75) / 0.25) : 1).toFixed(3)}`);
     });
-    counterCrates.forEach((node, i) => {
-      const on = run.accepted && i < Math.min(run.n, SLOTS.length) && age >= run.arrive + i * 0.2 + 0.42;
+    truckCrates.forEach((node, i) => {
+      const on = run.accepted && i < n && age >= i * 0.22 + 0.45 && age < run.arrive + i * 0.16;
       setAttr(node, "style", on ? null : "opacity:0");
     });
-    const happy = run.accepted && age >= run.unloadDone - 0.2 && age < run.unloadDone + 3.4;
-    armsDown.forEach((node) => setAttr(node, "style", happy ? "opacity:0" : null));
-    setAttr(armsUp, "style", happy ? null : "opacity:0");
+    counterCrates.forEach((node, i) => {
+      const on = run.accepted && i < Math.min(n, SLOTS.length) && age >= run.arrive + i * 0.16 + 0.42;
+      setAttr(node, "style", on ? null : "opacity:0");
+    });
+    live.happy = run.accepted && age >= run.unloadDone - 0.2 && age < run.unloadDone + 3.4;
     const delivered = run.accepted && age >= run.arrive;
     const [day, date] = delivered ? ["MON", "16"] : live.today;
     setText(el.caldate, date);
@@ -1041,37 +1065,67 @@ ${truck()}
     });
   }
 
-  /** Chef speech bubble, anchored above the toque with its tail on the chef. */
-  function drawBubble(state, t) {
-    const say = state.say;
-    if (!say) return setAttr(el.bubble, "style", "opacity:0");
-    const lines = wrap(say.text, 30);
-    const anchor = at([CHEF[0], CHEF[1], 88]);
-    const size = 27;
-    const lineH = size * 1.25;
-    const width = Math.max(...lines.map((l) => l.length)) * size * 0.53 + 36;
-    const height = lines.length * lineH + 26;
-    const x = anchor[0] + 22;
-    const y = anchor[1] - height - 20;
-    const tip = [anchor[0] + 6, anchor[1] - 4];
-    const rr = 14;
-    const d = `M${f1(x + rr)} ${f1(y)}H${f1(x + width - rr)}Q${f1(x + width)} ${f1(y)} ${f1(x + width)} ${f1(y + rr)}V${f1(y + height - rr)}Q${f1(x + width)} ${f1(y + height)} ${f1(x + width - rr)} ${f1(y + height)}H${f1(x + 40)}L${f1(tip[0])} ${f1(tip[1])}L${f1(x + 18)} ${f1(y + height)}H${f1(x + rr)}Q${f1(x)} ${f1(y + height)} ${f1(x)} ${f1(y + height - rr)}V${f1(y + rr)}Q${f1(x)} ${f1(y)} ${f1(x + rr)} ${f1(y)}Z`;
-    el.bubble.querySelector(".bubble-box").setAttribute("d", d);
-    const txt = el.bubble.querySelector(".bubble-text");
-    const key = lines.join("\n");
-    if (txt.dataset.key !== key) {
-      txt.dataset.key = key;
-      txt.textContent = "";
-      lines.forEach((line, i) => {
-        const span = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-        span.setAttribute("x", f1(x + 18));
-        span.setAttribute("y", f1(y + 13 + size + i * lineH - 4));
-        span.textContent = line;
-        txt.appendChild(span);
-      });
-      txt.setAttribute("font-size", size);
+  /** What the chef is typing into the kitchen terminal: the request appears letter by letter above the terminal. */
+  function drawTyped(state, t, calm) {
+    let source = null;
+    if (state.say) source = { text: state.say.text, since: state.say.since };
+    else if (state.draft && state.agent.at === "chef" && (state.agent.carry === "draft" || state.agent.carry === "question") && t - state.agent.since < 5) source = { text: state.draft.text, since: state.agent.since };
+    if (!source) {
+      setAttr(el.bubble, "style", "opacity:0");
+      return { typing: false };
     }
-    setAttr(el.bubble, "style", `opacity:${Math.min(1, (t - say.since) / 0.35).toFixed(3)}`);
+    const full = wrap(source.text, 26);
+    const shown = calm ? source.text.length : Math.floor((t - source.since) * 18);
+    let left = shown;
+    const lines = full.map((line) => {
+      const part = line.slice(0, Math.max(0, left));
+      left -= line.length + 1;
+      return part;
+    });
+    const size = 25;
+    const lineH = size * 1.3;
+    const width = Math.max(...full.map((l) => l.length + 1)) * size * 0.62 + 40;
+    const height = full.length * lineH + 26;
+    const [tx, ty] = at([PHONE.x + PHONE.w / 2, PHONE.y + PHONE.d, PHONE.z + PHONE.h + 6]);
+    const x = Math.max(14, Math.min(W - 14 - width, tx - width / 2 + 60));
+    const y = ty - height - 22;
+    const rr = 12;
+    const tipX = Math.min(Math.max(tx, x + 30), x + width - 30);
+    const d = `M${f1(x + rr)} ${f1(y)}H${f1(x + width - rr)}Q${f1(x + width)} ${f1(y)} ${f1(x + width)} ${f1(y + rr)}V${f1(y + height - rr)}Q${f1(x + width)} ${f1(y + height)} ${f1(x + width - rr)} ${f1(y + height)}H${f1(tipX + 12)}L${f1(tx)} ${f1(ty - 4)}L${f1(tipX - 12)} ${f1(y + height)}H${f1(x + rr)}Q${f1(x)} ${f1(y + height)} ${f1(x)} ${f1(y + height - rr)}V${f1(y + rr)}Q${f1(x)} ${f1(y)} ${f1(x + rr)} ${f1(y)}Z`;
+    el.bubble.querySelector(".typed-box").setAttribute("d", d);
+    const txt = el.bubble.querySelector(".typed-text");
+    while (txt.children.length < full.length) txt.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "tspan"));
+    [...txt.children].forEach((span, i) => {
+      const caret = !calm && i === lines.findLastIndex((l) => l.length > 0) && shown < source.text.length + 12 && Math.floor(t * 3) % 2 === 0 ? "▍" : "";
+      setText(span, (lines[i] ?? "") + caret);
+      setAttr(span, "x", f1(x + 20));
+      setAttr(span, "y", f1(y + 13 + size + i * lineH - 4));
+    });
+    setAttr(txt, "font-size", size);
+    setAttr(el.bubble, "style", `opacity:${Math.min(1, (t - source.since) / 0.3).toFixed(3)}`);
+    return { typing: shown < source.text.length + 8 };
+  }
+
+  /** The chef acts: types at the terminal, looks at it when an approval waits, taps to approve, cheers at delivery, frowns at an empty counter. */
+  function drawChef(state, t, typed, calm) {
+    const ph = state.phone;
+    const tapping = ph.status === "approved" && t - ph.since < 1;
+    const looking = ph.status === "buzzing" || tapping;
+    const sad = (state.naive.step === "load" && t - state.naive.since > 0.7) || state.naive.step === "stuck" || ph.status === "expired";
+    const typing = typed.typing || tapping;
+    const happy = live.happy;
+    const shrug = sad && !happy && !typing;
+    setAttr(armLeft, "style", typing || shrug ? "opacity:0" : null);
+    setAttr(armType, "style", typing ? null : "opacity:0");
+    setAttr(typingHand, "transform", typing && !calm ? `translate(0 ${f1(-Math.abs(Math.sin(t * 16)) * 2.4)})` : null);
+    armsDown.filter((node) => node !== armLeft).forEach((node) => setAttr(node, "style", happy || shrug ? "opacity:0" : null));
+    setAttr(armsUp, "style", happy ? null : "opacity:0");
+    setAttr(armsShrug, "style", shrug ? null : "opacity:0");
+    const [ex, ey] = looking || typing ? [-2.2, 0.6] : sad ? [0, 1.4] : [0, 0];
+    setAttr(eyes, "transform", ex || ey ? `translate(${f1(ex * KS)} ${f1(ey * KS)})` : null);
+    setAttr(smile, "style", happy ? null : "opacity:0");
+    setAttr(frown, "style", sad && !happy ? null : "opacity:0");
+    setAttr(el.phone, "data-typing", typed.typing && ph.status === "idle" ? "" : null);
   }
 
   /** The agent's card content as a label over its head. */
