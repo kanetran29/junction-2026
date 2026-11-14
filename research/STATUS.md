@@ -385,3 +385,54 @@ Kane duyệt cả 3 phần ("làm cả 3, k cần lo thời gian, làm cho tốt
 - Bổ sung: đã merge thêm commit demo `a4f7e8c` (sửa CSS: mũi tên của flow trong tab Inside nằm trên các thẻ), merge `0f53c3d`.
   Deploy phiên bản **`880c48c0-ab8e-4a31-8426-08e653ab42c7`**. CSS mới đã lên live. `/demo/?mode=inside` 200, `proof.json` 200,
   video với Range trả 206. Test demo 55 pass, 0 fail. Chỉ CSS đổi nên không chạy lại bộ test Worker (Docker vẫn tắt). Đã reset demo chuẩn.
+
+### C9. Try it: bếp sandbox không cần key trên door demo (xong, **chưa push**)
+**Route**
+- `POST /v1/try` chỉ có khi `DEMO_MODE=1`; nếu không thì trả 404 trước mọi bước validate. Route không cần key.
+- Lần gọi đầu mở một bếp sandbox:
+  - buyer `visitor-<8 hex>`, mandate của bếp (tự đặt tới 500 € một đơn và 1.500 € một ngày), người duyệt "You (kitchen manager)";
+  - trả token `visitor` (24 byte ngẫu nhiên, chỉ lưu sha256).
+- Door chạy đúng đường của agent tham chiếu, không có model nào chọn:
+  - interpret (Gemini, Gemma đọc lại) → confirm với mặc định của profile → quote → đặt offer 0 kèm JWS.
+  - Còn trường nào mở thì trả `needs_input` kèm câu hỏi. Khách trả lời bằng `{visitor, draftId, answer}`.
+  - Đơn HELD trả kèm approval token, vì khách là người duyệt của chính bếp sandbox đó.
+- `POST /v1/try/decision` duyệt hoặc từ chối qua đường duyệt bình thường, có kiểm lại.
+  - Token của buyer khác: 404. Agent key: 403.
+
+**Giới hạn**
+- 3 lần/phút cho mỗi địa chỉ (IPv6 tính theo /64).
+- 12 lần/phút cho mọi khách gộp lại; chỉ tính những lần sắp gọi model.
+- Tối đa 50 sandbox, mỗi địa chỉ tối đa 3. Sandbox để yên 30 phút thì được giải phóng.
+- Body tối đa 4 KB.
+- Lần gọi đầu bị lỗi thì sandbox của lần đó được giải phóng luôn.
+
+**Thế giới kho riêng**
+- Đơn sandbox chỉ tính với đơn sandbox khác, nên khách không bao giờ lấy kho mà hotel-a/hotel-b dùng.
+- Tách bằng `sameWorld` trong cả 4 chỗ đọc sổ kho, vẫn trong cùng câu lệnh và lock 1.
+
+**Review độc lập (Opus)**
+- Không có lỗ hổng giữa các tenant.
+- Đã sửa:
+  1. Thế giới kho riêng.
+  2. Lần gọi đầu bị lỗi không chiếm slot.
+  3. Ngân sách chung chỉ tính lần gọi model.
+  4. IPv6 tính theo /64.
+  5. Mỗi địa chỉ tối đa 3 sandbox; sandbox để yên 30 phút được giải phóng.
+  6. Hỏi tiếp khi vẫn còn trường mở, không rơi vào ngõ cụt 409.
+  7. Giới hạn body 4 KB.
+  8. Seed mandate trước khi chèn sandbox (an toàn khi reset chen vào).
+  9. Discovery và rules chỉ liệt kê Try it trên door demo.
+- Giới hạn đã biết:
+  - Try it dùng chung quota Gemini/Gemma với hai hotel. Khi Try bận, Gemma có thể `unavailable` cho cả draft của hotel.
+  - Gửi lại một câu text là đặt đơn mới.
+  - Chữ của khách hiện trên Live ticker (qua textContent, không có XSS).
+
+**Kết quả**
+- Test 390/390, tsc sạch, check-secrets OK.
+- Đã thêm bảng `try_visitors` lên Aiven trước khi deploy.
+- Deploy `eec84341-0152-43f5-bd99-2a080b83ad11`. Nghiệm thu **60/60** (thêm AC56–AC60), scenarios **11/11**.
+- Kiểm live:
+  - Đơn nhỏ ACCEPTED; câu sữa của chef HELD, khách duyệt thì ACCEPTED; event của sandbox hiện ở log không cần key.
+  - Lần gọi thứ 4 trong một phút trả 429 kèm `Retry-After`; text 201 ký tự trả 400.
+- `proof.json` cập nhật 60/60, 11/11, 390 test trên `eec84341`; deploy lại assets thành **`bc85188d`**.
+- Commit `075f486`, `50a6c67`. Đã reset demo chuẩn.
