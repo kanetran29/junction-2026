@@ -52,24 +52,45 @@ interface Raw {
 
 const UNITS = ['l', 'kg', 'pcs'];
 const FIELDS = ['category', 'subtype', 'claims', 'quantity', 'deliverBy', 'brand', 'packLitres'];
-const str = { type: 'STRING' };
+const str = { type: 'STRING', nullable: true };
+const strList = { type: 'ARRAY', items: { type: 'STRING' } };
 
-/** The Gemini response schema: the draft fields and nothing that could carry authority. */
+/**
+ * The Gemini response schema: the draft fields and nothing that could carry authority. Every field is required (the
+ * optional ones nullable) so the model must answer each one explicitly instead of silently leaving it out; `needs` comes
+ * first so the model names what the text asks for before it fills the fields.
+ */
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
+  propertyOrdering: ['needs', 'category', 'subtype', 'claims', 'quantity', 'deliverBy', 'brand', 'packLitres', 'unclear'],
   properties: {
-    category: { ...str, description: 'Category code from the list, or omit' },
+    needs: strList,
+    category: { ...str, description: 'Category code from the list, or null' },
     subtype: str,
-    claims: { type: 'ARRAY', items: str },
-    quantity: { type: 'OBJECT', properties: { value: { type: 'NUMBER' }, unit: str }, required: ['value', 'unit'] },
-    deliverBy: { ...str, description: 'ISO date YYYY-MM-DD' },
-    brand: { type: 'OBJECT', properties: { rule: { ...str, enum: ['only', 'prefer'] }, names: { type: 'ARRAY', items: str } }, required: ['rule', 'names'] },
-    packLitres: { type: 'NUMBER' },
-    unclear: { type: 'ARRAY', items: str },
-    needs: { type: 'ARRAY', items: str },
+    claims: { ...strList, nullable: true },
+    quantity: { type: 'OBJECT', nullable: true, properties: { value: { type: 'NUMBER' }, unit: { type: 'STRING' } }, required: ['value', 'unit'] },
+    deliverBy: { ...str, description: 'ISO date YYYY-MM-DD, or null' },
+    brand: { type: 'OBJECT', nullable: true, properties: { rule: { type: 'STRING', enum: ['only', 'prefer'] }, names: strList }, required: ['rule', 'names'] },
+    packLitres: { type: 'NUMBER', nullable: true },
+    unclear: strList,
   },
-  required: ['unclear', 'needs'],
+  required: ['needs', 'category', 'subtype', 'claims', 'quantity', 'deliverBy', 'brand', 'packLitres', 'unclear'],
 };
+
+/** Claim words (English and Finnish) a buyer's text can contain, with the claim id each one asks for. */
+const CLAIM_WORDS: [RegExp, string][] = [
+  [/lactose[- ]free|laktoositon/i, 'FREE_FROM_LACTOSE'],
+  [/gluten[- ]free|gluteeniton/i, 'FREE_FROM_GLUTEN'],
+  [/\bvegan|vegaani/i, 'VEGAN'],
+];
+
+/**
+ * A rule, not the model: the claim ids the text asks for in words that the draft does not carry. They are never added
+ * to the draft, only reported, so the buyer must fill them (a dropped requirement must not slip through a confirm).
+ */
+function claimWordsLost(text: string, claims: string[], claimIds: Set<string>): boolean {
+  return CLAIM_WORDS.some(([re, id]) => claimIds.has(id) && re.test(text) && !claims.includes(id));
+}
 
 /** Reads the reference lists the prompt and the validation share: category codes with names, and the claim ids in the index. */
 async function lists(env: Env) {
@@ -179,7 +200,7 @@ export async function interpret(
     d.missing = ['needs', ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy'])];
   } else {
     const modelUnclear = (Array.isArray(raw.unclear) ? raw.unclear : []).filter((u) => typeof u === 'string' && u);
-    d.unclear = [...new Set([...modelUnclear, ...unclear, ...(fields.category ? [] : ['category']), ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy'])])];
+    d.unclear = [...new Set([...modelUnclear, ...unclear, ...(fields.category ? [] : ['category']), ...(fields.quantity ? [] : ['quantity']), ...(fields.deliverBy ? [] : ['deliverBy']), ...(claimWordsLost(input.text, fields.claims, new Set(ref.claimIds)) ? ['claims'] : [])])];
   }
   await save(env, input.buyerId, d, helsinkiIso(at));
   await logEvent(env, { type: 'draft.created', buyerId: input.buyerId, draftId: d.id, data: { text: d.text, category: d.category ?? null, claims: d.claims, quantity: d.quantity ?? null, unclear: d.unclear } });

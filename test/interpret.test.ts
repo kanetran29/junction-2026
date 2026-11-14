@@ -35,7 +35,7 @@ describe('interpret', () => {
   beforeEach(async () => {
     for (const t of ['drafts', 'events', 'category_names', 'products']) await e.DB.prepare(`DELETE FROM ${t}`).run();
     await e.DB.prepare("INSERT INTO category_names(category, names, tag_source) VALUES ('10400','Milk','reviewed')").run();
-    await e.DB.prepare("INSERT INTO products(id, category, names, claims) VALUES ('T0001','10400','[]','[\"FREE_FROM_LACTOSE\",\"VEGAN\"]')").run();
+    await e.DB.prepare("INSERT INTO products(id, category, names, claims) VALUES ('T0001','10400','[]','[\"FREE_FROM_LACTOSE\",\"FREE_FROM_GLUTEN\",\"VEGAN\"]')").run();
     await setClock(e, '2026-11-13T21:10:00+02:00');
   });
 
@@ -49,6 +49,8 @@ describe('interpret', () => {
     const body = JSON.parse(s.calls[0].init.body as string);
     expect(body.generationConfig.responseMimeType).toBe('application/json');
     expect(body.generationConfig.responseSchema.properties.quantity).toBeDefined();
+    expect(body.generationConfig.responseSchema.propertyOrdering[0]).toBe('needs');
+    expect(body.generationConfig.responseSchema.required).toEqual(expect.arrayContaining(['claims', 'quantity', 'deliverBy', 'category']));
     expect(JSON.stringify(body)).toContain('2026-11-13');
     expect(JSON.stringify(body)).toContain('10400');
     expect(JSON.stringify(body)).toContain('FREE_FROM_LACTOSE');
@@ -64,6 +66,24 @@ describe('interpret', () => {
     expect(d.quantity).toBeUndefined();
     expect(d.deliverBy).toBeUndefined();
     expect([...d.unclear].sort()).toEqual(['category', 'claims', 'deliverBy', 'quantity']);
+  });
+
+  it('flags a claim the text asks for in words but the model dropped, and never adds it', async () => {
+    const lost = { ...milk, claims: [] };
+    for (const text of [MILK, 'Tarvitsen 1000 litraa laktoositonta maitoa', 'gluten-free flour by Monday']) {
+      const d = await interpret(e, { buyerId: 'b1', text }, stub(text.startsWith('gluten') ? { ...lost, claims: [] } : lost).deps);
+      expect(d.claims).toEqual([]);
+      expect(d.unclear).toContain('claims');
+    }
+    const d = await interpret(e, { buyerId: 'b1', text: MILK }, stub(lost).deps);
+    await expect(confirmDraft(e, { buyerId: 'b1', draftId: d.id, fill: {} })).rejects.toMatchObject({ code: 'DRAFT_UNCLEAR' });
+  });
+
+  it('does not flag claims when the text has no claim word or the claim is kept', async () => {
+    const plain = await interpret(e, { buyerId: 'b1', text: 'a thousand litres of milk by Monday' }, stub({ ...milk, claims: [] }).deps);
+    expect(plain.unclear).toEqual([]);
+    const kept = await interpret(e, { buyerId: 'b1', text: MILK }, stub(milk).deps);
+    expect(kept.unclear).toEqual([]);
   });
 
   it('rejects impossible dates, unreviewed subtypes and a non-object model reply', async () => {
