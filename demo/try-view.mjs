@@ -1,6 +1,6 @@
 // The "Try it: you are the chef" panel under Live: input, example chips, Send, and one result area that shows the door's
 // question, offer refusal, decision or the manager's phone card. Built with DOM calls only (text, never markup).
-import { EXAMPLES, MAX_TEXT, CACHED_NOTE, postTry, viewOf } from "./try.mjs";
+import { EXAMPLES, MAX_TEXT, CACHED_NOTE, PROGRESS, SLOW, stepAt, postTry, viewOf } from "./try.mjs";
 import { ICONS } from "./icons.mjs";
 
 const STORE_KEY = "lazydoor.try";
@@ -217,7 +217,19 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
     busy = true;
     send.disabled = true;
     const loading = el("div", "try-box try-loading");
-    loading.append(el("p", "try-title", "Sending to the door"), el("p", "try-line", "Reading, searching and quoting takes a few seconds."), el("span", "skeleton"));
+    const steps = el("ol", "try-steps");
+    const items = PROGRESS.map((p) => steps.appendChild(el("li", "", p.text)));
+    const slow = el("p", "try-line try-slow", SLOW.text);
+    loading.append(el("p", "try-title", "Sending to the door"), steps, slow, el("span", "skeleton"));
+    const sentAt = performance.now();
+    const tick = () => {
+      const seconds = (performance.now() - sentAt) / 1000;
+      const now = stepAt(seconds);
+      items.forEach((li, i) => (li.dataset.state = i < now ? "done" : i === now ? "now" : "next"));
+      slow.hidden = seconds < SLOW.at;
+    };
+    tick();
+    const progress = setInterval(tick, 250);
     result.setAttribute("aria-busy", "true");
     status.replaceChildren(loading);
     chips.removeAttribute("data-highlight");
@@ -233,6 +245,7 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
         res = await post({ text: original, visitor: sandbox?.visitor });
       }
     } else res = await post({ text: said, visitor: sandbox?.visitor });
+    clearInterval(progress);
     busy = false;
     send.disabled = false;
     if (res.status === 200 && res.body?.visitor) {

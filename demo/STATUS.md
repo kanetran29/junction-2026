@@ -286,6 +286,11 @@ Vấn đề tìm thấy:
 - Built with: logo nằm trên tên mỗi dòng (một dấu, hai dấu hay logo ngang đều thẳng hàng). Deck slide 7: Aiven, Gemini + Gemma, OpenAPI + MCP ở ô agent; render lại `pitch/out/deck.pdf` và `slides/07.png`.
 - Test: 67 pass với Playwright; `label overlaps: 0`; 375 px không cuộn ngang.
 
+### 38. Deck với số đo mới; Try it hiện tiến trình
+- Deck render lại từ `pitch/pitch.json` mới: slide 8 là 63/63, 11/11, 406; notes ghi 63 acceptance cases. Thiết kế giữ nguyên.
+- Try it: trong lúc door làm việc, hộp chờ hiện ba bước "Reading your request…", "Asking Valio…", "Deciding…" (bắt đầu ở 0, 2,5 và 5 s; bước xong chấm xanh, bước đang chạy chấm hồng và chữ đậm), sau 9 s thêm "Free text can take up to 15 s.". Các bước theo thời gian vì door trả lời một lần; tắt khi có trả lời.
+- Test: 68 pass với Playwright; `label overlaps: 0`. Lưu ý: `main` đã có số mới trong `demo/proof.json`, `compare.mjs`, `index.html` (từ build session); nhánh này không sửa các file đó nên merge không đụng.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

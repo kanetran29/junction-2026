@@ -52,6 +52,20 @@ const QUESTIONS = {
 };
 export const questionFor = (field) => QUESTIONS[field] ?? `One more detail: ${field}?`;
 
+/**
+ * The steps the panel shows while the door works, at the second each one starts after Send: a try takes about 6 s, free
+ * text up to 15 s. Timed, since the reply comes in one piece; `SLOW` is the note once a try runs long.
+ */
+export const PROGRESS = [
+  { at: 0, text: "Reading your request…" },
+  { at: 2.5, text: "Asking Valio…" },
+  { at: 5, text: "Deciding…" },
+];
+export const SLOW = { at: 9, text: "Free text can take up to 15 s." };
+
+/** The index of the progress step that is current `seconds` after Send. */
+export const stepAt = (seconds) => PROGRESS.findLastIndex((p) => seconds >= p.at);
+
 /** The line under an answer whose readings were recorded (the example chips are served from recorded readings). */
 export const CACHED_NOTE = "Example: readings recorded from Gemini and Gemma";
 

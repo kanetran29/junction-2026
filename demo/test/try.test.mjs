@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { viewOf, postTry, EXAMPLES, dayLabel, CACHED_NOTE, questionFor } from "../try.mjs";
+import { viewOf, postTry, EXAMPLES, dayLabel, CACHED_NOTE, questionFor, PROGRESS, SLOW, stepAt } from "../try.mjs";
 
 const SERVER = fileURLToPath(new URL("../dev/fake-gateway.mjs", import.meta.url));
 const PORT = 8795;
@@ -76,4 +76,10 @@ test("dev server: the try sandbox asks, holds, accepts and logs events under the
   assert.equal(answered.body.order.state, "ACCEPTED");
   const events = (await (await fetch(`http://localhost:${PORT}/v1/events?since=0`)).json()).events;
   assert.ok(events.length > 10 && events.every((e) => e.buyerId === held.body.buyerId));
+});
+
+test("try: while the door works the panel steps through reading, asking Valio and deciding, then notes that free text takes longer", () => {
+  assert.deepEqual(PROGRESS.map((p) => p.text), ["Reading your request…", "Asking Valio…", "Deciding…"]);
+  assert.deepEqual([0, 2.4, 2.5, 4.9, 5, 30].map(stepAt), [0, 0, 1, 1, 2, 2]);
+  assert.deepEqual([SLOW.at, SLOW.text], [9, "Free text can take up to 15 s."]);
 });
