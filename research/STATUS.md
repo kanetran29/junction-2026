@@ -382,3 +382,6 @@ Kane duyệt cả 3 phần ("làm cả 3, k cần lo thời gian, làm cho tốt
   - `demo/test/` vẫn 404.
 - Đã reset demo chuẩn. Đã tắt lại Docker (chỉ bật để chạy test).
 - **Quy ước reset chuẩn hiện tại:** Thứ Sáu 21:10, replay `replies_2026-11-16`, mandate 500 € một đơn và 1.500 € một ngày.
+- Bổ sung: đã merge thêm commit demo `a4f7e8c` (sửa CSS: mũi tên của flow trong tab Inside nằm trên các thẻ), merge `0f53c3d`.
+  Deploy phiên bản **`880c48c0-ab8e-4a31-8426-08e653ab42c7`**. CSS mới đã lên live. `/demo/?mode=inside` 200, `proof.json` 200,
+  video với Range trả 206. Test demo 55 pass, 0 fail. Chỉ CSS đổi nên không chạy lại bộ test Worker (Docker vẫn tắt). Đã reset demo chuẩn.
