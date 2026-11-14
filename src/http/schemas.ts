@@ -2,29 +2,29 @@ import { z } from '@hono/zod-openapi';
 import { draftSchema } from '../quote/store';
 
 /** The `{ error, detail }` body every failed request answers with. */
-export const ErrorBody = z.object({ error: z.string(), detail: z.string() }).openapi('Error');
+export const ErrorBody = z.object({ error: z.string(), detail: z.string() }).openapi('ErrorBody');
 
 /** The typed need (category, reference product or product list) shared by quotes, baskets and the MCP tools. */
-export const Draft = draftSchema.openapi('Need');
+export const Draft = draftSchema.openapi('Draft');
 
 /** A draft as `interpret` and `confirm` return it: typed fields plus what is still unclear or missing. */
-export const InterpretedDraft = z.looseObject({ id: z.string(), status: z.enum(['draft', 'needs_input', 'confirmed']), text: z.string(), claims: z.array(z.string()), unclear: z.array(z.string()), missing: z.array(z.string()), needs: z.array(z.string()) }).openapi('Draft');
+export const InterpretedDraft = z.looseObject({ id: z.string(), status: z.enum(['draft', 'needs_input', 'confirmed']), text: z.string(), claims: z.array(z.string()), unclear: z.array(z.string()), missing: z.array(z.string()), needs: z.array(z.string()) }).openapi('InterpretedDraft');
 
-export const InterpretBody = z.object({ text: z.string().min(1) }).openapi('InterpretRequest');
+export const InterpretBody = z.object({ text: z.string().min(1) }).openapi('InterpretBody');
 export const InterpretReply = z.object({ draft: InterpretedDraft, valioCalls: z.literal(0) }).openapi('InterpretReply');
 
-export const ConfirmBody = z.object({ fill: z.record(z.string(), z.unknown()) }).openapi('ConfirmRequest');
+export const ConfirmBody = z.object({ fill: z.record(z.string(), z.unknown()) }).openapi('ConfirmBody');
 export const ConfirmReply = z.object({ draft: InterpretedDraft }).openapi('ConfirmReply');
 
-export const SearchBody = z.object({ category: z.string().min(1), claims: z.array(z.string().min(1)).default([]), subtype: z.string().min(1).optional() }).openapi('SearchRequest');
+export const SearchBody = z.object({ category: z.string().min(1), claims: z.array(z.string().min(1)).default([]), subtype: z.string().min(1).optional() }).openapi('SearchBody');
 export const SearchProduct = z.looseObject({ id: z.string(), category: z.string(), subtype: z.string().nullable(), name: z.string().nullable(), brand: z.string().nullable(), salesUnit: z.string().nullable(), claims: z.array(z.string()) }).openapi('SearchProduct');
 export const SearchReply = z.object({ products: z.array(SearchProduct), valioCalls: z.literal(0) }).openapi('SearchReply');
 
 /** A quote request names a stored draft, a draft to confirm and use, or a bare need. */
-export const QuoteBody = z.union([z.object({ draftId: z.string().min(1) }), z.object({ draft: Draft }), Draft]).openapi('QuoteRequest');
+export const QuoteBody = z.union([z.object({ draftId: z.string().min(1) }), z.object({ draft: Draft }), Draft]).openapi('QuoteBody');
 export const Quote = z.looseObject({ id: z.string(), buyerId: z.string(), expiresAt: z.string(), offers: z.array(z.looseObject({ offerId: z.string(), netCents: z.number() })), rejections: z.array(z.looseObject({ productId: z.string(), code: z.string() })) }).openapi('Quote');
 
-export const BasketBody = z.object({ needs: z.array(Draft).min(1) }).openapi('BasketRequest');
+export const BasketBody = z.object({ needs: z.array(Draft).min(1) }).openapi('BasketBody');
 export const BasketReply = z.object({ basketId: z.string(), quotes: z.array(Quote), expiresAt: z.string() }).openapi('BasketReply');
 
 /** One offer of one quote; a basket order lists one per need. */
@@ -54,7 +54,7 @@ export const IdParam = z.object({ id: z.string().min(1) });
 export const IdempotencyHeader = z.object({ 'Idempotency-Key': z.string().optional().openapi({ description: 'Unique per order attempt; a retry with the same key and body returns the same order' }) });
 
 /** Exactly one of a product id, a sales-unit GTIN, a brand or a name. */
-export const ResolveBody = z.union([z.object({ productId: z.string().min(1) }), z.object({ gtin: z.string().min(1) }), z.object({ brand: z.string().min(1) }), z.object({ name: z.string().min(1) })]).openapi('ResolveRequest');
+export const ResolveBody = z.union([z.object({ productId: z.string().min(1) }), z.object({ gtin: z.string().min(1) }), z.object({ brand: z.string().min(1) }), z.object({ name: z.string().min(1) })]).openapi('ResolveBody');
 export const ResolveReply = z
   .looseObject({
     status: z.enum(['RESOLVED', 'AMBIGUOUS', 'NO_MATCH', 'BRAND_NOT_CARRIED', 'TYPE_RESOLVED']),
@@ -72,8 +72,8 @@ export const FamiliesQuery = z.object({ terms: z.string().optional().openapi({ d
 export const Family = z.looseObject({ category: z.string(), name: z.string().nullable(), subtypes: z.array(z.string()), claims: z.array(z.string()), productCount: z.number(), tagSource: z.enum(['reviewed', 'model']), evidence: z.object({ terms: z.array(z.string()), mentions: z.number(), of: z.number() }).optional() }).openapi('Family');
 export const FamiliesReply = z.object({ families: z.array(Family), valioCalls: z.literal(0) }).openapi('FamiliesReply');
 
-export const RulesReply = z.object({ decisions: z.array(z.object({ id: z.string(), rule: z.string(), owner: z.string(), model: z.boolean(), constants: z.record(z.string(), z.unknown()) })) }).openapi('Rules');
-export const ReasonCodesReply = z.object({ codes: z.array(z.object({ code: z.string(), text: z.string(), resolution: z.string(), retryable: z.boolean() })) }).openapi('ReasonCodes');
+export const RulesReply = z.object({ decisions: z.array(z.object({ id: z.string(), rule: z.string(), owner: z.string(), model: z.boolean(), constants: z.record(z.string(), z.unknown()) })) }).openapi('RulesReply');
+export const ReasonCodesReply = z.object({ codes: z.array(z.object({ code: z.string(), text: z.string(), resolution: z.string(), retryable: z.boolean() })) }).openapi('ReasonCodesReply');
 
 export const EventsQuery = z.object({ since: z.coerce.number().int().min(0).optional(), buyer: z.string().optional() });
 export const Event = z.looseObject({ seq: z.number(), ts: z.string(), type: z.string(), buyerId: z.string(), data: z.record(z.string(), z.unknown()) }).openapi('Event');

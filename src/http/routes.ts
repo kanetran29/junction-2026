@@ -1,4 +1,5 @@
 import { OpenAPIHono, createRoute, type z } from '@hono/zod-openapi';
+import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
 import { listFamilies, resolve } from '../catalog/open';
 import { searchProducts } from '../catalog/search';
@@ -12,14 +13,19 @@ import { QuoteError, createQuote, getQuote, type QuoteInput } from '../quote/sto
 import { productName } from '../receipt/render';
 import { uiRoutes, receiptText } from '../ui/approve';
 import { adminRoutes } from './admin';
-import { HttpError, rateLimit, requireBuyer } from './auth';
+import { HttpError, authenticate, rateLimit, requireBuyer } from './auth';
 import { readEvents, streamEvents } from './events';
 import * as S from './schemas';
 
 export const INTERPRET_PER_MINUTE = 20;
 
+/** The only `/v1` routes that need no key: the published rules and reason codes. */
+const PUBLIC_PATHS = ['/v1/rules', '/v1/reason-codes'];
+
+/** One documented JSON reply: its description and the zod schema of the body. */
 const json = <T extends z.ZodType>(schema: T, description: string) => ({ description, content: { 'application/json': { schema } } });
 
+/** Every buyer route asks for the bearer API key. */
 const SECURITY = [{ bearerAuth: [] }];
 
 /** The documented replies of a buyer route: its 200 body plus the one shared `{ error, detail }` body for every failure status. */
@@ -27,6 +33,7 @@ const ok = <T extends z.ZodType>(schema: T) => ({
   200: json(schema, 'OK'),
   400: json(S.ErrorBody, 'Invalid request'),
   401: json(S.ErrorBody, 'Missing or unknown API key'),
+  403: json(S.ErrorBody, 'The admin key has no buyer'),
   404: json(S.ErrorBody, 'Not found'),
   409: json(S.ErrorBody, 'Conflict'),
   422: json(S.ErrorBody, 'Unprocessable'),
@@ -35,6 +42,7 @@ const ok = <T extends z.ZodType>(schema: T) => ({
   503: json(S.ErrorBody, 'Model unavailable'),
 });
 
+/** The required JSON request body of a route, as the zod schema describes it. */
 const body = <T extends z.ZodType>(schema: T) => ({ body: { content: { 'application/json': { schema } }, required: true as const } });
 
 const interpretRoute = createRoute({ method: 'post', path: '/v1/interpret', summary: 'Turn one sentence into a typed draft need (Gemini translates, policy never reads it)', request: body(S.InterpretBody), security: SECURITY, responses: ok(S.InterpretReply) });
@@ -80,6 +88,10 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
     },
   });
 
+  app.use('/v1/*', authenticate(PUBLIC_PATHS));
+
+  app.notFound((c) => c.json({ error: 'NOT_FOUND', detail: 'no such route' }, 404));
+
   app.onError((err, c) => {
     const known = errorBody(err);
     if (known) return c.json({ error: known.code, detail: known.detail }, known.status);
@@ -89,10 +101,12 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
 
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', { type: 'http', scheme: 'bearer', description: 'An API key from the gateway operator' });
 
+  /** Liveness, the gateway clock, replay mode and whether a Gemini key is configured. */
   app.openapi(healthRoute, async (c) =>
     c.json({ ok: true, now: helsinkiIso(await now(c.env)), replay: await replayOn(c.env), models: { gemini: Boolean(c.env.GEMINI_API_KEY) } }, 200),
   );
 
+  /** Interprets one sentence into a draft; rate limited per key, never touches Valio. */
   app.openapi(interpretRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
     await rateLimit(c.env, c.req.header('Authorization'), INTERPRET_PER_MINUTE);
@@ -100,12 +114,14 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
     return c.json({ draft, valioCalls: 0 as const }, 200);
   });
 
+  /** Applies the buyer's fill to the caller's own draft and confirms it. */
   app.openapi(confirmRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
     const draft = await confirmDraft(c.env, { draftId: c.req.valid('param').id, fill: c.req.valid('json').fill, buyerId });
     return c.json({ draft }, 200);
   });
 
+  /** Catalogue search by category and claims, logged as `search.done`; zero Valio calls. */
   app.openapi(searchRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
     const q = c.req.valid('json');
@@ -115,11 +131,13 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
     return c.json({ products, valioCalls: 0 as const }, 200);
   });
 
+  /** Quotes a stored draft, a posted draft or a product list for the caller. */
   app.openapi(quoteRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
     return c.json((await createQuote(c.env, buyerId, c.req.valid('json') as QuoteInput, fetchFn)) as never, 200);
   });
 
+  /** Reads the caller's own quote; another buyer's is 404. */
   app.openapi(getQuoteRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
     const q = await getQuote(c.env, buyerId, c.req.valid('param').id);
@@ -127,17 +145,20 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
     return c.json(q as never, 200);
   });
 
+  /** Quotes several needs as one basket for the caller. */
   app.openapi(basketRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
     return c.json((await createBasket(c.env, buyerId, c.req.valid('json').needs, fetchFn)) as never, 200);
   });
 
+  /** Places one offer or a basket selection; identity and the Idempotency-Key come from the request, never from the body. */
   app.openapi(orderRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
-    const reply = await placeOrder(c.env, { buyerId, idempotencyKey: c.req.header('Idempotency-Key') || undefined, ...c.req.valid('json') }, fetchFn);
+    const reply = await placeOrder(c.env, { ...c.req.valid('json'), buyerId, idempotencyKey: c.req.header('Idempotency-Key') || undefined }, fetchFn);
     return c.json(reply as never, 200);
   });
 
+  /** Reads the caller's own order; another buyer's is 404. */
   app.openapi(getOrderRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
     const o = await getOrder(c.env, buyerId, c.req.valid('param').id);
@@ -145,6 +166,7 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
     return c.json(o as never, 200);
   });
 
+  /** The plain-text receipt of the caller's own order. */
   app.openapi(receiptRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
     const text = await receiptText(c.env, c.req.valid('param').id, buyerId);
@@ -152,20 +174,26 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
     return c.json({ text }, 200);
   });
 
+  /** Resolves an id, GTIN, brand or name from the catalogue; never corrects input. */
   app.openapi(resolveRoute, async (c) => {
     await requireBuyer(c);
     return c.json((await resolve(c.env, c.req.valid('json'))) as never, 200);
   });
 
+  /** The catalogue families, with evidence for the given terms. */
   app.openapi(familiesRoute, async (c) => {
     await requireBuyer(c);
     const terms = (c.req.valid('query').terms ?? '').split(',');
     return c.json({ families: await listFamilies(c.env, terms), valioCalls: 0 as const }, 200);
   });
 
+  /** The public decision register. */
   app.openapi(rulesRoute, (c) => c.json({ decisions: decisionRegister() }, 200));
+  /** The public reason-code table. */
   app.openapi(reasonCodesRoute, (c) => c.json({ codes: reasonCodes() }, 200));
+  /** Polls the event log; the key decides which buyers are visible. */
   app.openapi(eventsRoute, async (c) => c.json(await readEvents(c), 200));
+  /** Streams the event log as Server-Sent Events. */
   app.openapi(streamRoute, (c) => streamEvents(c) as never);
 
   app.doc('/openapi.json', { openapi: '3.0.3', info: { title: 'Lazydoor', version: '0.1.0', description: 'Lazy at the order, strict at the border.' } });
@@ -182,6 +210,7 @@ export function errorBody(err: unknown): { status: 400 | 401 | 403 | 404 | 409 |
     const status = err.code === 'DRAFT_NOT_FOUND' ? 404 : err.code === 'UPSTREAM_ERROR' ? 502 : 409;
     return { status, code: err.code, detail: err.message };
   }
+  if (err instanceof HTTPException) return { status: 400, code: 'INVALID_REQUEST', detail: err.message };
   if (err instanceof ZodError) return { status: 400, code: 'INVALID_REQUEST', detail: err.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ') };
   return null;
 }

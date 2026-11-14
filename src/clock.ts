@@ -32,12 +32,17 @@ export async function setClock(env: Env, iso: string | null): Promise<void> {
     await env.DB.prepare("DELETE FROM settings WHERE key = 'clock'").run();
     return;
   }
+  await env.DB.prepare("INSERT INTO settings(key, value) VALUES('clock', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .bind(normaliseClock(iso))
+    .run();
+}
+
+/** Checks a clock string (it needs `Z` or an explicit offset and must be a real time) and returns it as UTC `Z`; throws otherwise. */
+export function normaliseClock(iso: string): string {
   if (!/(Z|[+-]\d{2}:?\d{2})$/.test(iso)) throw new Error(`clock needs Z or an offset: ${iso}`);
   const t = new Date(iso);
   if (Number.isNaN(t.getTime())) throw new Error(`invalid clock: ${iso}`);
-  await env.DB.prepare("INSERT INTO settings(key, value) VALUES('clock', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
-    .bind(t.toISOString())
-    .run();
+  return t.toISOString();
 }
 
 /**

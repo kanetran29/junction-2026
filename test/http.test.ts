@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { insertStatements } from '../scripts/build-index';
 import type { Env } from '../src/env';
 import { createApp } from '../src/http/routes';
+import { sha256Hex } from '../src/orders/store';
 import { fakeValio, product } from './quote-helpers';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'vk', ADMIN_KEY: 'adm', GEMINI_API_KEY: 'gk', GEMINI_MODEL: 'gm' };
@@ -16,6 +17,7 @@ const upstream = (async (url: string | URL | Request, init?: RequestInit) =>
     : valio(url, init)) as typeof fetch;
 
 const app = createApp(upstream);
+/** Sends one request to the app (JSON body when given, bearer key when given) with the test env or the one in `o.env`. */
 const call = (path: string, o: { key?: string; body?: unknown; headers?: Record<string, string>; method?: string; env?: Env } = {}) =>
   app.request(
     path,
@@ -26,7 +28,9 @@ const call = (path: string, o: { key?: string; body?: unknown; headers?: Record<
     },
     o.env ?? e,
   );
+/** Reads a reply body as JSON. */
 const json = async (r: Response) => (await r.json()) as any;
+/** Resets the gateway through the admin route with the default case state (overridable) and returns the minted keys. */
 const reset = async (body: Record<string, unknown> = {}) =>
   json(await call('/admin/reset', { key: 'adm', body: { clock: '2026-11-13T21:10:00+02:00', replay: null, replayVariant: {}, mandate: { perOrder: { auto: 500, hard: 5000 }, perDay: { auto: 500, hard: 10000 }, reliabilityFloor: 0.9, approver: 'Kitchen manager' }, ...body } }));
 
@@ -56,7 +60,61 @@ describe('auth', () => {
   });
 });
 
+describe('structural auth and error shapes', () => {
+  it('answers 401 before validating: an unauthenticated malformed POST is 401, an authenticated one 400', async () => {
+    const keys = await reset();
+    const bad = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' };
+    expect((await app.request('/v1/quotes', bad, e)).status).toBe(401);
+    expect((await app.request('/v1/search', bad, e)).status).toBe(401);
+    const r = await app.request('/v1/quotes', { ...bad, headers: { ...bad.headers, Authorization: `Bearer ${keys.agentKeys['hotel-a']}` } }, e);
+    expect(r.status).toBe(400);
+    expect(await json(r)).toMatchObject({ error: 'INVALID_REQUEST' });
+  });
+
+  it('keeps /v1/rules and /v1/reason-codes public and answers unknown routes with JSON 404', async () => {
+    expect((await call('/v1/rules')).status).toBe(200);
+    expect((await call('/v1/reason-codes')).status).toBe(200);
+    const r = await call('/nope');
+    expect(r.status).toBe(404);
+    expect(await json(r)).toMatchObject({ error: 'NOT_FOUND', detail: expect.any(String) });
+  });
+
+  it("never lets a body override the key's buyer", async () => {
+    const keys = await reset();
+    const q = await json(await call('/v1/quotes', { key: keys.agentKeys['hotel-a'], body: { draft: { category: '10400', claims: [], quantity: { value: 5, unit: 'l' }, deliverBy: '2026-11-16' } } }));
+    const o = await json(await call('/v1/orders', { key: keys.agentKeys['hotel-b'], headers: { 'Idempotency-Key': 'x1' }, body: { quoteId: q.id, offerId: q.offers[0].offerId, buyerId: 'hotel-a' } }));
+    expect(o.error).toBe('QUOTE_NOT_FOUND');
+  });
+
+  it('answers 409 while the same Idempotency-Key is still being processed', async () => {
+    const keys = await reset();
+    const hash = await sha256Hex(JSON.stringify(['qx', 'ox', null, null, null]));
+    await e.DB.prepare("INSERT INTO orders(id, buyer_id, quote_id, idempotency_key, request_hash, state, body, created_at) VALUES ('ord_busy','hotel-a','qx','busy',?,'PLACING','{}','2026-11-13T21:10:00+02:00')").bind(hash).run();
+    const r = await call('/v1/orders', { key: keys.agentKeys['hotel-a'], headers: { 'Idempotency-Key': 'busy' }, body: { quoteId: 'qx', offerId: 'ox' } });
+    expect(r.status).toBe(409);
+    expect(await json(r)).toMatchObject({ error: 'IDEMPOTENCY_IN_PROGRESS' });
+  });
+
+  it('lets an agent key neither approve nor reject', async () => {
+    const keys = await reset();
+    for (const verb of ['approve', 'reject']) expect((await call(`/${verb}/sometoken`, { key: keys.agentKeys['hotel-a'], method: 'POST' })).status).toBe(403);
+  });
+});
+
 describe('admin reset', () => {
+  it('refuses every admin call when ADMIN_KEY is not configured', async () => {
+    const noAdmin = { ...e, ADMIN_KEY: undefined } as unknown as Env;
+    expect((await call('/admin/orders?idempotencyKey=x', { key: 'adm', env: noAdmin })).status).toBe(401);
+    expect((await call('/admin/orders?idempotencyKey=x', { key: '', env: noAdmin })).status).toBe(401);
+  });
+
+  it('answers 400 for a clock without an offset and leaves the database untouched', async () => {
+    const keys = await reset();
+    const r = await call('/admin/reset', { key: 'adm', body: { clock: '2026-11-13T21:10:00' } });
+    expect(r.status).toBe(400);
+    expect((await call('/v1/quotes/q1', { key: keys.agentKeys['hotel-a'] })).status).toBe(404);
+  });
+
   it('can run twice (mandates are deleted before seeding), mints fresh keys and honours the case givens', async () => {
     const a = await reset();
     const b = await reset({ priorAccepted: [{ buyer: 'hotel-a', productId: 'P1', salesUnits: 4 }], priorAcceptedNetCents: 1000 });

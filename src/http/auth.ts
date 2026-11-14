@@ -1,4 +1,4 @@
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import type { Env } from '../env';
 import { sha256Hex } from '../orders/store';
 
@@ -13,7 +13,7 @@ export interface Caller {
 /** A refusal that maps straight onto a status and the `{ error, detail }` body. */
 export class HttpError extends Error {
   constructor(
-    readonly status: 401 | 403 | 404 | 429,
+    readonly status: 400 | 401 | 403 | 404 | 429,
     readonly code: string,
     message: string,
   ) {
@@ -47,9 +47,27 @@ export async function identify(env: Env, header: string | undefined): Promise<Ca
   return row ? { role: row.role, buyerId: row.buyer_id } : null;
 }
 
-/** The buyer behind an agent or judge key; no key or an unknown one is 401, the buyerless admin key 403. */
+/** The context key under which `authenticate` stores the resolved caller. */
+const CALLER = 'caller';
+
+/**
+ * Structural auth for `/v1/*`: resolves the caller from the bearer key before any validation (no key or an unknown one is
+ * 401) and keeps it in the request context for `requireBuyer`; the public `exempt` paths skip it.
+ */
+export function authenticate(exempt: string[]): MiddlewareHandler<{ Bindings: Env }> {
+  return async (c, next) => {
+    if (!exempt.includes(c.req.path)) {
+      const who = await identify(c.env, c.req.header('Authorization'));
+      if (!who) throw new HttpError(401, 'UNAUTHORIZED', 'a valid Bearer API key is required');
+      c.set(CALLER as never, who as never);
+    }
+    await next();
+  };
+}
+
+/** The buyer behind an agent or judge key (from the context set by `authenticate`, else resolved here, as `/mcp` does); no key or an unknown one is 401, the buyerless admin key 403. */
 export async function requireBuyer(c: Context<{ Bindings: Env }>): Promise<{ buyerId: string; role: Role }> {
-  const who = await identify(c.env, c.req.header('Authorization'));
+  const who = (c.get(CALLER as never) as Caller | undefined) ?? (await identify(c.env, c.req.header('Authorization')));
   if (!who) throw new HttpError(401, 'UNAUTHORIZED', 'a valid Bearer API key is required');
   if (!who.buyerId) throw new HttpError(403, 'FORBIDDEN', 'the admin key has no buyer; use an agent or judge key');
   return { buyerId: who.buyerId, role: who.role };

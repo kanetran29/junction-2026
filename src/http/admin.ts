@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { helsinkiIso, now, setClock } from '../clock';
+import { helsinkiIso, normaliseClock, now, setClock } from '../clock';
 import { DEFAULT_MANDATE_EXP } from '../domain/constants';
 import type { Env } from '../env';
 import { logEvent } from '../events/log';
@@ -56,6 +56,7 @@ async function insertPriorOrder(env: Env, buyerId: string, netCents: number, lin
 export function adminRoutes(): Hono<{ Bindings: Env }> {
   const admin = new Hono<{ Bindings: Env }>();
 
+  /** Gate for every admin route: demo mode only (else 404, as if absent), then the admin key (else 401). */
   admin.use('/admin/*', async (c, next) => {
     if (c.env.DEMO_MODE !== '1') throw new HttpError(404, 'NOT_FOUND', 'no such route');
     const who = await identify(c.env, c.req.header('Authorization'));
@@ -73,6 +74,13 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
     if (!parsed.success) throw parsed.error;
     const b = parsed.data;
     const env = c.env;
+    if (b.clock) {
+      try {
+        normaliseClock(b.clock);
+      } catch (err) {
+        throw new HttpError(400, 'INVALID_REQUEST', (err as Error).message);
+      }
+    }
     await env.DB.batch(['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'api_keys', 'rate_limits', 'mandates', 'buyer_keys'].map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
     await setClock(env, b.clock ?? null);
     await setSetting(env, 'replay', b.replay ? '1' : null);
