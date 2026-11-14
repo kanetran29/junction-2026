@@ -1,0 +1,11 @@
+{
+ "note": "Numbers shown on the Inside tab. Set confirmed to true once they are read from the deployed door after the final deploy.",
+ "acceptance": { "passed": 55, "total": 55, "label": "acceptance cases pass on the deployed door", "confirmed": false },
+ "scenarios": { "passed": 11, "total": 11, "label": "scenarios pass", "confirmed": false },
+ "tests": { "passed": 364, "label": "unit tests pass", "confirmed": false },
+ "agentRun": {
+  "src": "assets/proof/agent-run.mp4",
+  "caption": "A real Gemini agent on the deployed door: milk held, approved by the kitchen manager, accepted 1,010.00 €; chicken 154.00 € accepted with no human."
+ },
+ "pitchVideo": { "url": null, "label": "The 1:59 pitch video" }
+}

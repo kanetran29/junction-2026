@@ -7,6 +7,8 @@ const CLIPS = [...VOICE, ...SFX].sort((a, b) => a.at - b.at);
 import { connectLive, readBacklog } from "./live.mjs";
 import { buildScene } from "./scene.mjs";
 import { STRENGTHS, PAGE_ONLY, CONNECT_LINE } from "./compare.mjs";
+import { mountInside } from "./inside-view.mjs";
+import { runCheck, CHECKS } from "./inside.mjs";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -22,7 +24,10 @@ if (kiosk) document.body.classList.add("kiosk");
 const scene = buildScene($("scene"));
 const still = matchMedia("(prefers-reduced-motion: reduce)");
 
-let mode = ["live", "compare"].includes(params.get("mode")) ? params.get("mode") : "story";
+let mode = ["live", "compare", "inside"].includes(params.get("mode")) ? params.get("mode") : "story";
+/** The pages that replace the stage (no scene, no story or live). */
+const PAGES = ["compare", "inside"];
+let insideMounted = false;
 const story = { t: 0, next: 0, state: initialState(), playing: false, snap: true };
 /** Live watches the door at ?gateway= (a local preview against the deployed door) or the page's own origin, and follows ?buyer=. */
 const GATEWAY = params.get("gateway") || location.origin;
@@ -139,7 +144,7 @@ function overlays(state, t = 0) {
 let last = performance.now();
 /** Draws one frame dt seconds after the previous one. */
 function render(dt) {
-  if (mode === "compare") return;
+  if (PAGES.includes(mode)) return;
   if (mode === "story") {
     advance(dt);
     syncVoice();
@@ -222,7 +227,30 @@ function status(s) {
 }
 
 /** Queues a live event: the door often sends several in the same instant, and the scene shows them one after another. */
-const onLive = (ev) => live.queue.push(ev);
+/** Events after which Live re-checks the door's hash chain. */
+const ORDER_EVENTS = new Set(["policy.decided", "order.accepted", "approval.approved", "approval.rejected", "approval.expired"]);
+let auditBusy = false;
+
+/**
+ * Re-checks the door's hash-chained log (/v1/audit/verify) and shows the result as a chip in the ticker's header; the chip
+ * stays hidden while the route is not deployed or not reachable.
+ */
+async function checkAudit() {
+  if (auditBusy) return;
+  auditBusy = true;
+  const out = await runCheck(GATEWAY, CHECKS.find((c) => c.id === "audit"));
+  auditBusy = false;
+  const chip = $("audit-chip");
+  chip.dataset.state = out.state;
+  chip.textContent = out.state === "bad" ? "Audit chain ✕" : "Audit chain ✓";
+  chip.hidden = mode !== "live" || !["ok", "bad"].includes(out.state);
+}
+
+/** Queues a live event (the door often sends several in the same instant) and re-checks the audit chain after order events. */
+const onLive = (ev) => {
+  live.queue.push(ev);
+  if (ORDER_EVENTS.has(ev.type)) checkAudit();
+};
 
 /**
  * Applies queued live events at most one every 0.45 s (faster when many wait), and keeps each plain-words caption up for
@@ -265,6 +293,7 @@ async function connect() {
       await new Promise((r) => setTimeout(r, 3000));
     }
   }
+  checkAudit();
   connectLive({ base: GATEWAY, since, onEvent: onLive, onStatus: status, signal: ctl.signal });
 }
 
@@ -273,8 +302,14 @@ function setMode(next) {
   document.querySelectorAll(".modes button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
   $("story-controls").hidden = mode !== "story";
   $("live-note").hidden = mode !== "live";
-  $("stage").hidden = mode === "compare";
+  $("stage").hidden = PAGES.includes(mode);
   $("compare-page").hidden = mode !== "compare";
+  $("inside-page").hidden = mode !== "inside";
+  if (mode !== "live") $("audit-chip").hidden = true;
+  if (mode === "inside" && !insideMounted) {
+    insideMounted = true;
+    mountInside($("inside-page"), GATEWAY);
+  }
   $("mode-tag").textContent = mode === "story" ? "Story" : "Live";
   $("chip").hidden = mode !== "live";
   if (mode === "live") {
@@ -282,7 +317,7 @@ function setMode(next) {
     connect();
   } else {
     live.abort?.abort();
-    if (mode === "compare") setPlaying(false);
+    if (PAGES.includes(mode)) setPlaying(false);
     else seek(story.t);
   }
 }

@@ -17,7 +17,8 @@ export const STRENGTHS = [
 /** Rows only the Compare page shows, after the eight strengths. */
 export const PAGE_ONLY = [
   { topic: "Who checks the cut-off", without: "Nobody: the agent reads 999999 and orders", webshop: "the person, if they notice", with: "The door, on every quote", evidence: "closingTime · CUTOFF_PASSED" },
-  { topic: "Audit log of every step", without: "Only what the agent itself logs", webshop: "—", with: "Every step is an event, readable live", evidence: "/v1/events · /v1/events/stream" },
+  { topic: "Audit trail", without: "Only what the agent itself logs", webshop: "—", with: "Every step hash-chained; verify it yourself", evidence: "/v1/audit/verify · /v1/events" },
+  { topic: "Quotes", without: "Price can change in transit", webshop: "—", with: "Signed quote and receipt; check against /.well-known/jwks.json", evidence: "AC51 · QUOTE_SIGNATURE_INVALID" },
   { topic: "Works with any agent", without: "Each agent wires Valio's API itself", webshop: "—", with: "HTTP and MCP from one schema", evidence: "/openapi.json · /mcp (9 tools)" },
   { topic: "Published rules", without: "Rules live inside each agent", webshop: "—", with: "Every decision is a published rule with a reason code", evidence: "/v1/rules · /v1/reason-codes" },
 ];

@@ -16,6 +16,7 @@
       <button type="button" data-mode="story" aria-pressed="true">Story</button>
       <button type="button" data-mode="live" aria-pressed="false">Live</button>
       <button type="button" data-mode="compare" aria-pressed="false">Compare</button>
+      <button type="button" data-mode="inside" aria-pressed="false">Inside</button>
     </div>
     <div class="right">
       <span id="chip" class="chip" hidden></span>
@@ -26,7 +27,7 @@
     <div class="ground" aria-hidden="true"></div>
     <div id="scene"></div>
     <div class="hud-events">
-      <div class="hud-head"><span id="mode-tag">Story</span><span id="replay" class="badge" hidden>Replay</span></div>
+      <div class="hud-head"><span id="mode-tag">Story</span><span id="replay" class="badge" hidden>Replay</span><span id="audit-chip" class="badge audit" hidden></span></div>
       <ol id="ticker" class="ticker" aria-label="Gateway events"></ol>
     </div>
     <div class="hud-clock" aria-label="Cut-off clock">
@@ -74,6 +75,7 @@
     <p class="cmp-note">Every Lazydoor line was measured on the deployed door; the tag under it names the acceptance case, reason code or endpoint. In the webshop column, "—" means we do not know.</p>
     <footer class="cmp-foot">Live door: <a href="https://lazydoor.lazydoor.workers.dev">lazydoor.lazydoor.workers.dev</a> · Code: <a href="https://github.com/kanetran29/junction-2026">github.com/kanetran29/junction-2026</a> · 49 acceptance cases pass.</footer>
   </section>
+  <section id="inside-page" class="compare-page inside-page" aria-label="Inside Lazydoor" hidden></section>
   <p id="live-note" class="live-note" hidden>Live: the scene follows Hotel Aurora's agent at the door, as it happens; other hotels' agents show as letters from the left. Nothing is sent from this page.</p>
 </main>
 <script type="module" src="main.mjs"></script>

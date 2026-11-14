@@ -236,6 +236,14 @@ Vấn đề tìm thấy:
 - Kiểm: ffprobe một luồng h264 + một luồng aac, 118,9 s, 16,5 MB; silencedetect: 13/13 đoạn bắt đầu trong khoảng +0,00…+0,05 s so với `at` (phần lệch là 0,05 s lặng đầu file). Đã xem ảnh tổng và các khung 0:16, 0:19, 0:48,5, 1:45,5, 1:52,5, 1:57.
 - Bản cho Kane tải lên: `~/junction-2026/.data/pitch/lazydoor-pitch.mp4` (không tải lên đâu cả).
 
+### 31. Tab "Inside": một trang cho giám khảo xem toàn bộ dự án
+- `?mode=inside`, 7 mục: What it is · How an order flows (7 bước, ngang trên desktop, dọc trên điện thoại, "every step is an event in a hash-chained log") · Guardrails, with evidence (11 dòng, mã và số AC đối chiếu với `src/domain/reasons.ts`, `research/acceptance/cases.json` và README trên `main`: CUTOFF_PASSED AC05, stockNote, OVER_ORDER_AUTO/OVER_DAY_AUTO AC01/AC30, 403 AGENT_CANNOT_APPROVE AC29, APPROVAL_EXPIRED AC20, NEW_ALLERGEN AC17, STOCK_TAKEN AC31 + bài race 20 đơn, PRICE_CHANGED AC35, needs_input AC44, OVER_ORDER_HARD AC16, 422 QUOTE_SIGNATURE_INVALID AC51) · Check it yourself, live · Proof · Built with · Path to production.
+- Kiểm tra trực tiếp khi mở tab (`inside.mjs` `runCheck`/`summarize`): `/v1/audit/verify` ("Chain valid ✓ · N events · head …"), `/.well-known/jwks.json` (key id), `/.well-known/agent-gateway.json` (danh sách endpoint), `/v1/rules` (số luật theo owner), `/v1/reason-codes` (số mã); 404 hoặc 401 → "Coming with the next deploy.", không trả lời → "Not reachable from this page.". Có link `/openapi.json`, MCP và hai lệnh copy được.
+- Proof: số đọc từ `demo/proof.json` (55 / 11 / 364, ghi "pending final deploy" tới khi `confirmed: true`), video agent thật `assets/proof/agent-run.mp4` (chép từ `.data/agent-test-2026-11-14`, 2,7 MB, 1:24) kèm chú thích, chỗ để link video pitch.
+- Compare: dòng "Audit log of every step" thành "Audit trail" (hash-chained, `/v1/audit/verify`), thêm dòng "Quotes" (quote và biên nhận có chữ ký, AC51 QUOTE_SIGNATURE_INVALID); 13 dòng. Live: chip "Audit chain ✓" trong ô ticker, kiểm lại `/v1/audit/verify` sau mỗi event đơn hàng, ẩn khi route chưa có.
+- `dev/fake-gateway.mjs --door URL` chuyển các route công khai đó sang door thật (phía server), để xem kết quả thật ở máy. Story không đổi.
+- Test: 58 pass với Playwright (từng file một), 55 + 3 bỏ qua khi không có; `label overlaps: 0`. Trên door đang chạy lúc này: rules (14: 11 seller, 2 buyer, 1 approver) và reason codes (35) có kết quả; audit (401), jwks và discovery (404) hiện "Coming with the next deploy" tới lần deploy tới.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).
