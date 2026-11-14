@@ -95,6 +95,31 @@ describe('structural auth and error shapes', () => {
     expect(await json(r)).toMatchObject({ error: 'NOT_FOUND', detail: expect.any(String) });
   });
 
+  it('lets a browser read the two events routes cross-origin with a bearer header, and no other route', async () => {
+    const keys = await reset();
+    for (const path of ['/v1/events', '/v1/events/stream']) {
+      const pre = await call(path, { method: 'OPTIONS', headers: { Origin: 'https://demo.example', 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'authorization' } });
+      expect(pre.status).toBe(204);
+      expect(pre.headers.get('access-control-allow-origin')).toBe('*');
+      expect(pre.headers.get('access-control-allow-headers')?.toLowerCase()).toContain('authorization');
+      expect(pre.headers.get('access-control-allow-credentials')).toBeNull();
+    }
+    const ok = await call('/v1/events', { key: keys.agentKeys['hotel-a'], headers: { Origin: 'https://demo.example', 'Last-Event-ID': 'garbage' } });
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get('access-control-allow-origin')).toBe('*');
+    const denied = await call('/v1/events', { headers: { Origin: 'https://demo.example' } });
+    expect(denied.status).toBe(401);
+    expect(denied.headers.get('access-control-allow-origin')).toBe('*');
+    expect((await call('/v1/quotes/q1', { key: keys.agentKeys['hotel-a'], headers: { Origin: 'https://demo.example' } })).headers.get('access-control-allow-origin')).toBeNull();
+  });
+
+  it('publishes rules that follow the code: the quote ranking constant and rounding up', async () => {
+    const { decisions } = await json(await call('/v1/rules'));
+    const by = (id: string) => decisions.find((d: any) => d.id === id);
+    expect(by('ranking').constants.rankedBy).toEqual(['netTotal', 'unitPrice', 'reliability']);
+    expect(by('conversion').rule).toContain('rounded up');
+  });
+
   it("never lets a body override the key's buyer", async () => {
     const keys = await reset();
     const q = await json(await call('/v1/quotes', { key: keys.agentKeys['hotel-a'], body: { draft: { category: '10400', claims: [], quantity: { value: 5, unit: 'l' }, deliverBy: '2026-11-16' } } }));

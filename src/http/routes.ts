@@ -1,4 +1,5 @@
 import { OpenAPIHono, createRoute, type z } from '@hono/zod-openapi';
+import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
 import { listFamilies, resolve } from '../catalog/open';
@@ -88,6 +89,9 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
     },
   });
 
+  const eventsCors = cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'], allowHeaders: ['Authorization', 'Last-Event-ID'] });
+  app.use('/v1/events', eventsCors);
+  app.use('/v1/events/stream', eventsCors);
   app.use('/v1/*', authenticate(PUBLIC_PATHS));
 
   app.notFound((c) => c.json({ error: 'NOT_FOUND', detail: 'no such route' }, 404));

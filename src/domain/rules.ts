@@ -1,4 +1,4 @@
-import { QUOTE_TTL_MS } from '../quote/build';
+import { QUOTE_TTL_MS, RANKED_BY } from '../quote/build';
 import { REJECTION_PRECEDENCE, defaultMandate } from './constants';
 import { REASONS } from './reasons';
 
@@ -20,14 +20,14 @@ export function decisionRegister(): Decision[] {
   const mandate = defaultMandate('buyer');
   return [
     seller('orderable', 'A product is orderable only with a valid price, stock for the delivery date, no sales block and the cut-off not passed.'),
-    seller('conversion', 'The requested quantity becomes whole sales units from the product content and lot step; a quantity that does not divide is rejected, never rounded silently.'),
+    seller('conversion', 'The requested quantity becomes whole sales units from the product content and lot step, rounded up; the offer shows the overage. Only a quantity that cannot be converted (unit mismatch, no usable content) is rejected.'),
     seller('rounding', 'Money is integer cents; products of price and units round half up.', { mode: 'half-up', unit: 'cent' }),
     seller('subtype', 'A product matches the need only inside the reviewed or tagged subtype of the requested category.'),
-    seller('ranking', 'Offers rank by net total, ascending. No sponsored placement, no popularity score.', { rankedBy: ['netTotal'], sponsored: false, popularity: false }),
+    seller('ranking', 'Offers that cover the quantity rank before partial ones, a preferred brand before others, then by net total, unit price and reliability. No sponsored placement, no popularity score.', { rankedBy: RANKED_BY, sponsored: false, popularity: false }),
     seller('rejectionPrecedence', 'The first failing check in this order is the single rejection code of a candidate.', { order: [...REJECTION_PRECEDENCE] }),
-    seller('split', 'An order may be split across products only to cover the quantity from stock, cheapest first.'),
+    seller('split', 'An order may be split across products only to cover the quantity from stock: the reference product first, then the others cheapest per litre or kilo first.'),
     seller('substitution', 'A substitute must keep the subtype, claims and allergen profile; any change is declared as a change code.'),
-    seller('quoteExpiry', 'A quote is binding until it expires or the earliest Valio cut-off, whichever is first.', { ttlMinutes: QUOTE_TTL_MS / 60_000 }),
+    seller('quoteExpiry', 'A quote is binding until the earliest of its time limit, the Valio cut-off of its products and the end of their price validity.', { ttlMinutes: QUOTE_TTL_MS / 60_000 }),
     seller('allocation', 'Stock is allocated first come, first served at acceptance; a later order that finds it taken is refused with STOCK_TAKEN.'),
     seller('approvalRecheck', 'An approved held order is re-checked against live price and stock before it is accepted.'),
     { id: 'interpretation', rule: 'A model turns free text into a typed draft; policy and money never read the model output directly.', owner: 'buyer', model: true, constants: {} },

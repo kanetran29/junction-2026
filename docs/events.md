@@ -11,7 +11,9 @@ exactly this schema; a change here is announced in `research/STATUS.md`.
 | `GET /v1/events/stream?since=<seq>&buyer=<buyerId>` | Server-Sent Events: one message per event, `id: <seq>`, `event: <type>`, `data: <Event as JSON>`; a comment line `: ping` every 15 s; the server may close the stream after about 60 s, and the client resumes with `?since=` or the `Last-Event-ID` header |
 
 - `since` is exclusive (events with `seq > since`); default 0. `buyer` is optional (all buyers).
-- Auth: `Authorization: Bearer <key>`. A judge or admin key reads every buyer; an agent key reads only its own buyer's events.
+- Auth: `Authorization: Bearer <key>`. A judge or admin key reads every buyer; an agent key reads only its own buyer's events. Keys are never accepted in the query string.
+- A `since` or `Last-Event-ID` that is not a non-negative integer is treated as 0.
+- Browsers: `EventSource` cannot send an `Authorization` header, so use `fetch(url, { headers: { Authorization: 'Bearer <key>' } })` and read the response body stream (parse the `id:`/`event:`/`data:` lines yourself), or poll `GET /v1/events?since=`. Both events routes answer cross-origin requests (`Access-Control-Allow-Origin: *`, `Authorization` allowed, `OPTIONS` preflight answered, no credentials or cookies); no other route does.
 
 ## Event
 

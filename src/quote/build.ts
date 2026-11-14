@@ -78,7 +78,7 @@ export interface Quote {
   valioCalls: number;
   liveValioCalls: number;
   replay: boolean;
-  rankedBy: ['netTotal', 'unitPrice', 'reliability'];
+  rankedBy: [...typeof RANKED_BY];
   summary: { candidates: number; offered: number; rejected: number; unaccounted: number };
   understoodAs: Draft;
   coverage: { reliability: string };
@@ -102,6 +102,10 @@ export interface BuildInput {
 /** The order offer `changes` are listed in. */
 const CHANGE_ORDER: ReasonCode[] = ['SUBSTITUTE', 'ALLERGEN_UNKNOWN', 'SUBTYPE_UNVERIFIED', 'PACK_SIZE_CHANGED', 'BRAND_CHANGED', 'SHORTFALL'];
 const RELIABILITY_FLOOR = defaultMandate('').reliabilityFloor;
+/** The tie-break chain offers are ranked by after covering offers and a preferred brand; published in every quote and in `/v1/rules`. */
+export const RANKED_BY = ['netTotal', 'unitPrice', 'reliability'] as const;
+
+/** How long a quote stays valid at most, before the earlier cut-off and price-validity limits apply. */
 export const QUOTE_TTL_MS = 30 * 60_000;
 
 /** Rounds to `dp` decimals (tames float noise such as 4.4 x 5). */
@@ -376,7 +380,7 @@ export function buildQuote(input: BuildInput): Quote {
     valioCalls: offers.calls,
     liveValioCalls: offers.liveCalls,
     replay: offers.replay,
-    rankedBy: ['netTotal', 'unitPrice', 'reliability'],
+    rankedBy: [...RANKED_BY],
     summary: { candidates: candidateCount, offered, rejected: rejections.length, unaccounted: candidateCount - offered - rejections.length },
     understoodAs: draft,
     coverage: { reliability: `${known} of ${candidateCount}` },
