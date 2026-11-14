@@ -22,7 +22,7 @@ interface Tool {
   failed?: (reply: any) => boolean;
 }
 
-const PlaceOrderInput = z.intersection(S.OrderBody, z.object({ idempotencyKey: S.IdempotencyHeader.shape["Idempotency-Key"].unwrap() }));
+const PlaceOrderInput = z.intersection(S.OrderBody, z.object({ idempotencyKey: S.IdempotencyHeader.shape["Idempotency-Key"].unwrap().describe('Unique per order attempt; a retry with the same key and body returns the same order') }));
 
 const tools: Tool[] = [
   {

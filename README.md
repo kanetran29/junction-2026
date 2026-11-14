@@ -78,12 +78,16 @@ The scenarios use the demo-only admin routes (reset, clock, replay), so they wor
 | Reason codes | `GET /v1/reason-codes` (public); also [docs/reason-codes.md](docs/reason-codes.md) |
 | Events | `GET /v1/events` (polling) and `GET /v1/events/stream` (Server-Sent Events); schema in [docs/events.md](docs/events.md) |
 | Approver | `GET /approver/{approverKey}` (inbox), `GET /approve/{token}` (phone page), `POST /approve/{token}` and `POST /reject/{token}` |
-| Receipt | `GET /v1/orders/{id}/receipt` (plain text) |
+| Receipt | `GET /v1/orders/{id}/receipt` (plain text, buyer key); `GET /receipt/{orderId}` (plain text, no key: the order id is the capability URL, so share it only with whoever may see the receipt) |
 | Health | `GET /health` |
 
 The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/search`, `/v1/quotes`, `/v1/baskets`, `/v1/orders`, `/v1/resolve`, and `GET /v1/families`, `/v1/quotes/{id}` and `/v1/orders/{id}`. Every `/v1` route except `/v1/rules` and `/v1/reason-codes` needs `Authorization: Bearer <key>`, and so does `/mcp`. `/health` and `/openapi.json` are open. HTTP and MCP share one schema.
 
 `POST /v1/orders` follows the ACP idempotency rules: a missing `Idempotency-Key` is 400, the same key in flight is 409, the same key with another body is 422. A retry with the same key and body returns the same order.
+
+**Judge key.** The operator mints a read-everything key with `POST /admin/judge-key` (admin key, `DEMO_MODE=1`); it returns `{ key }` once. The key acts as buyer `hotel-b` (it can place orders as `hotel-b`) and reads every buyer's events. It survives `/admin/reset`; agent and approver keys do not.
+
+**Deploying.** The remote D1 database is filled with `pnpm migrate:remote`, `pnpm index:load:remote`, `pnpm replies:load:remote` and `pnpm categories:load:remote` (the local `dev:load` equivalents run against `--local`).
 
 The agent never receives the approval link. `place_order` returns only the approval status and the approver's name. The link goes to the approver inbox.
 
@@ -102,7 +106,7 @@ Be clear about what this prototype does not do.
 
 - **Order acceptance is simulated.** Valio has no order endpoint in the challenge. The receipt says "Accepted = binding order, invoiced on delivery (simulated)". The ledger is a **mock ledger adapter** in the Worker's D1 database. Valio's order API and allocation rule would replace it at the same call.
 - **Allocation is a stand-in.** Stock is allocated first come, first served against the Valio availability amount less accepted ledger lines. One SQL statement inserts all lines of an order or none. A quote and a held order reserve nothing.
-- **Replay.** After Sunday 15 Nov 17:00 (Helsinki) the gateway serves the recording made on Friday 13 Nov at 21:08 instead of calling Valio. Before that it calls Valio live. The demo clock can be set with the demo-only admin routes (`DEMO_MODE=1` and the admin key; otherwise 404). The deployed instance keeps `DEMO_MODE=1` so the demo can set the clock and replay. Its admin routes are protected by a long random `ADMIN_KEY` Worker secret.
+- **Replay.** After Sunday 15 Nov 17:00 (Helsinki) the gateway serves the recording made on Friday 13 Nov at 21:08 instead of calling Valio. Before that it calls Valio live. Replay switches on by itself only when the gateway clock is real time (no override) and has passed Sun 15 Nov 17:00 Helsinki; a demo reset with a set clock must pass `replay: "replies_2026-11-16"` to replay. Running the scenarios or acceptance against a deployed URL leaves that run's last state, so finish with one explicit demo reset (`clock: 2026-11-13T21:10:00+02:00`, `replay: replies_2026-11-16`). The demo clock can be set with the demo-only admin routes (`DEMO_MODE=1` and the admin key; otherwise 404). The deployed instance keeps `DEMO_MODE=1` so the demo can set the clock and replay. Its admin routes are protected by a long random `ADMIN_KEY` Worker secret.
 - **Payments, invoices and delivery** are not implemented.
 - **Mandate.** A mandate is a bearer JWS (Ed25519, signed per buyer, checked on every order). It has no key binding to the agent, so anyone holding it could present it. AP2-style key binding is out of scope.
 

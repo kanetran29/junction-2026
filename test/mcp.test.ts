@@ -115,5 +115,6 @@ describe('mcp', () => {
     const branches = (by.place_order.inputSchema as any).anyOf;
     expect(branches).toHaveLength(2);
     for (const b of branches) expect(b.required).toContain('idempotencyKey');
+    for (const b of branches) expect(b.properties.idempotencyKey.description).toContain('Unique per order attempt');
   });
 });

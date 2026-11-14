@@ -5,6 +5,10 @@
   "scripts": {
     "index:build": "tsx scripts/build-index.ts",
     "index:load": "wrangler d1 execute DB --local --file .data/valio/build/products.sql",
+    "migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "replies:load:remote": "wrangler d1 execute DB --remote --file .data/valio/build/replies.sql",
+    "categories:load:remote": "wrangler d1 execute DB --remote --file .data/valio/build/categories.sql",
+    "docs:reasons": "tsx scripts/reason-codes-md.ts",
     "index:load:remote": "wrangler d1 execute DB --remote --file .data/valio/build/products.sql",
     "acceptance": "tsx test/acceptance/run.ts",
     "agent": "tsx --env-file-if-exists=.dev.vars agent/buyer.ts",
