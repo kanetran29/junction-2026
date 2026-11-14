@@ -361,11 +361,21 @@ describe('approval', () => {
     expect(await lineCount()).toBe(0);
   });
 
-  it('a product Valio no longer lists is EXPIRED APPROVAL_EXPIRED', async () => {
+  it('stock Valio no longer shows is EXPIRED STOCK_TAKEN with nothing available', async () => {
     await held();
     const token = await tokenOf();
     const gone = { ...rows, QA: { price: 1.01, noStock: true } };
-    expect(await approve(e, token, { callerRole: 'approver' }, fakeValio(gone).fn)).toMatchObject({ state: 'EXPIRED', reason: 'APPROVAL_EXPIRED' });
+    expect(await approve(e, token, { callerRole: 'approver' }, fakeValio(gone).fn)).toMatchObject({ state: 'EXPIRED', reason: 'STOCK_TAKEN', available: 0 });
+  });
+
+  it('a Valio cut-off that passed while held is APPROVAL_EXPIRED; another orderable failure keeps its own code', async () => {
+    const id = await held();
+    const token = await tokenOf();
+    const late = { ...rows, QA: { price: 1.01, closing: '2026-11-13T09:00:00+02:00' } };
+    expect(await approve(e, token, { callerRole: 'approver' }, fakeValio(late).fn)).toMatchObject({ orderId: id, state: 'EXPIRED', reason: 'APPROVAL_EXPIRED' });
+    await held();
+    const blocked = { ...rows, QA: { price: 1.01, blocked: true } };
+    expect(await approve(e, await tokenOf(), { callerRole: 'approver' }, fakeValio(blocked).fn)).toMatchObject({ state: 'EXPIRED', reason: 'SALES_BLOCKED' });
   });
 
   it('approval is not a reservation: stock taken meanwhile is EXPIRED STOCK_TAKEN with what is left', async () => {

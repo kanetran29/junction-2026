@@ -13,10 +13,9 @@ The same table is served live at `GET /v1/reason-codes`.
 | `CUTOFF_PASSED` | The order cut-off for this product has passed for the requested delivery. | `requires_buyer_input` | no |
 | `NOT_ORDERABLE` | Valio shows no stock or schedule for this product. | `requires_buyer_input` | no |
 | `SALES_BLOCKED` | Valio has blocked sales of this product. | `requires_buyer_input` | no |
-| `STOCK_LIMITED` | Less stock is available than requested, so the quantity was reduced. | `requires_buyer_review` | no |
+| `STOCK_LIMITED` | Not enough stock is available for the requested quantity, so this product was rejected. | `requires_buyer_review` | no |
 | `PRICE_UNAVAILABLE` | Valio returned no valid price for this product. | `requires_buyer_input` | yes |
 | `NOT_CONVERTIBLE` | The requested quantity cannot be converted into whole sales units of this product. | `requires_buyer_input` | no |
-| `UNIT_MISMATCH` | The requested unit does not match the unit this product is sold in. | `requires_buyer_input` | no |
 | `SUBTYPE_MISMATCH` | The product is a different kind of product than the one requested. | `requires_buyer_input` | no |
 | `CLAIM_MISSING` | The product does not carry a claim the request requires. | `requires_buyer_input` | no |
 | `BRAND_EXCLUDED` | The product is from a brand the request excludes. | `requires_buyer_input` | no |

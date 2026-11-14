@@ -120,6 +120,18 @@ describe('structural auth and error shapes', () => {
     expect(by('conversion').rule).toContain('rounded up');
   });
 
+  it('answers 400 for oversized inputs', async () => {
+    const keys = await reset();
+    const key = keys.agentKeys['hotel-a'];
+    expect((await call('/v1/interpret', { key, body: { text: 'x'.repeat(1001) } })).status).toBe(400);
+    expect((await call('/v1/search', { key, body: { category: '10400', claims: Array.from({ length: 21 }, (_, i) => `C${i}`) } })).status).toBe(400);
+    const draft = { category: '10400', claims: [], quantity: { value: 5, unit: 'l' }, deliverBy: '2026-11-16' };
+    expect((await call('/v1/baskets', { key, body: { needs: Array.from({ length: 21 }, () => draft) } })).status).toBe(400);
+    expect((await call('/v1/orders', { key, headers: { 'Idempotency-Key': 'k1' }, body: { quoteId: 'q', offerId: 'o1', agentReason: 'x'.repeat(501) } })).status).toBe(400);
+    expect((await call(`/v1/families?terms=${Array.from({ length: 21 }, (_, i) => `t${i}`).join(',')}`, { key })).status).toBe(400);
+    expect((await call('/v1/families?terms=a,b', { key })).status).toBe(200);
+  });
+
   it("never lets a body override the key's buyer", async () => {
     const keys = await reset();
     const q = await json(await call('/v1/quotes', { key: keys.agentKeys['hotel-a'], body: { draft: { category: '10400', claims: [], quantity: { value: 5, unit: 'l' }, deliverBy: '2026-11-16' } } }));

@@ -10,13 +10,13 @@ export const Draft = draftSchema.openapi('Draft');
 /** A draft as `interpret` and `confirm` return it: typed fields plus what is still unclear or missing. */
 export const InterpretedDraft = z.looseObject({ id: z.string(), status: z.enum(['draft', 'needs_input', 'confirmed']), text: z.string(), claims: z.array(z.string()), unclear: z.array(z.string()), missing: z.array(z.string()), needs: z.array(z.string()) }).openapi('InterpretedDraft');
 
-export const InterpretBody = z.object({ text: z.string().min(1) }).openapi('InterpretBody');
+export const InterpretBody = z.object({ text: z.string().min(1).max(1000) }).openapi('InterpretBody');
 export const InterpretReply = z.object({ draft: InterpretedDraft, valioCalls: z.literal(0) }).openapi('InterpretReply');
 
 export const ConfirmBody = z.object({ fill: z.record(z.string(), z.unknown()) }).openapi('ConfirmBody');
 export const ConfirmReply = z.object({ draft: InterpretedDraft }).openapi('ConfirmReply');
 
-export const SearchBody = z.object({ category: z.string().min(1), claims: z.array(z.string().min(1)).default([]), subtype: z.string().min(1).optional() }).openapi('SearchBody');
+export const SearchBody = z.object({ category: z.string().min(1), claims: z.array(z.string().min(1)).max(20).default([]), subtype: z.string().min(1).optional() }).openapi('SearchBody');
 export const SearchProduct = z.looseObject({ id: z.string(), category: z.string(), subtype: z.string().nullable(), name: z.string().nullable(), brand: z.string().nullable(), salesUnit: z.string().nullable(), claims: z.array(z.string()) }).openapi('SearchProduct');
 export const SearchReply = z.object({ products: z.array(SearchProduct), valioCalls: z.literal(0) }).openapi('SearchReply');
 
@@ -24,14 +24,14 @@ export const SearchReply = z.object({ products: z.array(SearchProduct), valioCal
 export const QuoteBody = z.union([z.object({ draftId: z.string().min(1) }), z.object({ draft: Draft }), Draft]).openapi('QuoteBody');
 export const Quote = z.looseObject({ id: z.string(), buyerId: z.string(), expiresAt: z.string(), offers: z.array(z.looseObject({ offerId: z.string(), netCents: z.number() })), rejections: z.array(z.looseObject({ productId: z.string(), code: z.string() })) }).openapi('Quote');
 
-export const BasketBody = z.object({ needs: z.array(Draft).min(1) }).openapi('BasketBody');
+export const BasketBody = z.object({ needs: z.array(Draft).min(1).max(20) }).openapi('BasketBody');
 export const BasketReply = z.object({ basketId: z.string(), quotes: z.array(Quote), expiresAt: z.string() }).openapi('BasketReply');
 
 /** One offer of one quote; a basket order lists one per need. */
 const Selection = z.object({ quoteId: z.string().min(1), offerId: z.string().min(1) });
 export const OrderBody = z.union([
-  z.object({ quoteId: z.string().min(1), offerId: z.string().min(1), agentReason: z.string().optional() }),
-  z.object({ basketId: z.string().min(1), selections: z.array(Selection).min(1), agentReason: z.string().optional() }),
+  z.object({ quoteId: z.string().min(1), offerId: z.string().min(1), agentReason: z.string().max(500).optional() }),
+  z.object({ basketId: z.string().min(1), selections: z.array(Selection).min(1), agentReason: z.string().max(500).optional() }),
 ]).openapi('OrderBody');
 export const Order = z.looseObject({
   orderId: z.string(),
@@ -68,7 +68,7 @@ export const ResolveReply = z
   })
   .openapi('ResolveReply');
 
-export const FamiliesQuery = z.object({ terms: z.string().optional().openapi({ description: 'Comma-separated occasion words; omit for the whole catalogue map' }) });
+export const FamiliesQuery = z.object({ terms: z.string().refine((t) => t.split(',').length <= 20, 'at most 20 terms').optional().openapi({ description: 'Comma-separated occasion words; omit for the whole catalogue map' }) });
 export const Family = z.looseObject({ category: z.string(), name: z.string().nullable(), subtypes: z.array(z.string()), claims: z.array(z.string()), productCount: z.number(), tagSource: z.enum(['reviewed', 'model']), evidence: z.object({ terms: z.array(z.string()), mentions: z.number(), of: z.number() }).optional() }).openapi('Family');
 export const FamiliesReply = z.object({ families: z.array(Family), valioCalls: z.literal(0) }).openapi('FamiliesReply');
 

@@ -183,11 +183,11 @@ async function fetchLineOffers(env: Env, lines: OfferLine[], fetchFn: typeof fet
   }
 }
 
-/** Each line's limit per product and delivery day from Valio's rows (null = unlimited; a product no longer orderable counts as 0) and whether all are orderable. Writes nothing. */
-async function limitsFrom(env: Env, lines: OfferLine[], at: Date, offers: Offers): Promise<{ limits: Map<string, number | null>; allOrderable: boolean }> {
+/** Each line's limit per product and delivery day from Valio's rows (null = unlimited; a product no longer orderable counts as 0) and the first reason a product is not orderable, if any. Writes nothing. */
+async function limitsFrom(env: Env, lines: OfferLine[], at: Date, offers: Offers): Promise<{ limits: Map<string, number | null>; failure: ReasonCode | null }> {
   const products = new Map((await getProducts(env, [...new Set(lines.map((l) => l.productId))])).map((p) => [p.id, p]));
   const limits = new Map<string, number | null>();
-  let allOrderable = true;
+  let failure: ReasonCode | null = null;
   for (const [k, l] of new Map(lines.map((l) => [limitKey(l), l]))) {
     const av = offers.availability.get(l.productId);
     const p = products.get(l.productId);
@@ -195,14 +195,14 @@ async function limitsFrom(env: Env, lines: OfferLine[], at: Date, offers: Offers
     if (ord?.ok) limits.set(k, ord.limit);
     else {
       limits.set(k, 0);
-      allOrderable = false;
+      failure ??= ord ? ord.code : 'NOT_ORDERABLE';
     }
   }
-  return { limits, allOrderable };
+  return { limits, failure };
 }
 
 /** Reads Valio's limits for the lines, logging the two `valio.called` events (the commit path; see `freeStock` for the write-free read). */
-async function readLimits(env: Env, lines: OfferLine[], at: Date, ref: Ref, fetchFn: typeof fetch): Promise<{ limits: Map<string, number | null>; allOrderable: boolean; offers: Offers }> {
+async function readLimits(env: Env, lines: OfferLine[], at: Date, ref: Ref, fetchFn: typeof fetch): Promise<{ limits: Map<string, number | null>; failure: ReasonCode | null; offers: Offers }> {
   const offers = await fetchLineOffers(env, lines, fetchFn);
   for (const endpoint of ['availability', 'price']) await logEvent(env, { ...ref, type: 'valio.called', data: { endpoint, ids: offers.ids, replay: offers.replay } });
   return { ...(await limitsFrom(env, lines, at, offers)), offers };
@@ -275,7 +275,7 @@ async function finalize(env: Env, row: Row): Promise<{ reply: PlaceReply; decisi
     const detail = shorts.map((s) => `${s.productId}: ${s.remaining} available, ${s.needed} needed`).join('; ');
     decision = { outcome: 'REJECT', reasons: [...decision.reasons.filter((r) => r.code !== 'STOCK_TAKEN'), { code: 'STOCK_TAKEN', detail }] };
     Object.assign(extra, { available: shorts[0]?.remaining ?? 0, retryable: false, resolution: 'requote' as const });
-  } else if (row.state === 'REJECTED' && decision.outcome !== 'REJECT') {
+  } else if (row.state === 'REJECTED' && row.reason === 'OVER_DAY_HARD' && decision.outcome !== 'REJECT') {
     decision = { outcome: 'REJECT', reasons: [...decision.reasons, { code: 'OVER_DAY_HARD', detail: 'the day total crossed the hard limit while this order was placed' }] };
   }
   const reply: PlaceReply = { ...view({ ...row, decision: JSON.stringify(decision) }), ...extra };
@@ -445,7 +445,7 @@ async function expireOrder(env: Env, row: Row, reason: ReasonCode, extra: { avai
 
 /**
  * Approves a HELD order by its token (single use). Any caller but the approver is refused (403) before anything is read. Then, in order:
- * the cut-off, Valio's current orderability and price, the token's lines binding, and finally ONE batch that moves the order
+ * the cut-off (ours, then Valio's: both APPROVAL_EXPIRED), Valio's current orderability (stock gone is STOCK_TAKEN, any other failure keeps its own code) and price, the token's lines binding, and finally ONE batch that moves the order
  * to ACCEPTED and writes its lines only if every finite line still fits. Approval is not a reservation: stock gone is
  * EXPIRED STOCK_TAKEN with what is left; a price that moved is EXPIRED PRICE_CHANGED; a used token is 409.
  */
@@ -458,8 +458,9 @@ export async function approve(env: Env, token: string, opts: { callerRole: 'appr
   if (at.getTime() >= Date.parse(row.expires_at!)) return expireOrder(env, row, 'APPROVAL_EXPIRED');
 
   const ref: Ref = { buyerId: row.buyer_id, orderId: row.id, ...(row.quote_id ? { quoteId: row.quote_id } : {}) };
-  const { limits, allOrderable, offers } = await readLimits(env, lines, at, ref, fetchFn);
-  if (!allOrderable) return expireOrder(env, row, 'APPROVAL_EXPIRED');
+  const { limits, failure, offers } = await readLimits(env, lines, at, ref, fetchFn);
+  if (failure === 'NOT_ORDERABLE') return expireOrder(env, row, 'STOCK_TAKEN', { available: 0 });
+  if (failure) return expireOrder(env, row, failure === 'CUTOFF_PASSED' ? 'APPROVAL_EXPIRED' : failure);
   const moved = lines.some((l) => halfUp((offers.price.get(l.productId)!.catalogPrice!.value as number) * 100) !== l.netCentsPerSalesUnit);
   if (moved) return expireOrder(env, row, 'PRICE_CHANGED');
 

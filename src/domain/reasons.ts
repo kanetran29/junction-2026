@@ -6,6 +6,7 @@ export interface ReasonInfo {
   retryable: boolean;
 }
 
+/** Builds one reason-table entry; `retryable` defaults to false. */
 const r = (text: string, resolution: Resolution, retryable = false): ReasonInfo => ({ text, resolution, retryable });
 
 /**
@@ -16,10 +17,9 @@ export const REASONS = {
   CUTOFF_PASSED: r('The order cut-off for this product has passed for the requested delivery.', 'requires_buyer_input'),
   NOT_ORDERABLE: r('Valio shows no stock or schedule for this product.', 'requires_buyer_input'),
   SALES_BLOCKED: r('Valio has blocked sales of this product.', 'requires_buyer_input'),
-  STOCK_LIMITED: r('Less stock is available than requested, so the quantity was reduced.', 'requires_buyer_review'),
+  STOCK_LIMITED: r('Not enough stock is available for the requested quantity, so this product was rejected.', 'requires_buyer_review'),
   PRICE_UNAVAILABLE: r('Valio returned no valid price for this product.', 'requires_buyer_input', true),
   NOT_CONVERTIBLE: r('The requested quantity cannot be converted into whole sales units of this product.', 'requires_buyer_input'),
-  UNIT_MISMATCH: r('The requested unit does not match the unit this product is sold in.', 'requires_buyer_input'),
   SUBTYPE_MISMATCH: r('The product is a different kind of product than the one requested.', 'requires_buyer_input'),
   CLAIM_MISSING: r('The product does not carry a claim the request requires.', 'requires_buyer_input'),
   BRAND_EXCLUDED: r('The product is from a brand the request excludes.', 'requires_buyer_input'),
