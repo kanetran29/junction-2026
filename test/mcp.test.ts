@@ -6,6 +6,8 @@ import { createApp } from '../src/http/routes';
 import * as S from '../src/http/schemas';
 import { mcpRoutes } from '../src/mcp/tools';
 import { z } from 'zod';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { fakeValio, product } from './quote-helpers';
 
 const e = { ...(env as unknown as Env), DEMO_MODE: '1', VALIO_API_KEY: 'vk', ADMIN_KEY: 'adm', GEMINI_API_KEY: 'gk', GEMINI_MODEL: 'gm' };
@@ -67,10 +69,11 @@ describe('mcp', () => {
     expect(placed.structuredContent).toEqual(http);
     expect((await callTool(key, 'get_order', { id: http.orderId })).structuredContent).toEqual(http);
     const missing = await callTool(key, 'get_order', { id: 'nope' });
-    expect(missing).toMatchObject({ isError: true, structuredContent: { error: 'ORDER_NOT_FOUND' } });
+    expect(missing).toMatchObject({ isError: true, content: [{ text: expect.stringContaining('ORDER_NOT_FOUND') }] });
     const noKey = await callTool(key, 'place_order', { quoteId: q.id, offerId: q.offers[0].offerId });
-    expect(noKey).toMatchObject({ isError: true, structuredContent: { error: 'IDEMPOTENCY_KEY_REQUIRED' } });
-    expect(await callTool(key, 'get_quote', { draft: { category: '10400' } })).toMatchObject({ isError: true, structuredContent: { error: 'INVALID_REQUEST' } });
+    expect(noKey).toMatchObject({ isError: true, content: [{ text: expect.stringContaining('INVALID_REQUEST') }] });
+    expect(noKey.structuredContent).toBeUndefined();
+    expect(await callTool(key, 'get_quote', { draft: { category: '10400' } })).toMatchObject({ isError: true, content: [{ text: expect.stringContaining('INVALID_REQUEST') }] });
   });
 
   it('a REJECTED order sets isError', async () => {
@@ -80,5 +83,37 @@ describe('mcp', () => {
     const r = await callTool(key, 'place_order', { quoteId: q.id, offerId: q.offers[0].offerId, idempotencyKey: 'm2' });
     expect(r.isError).toBe(true);
     expect(r.structuredContent).toMatchObject({ state: 'REJECTED' });
+  });
+
+  it('HELD is not an error, an unknown tool is a protocol error, GET is 405, internal errors are masked', async () => {
+    const keys = await reset();
+    const key = keys.agentKeys['hotel-a'];
+    const big = { ...need, quantity: { value: 200, unit: 'l' } };
+    const q = (await callTool(key, 'get_quote', big)).structuredContent;
+    const held = await callTool(key, 'place_order', { quoteId: q.id, offerId: q.offers[0].offerId, idempotencyKey: 'h1' });
+    expect(held).toMatchObject({ isError: false, structuredContent: { state: 'HELD' } });
+    expect((await rpc(key, 'tools/call', { name: 'nope', arguments: {} })).error.code).toBe(-32602);
+    expect((await app.request('/mcp', { headers: { Authorization: `Bearer ${key}`, Accept: 'text/event-stream' } }, e)).status).toBe(405);
+    const db = { prepare: (sql: string) => (sql.includes('api_keys') ? e.DB.prepare(sql) : (() => { throw new TypeError('secret internals'); })()), batch: e.DB.batch.bind(e.DB) } as unknown as D1Database;
+    const masked = (await (await app.request('/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${key}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_families', arguments: {} } }) }, { ...e, DB: db })).json()) as any;
+    expect(masked.result).toMatchObject({ isError: true, content: [{ text: JSON.stringify({ error: 'INTERNAL_ERROR', detail: 'unexpected failure' }) }] });
+  });
+
+  it('an SDK client lists tools and receives a refusal as an isError result, not a thrown error', async () => {
+    const keys = await reset();
+    const client = new Client({ name: 'sdk', version: '0' });
+    await client.connect(new StreamableHTTPClientTransport(new URL('http://door/mcp'), {
+      requestInit: { headers: { Authorization: `Bearer ${keys.agentKeys['hotel-a']}` } },
+      fetch: ((u: any, i: any) => app.request(new Request(u, i), undefined, e)) as typeof fetch,
+    }));
+    expect((await client.listTools()).tools).toHaveLength(9);
+    const r = await client.callTool({ name: 'get_order', arguments: { id: 'nope' } });
+    expect(r.isError).toBe(true);
+    expect(JSON.stringify(r.content)).toContain('ORDER_NOT_FOUND');
+    const by = Object.fromEntries((await client.listTools()).tools.map((t) => [t.name, t]));
+    expect(by.confirm_draft.inputSchema).toMatchObject({ required: ['id', 'fill'] });
+    const branches = (by.place_order.inputSchema as any).anyOf;
+    expect(branches).toHaveLength(2);
+    for (const b of branches) expect(b.required).toContain('idempotencyKey');
   });
 });

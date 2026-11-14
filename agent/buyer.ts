@@ -78,8 +78,11 @@ async function connectMcp(gatewayUrl: string, apiKey: string, fetchFn: typeof fe
   const { tools } = await send('tools/list');
   return {
     tools: tools as { name: string; description: string; inputSchema: Json }[],
-    /** Calls one tool and returns its structured reply (an error reply is `{ error, detail }`). */
-    call: async (name: string, args: Json): Promise<Json> => (await send('tools/call', { name, arguments: args })).structuredContent,
+    /** Calls one tool and returns its structured reply; a refusal has no structured part, so its text JSON `{ error, detail }` is parsed instead. */
+    call: async (name: string, args: Json): Promise<Json> => {
+      const r = await send('tools/call', { name, arguments: args });
+      return r.structuredContent ?? JSON.parse(r.content?.[0]?.text ?? '{}');
+    },
   };
 }
 

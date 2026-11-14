@@ -1,18 +1,15 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ErrorCode, McpError, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { listFamilies, resolve } from '../catalog/open';
-import { searchProducts } from '../catalog/search';
 import type { Env } from '../env';
-import { logEvent } from '../events/log';
 import { confirmDraft, interpret } from '../interpret/gemini';
 import { createBasket, getOrder, placeOrder } from '../orders/store';
 import { createQuote, type QuoteInput } from '../quote/store';
-import { productName } from '../receipt/render';
 import { HttpError, rateLimit, requireBuyer } from '../http/auth';
-import { INTERPRET_PER_MINUTE, errorBody } from '../http/routes';
+import { INTERPRET_PER_MINUTE, errorBody, searchReply } from '../http/routes';
 import * as S from '../http/schemas';
 
 /** One MCP tool: its schemas (the HTTP ones) and the service call behind it. */
@@ -25,7 +22,7 @@ interface Tool {
   failed?: (reply: any) => boolean;
 }
 
-const PlaceOrderInput = z.intersection(S.OrderBody, z.object({ idempotencyKey: z.string().optional().describe('Unique per order attempt; a retry with the same key and body returns the same order') }));
+const PlaceOrderInput = z.intersection(S.OrderBody, z.object({ idempotencyKey: S.IdempotencyHeader.shape["Idempotency-Key"].unwrap() }));
 
 const tools: Tool[] = [
   {
@@ -50,12 +47,7 @@ const tools: Tool[] = [
     description: 'Find products by category and claims, from the catalogue only (no Valio call).',
     input: S.SearchBody,
     output: S.SearchReply,
-    run: async (a, { env, buyerId }) => {
-      const found = await searchProducts(env, { category: a.category, claims: a.claims, subtype: a.subtype });
-      await logEvent(env, { buyerId, type: 'search.done', data: { count: found.length, categories: [...new Set(found.map((p) => p.category))] } });
-      const products = found.map((p) => ({ id: p.id, category: p.category, subtype: p.subtype, name: productName([p], p.id), brand: p.brand, salesUnit: p.salesUnit, claims: p.claims }));
-      return { products, valioCalls: 0 };
-    },
+    run: (a, { env, buyerId }) => searchReply(env, buyerId, a),
   },
   {
     name: 'get_quote',
@@ -76,7 +68,7 @@ const tools: Tool[] = [
     description: 'Place one offer, or one offer per basket need; needs an idempotencyKey. A REJECTED order is returned with isError.',
     input: PlaceOrderInput,
     output: S.Order,
-    run: (a, { env, buyerId, fetchFn }) => placeOrder(env, { buyerId, ...a }, fetchFn),
+    run: (a, { env, buyerId, fetchFn }) => placeOrder(env, { ...a, buyerId }, fetchFn),
     failed: (reply) => reply.state === 'REJECTED',
   },
   {
@@ -108,8 +100,11 @@ const jsonSchema = (s: z.ZodType) => ({ type: 'object' as const, ...z.toJSONSche
 /** The tools/list payload; exported so tests can compare it with the HTTP schemas. */
 export const toolDefinitions = tools.map((t) => ({ name: t.name, description: t.description, inputSchema: jsonSchema(t.input), outputSchema: { type: 'object' as const, ...z.toJSONSchema(t.output, { io: 'output', unrepresentable: 'any' }) } }));
 
-/** Wraps a reply or a typed error as the MCP tool result: JSON in `structuredContent` and as text; refusals set `isError`. */
-const result = (body: unknown, isError = false) => ({ content: [{ type: 'text' as const, text: JSON.stringify(body) }], structuredContent: body as Record<string, unknown>, isError });
+/** Wraps a reply as the MCP tool result: JSON in `structuredContent` and as text. */
+const result = (body: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(body) }], structuredContent: body as Record<string, unknown>, isError: false });
+
+/** A refusal: the JSON as text only, because it does not match the tool's `outputSchema` and clients validate `structuredContent` against it. */
+const refusal = (error: string, detail: string) => ({ content: [{ type: 'text' as const, text: JSON.stringify({ error, detail }) }], isError: true });
 
 /**
  * Serves one stateless MCP request for an authenticated buyer: a fresh server and transport per call, tools run the same
@@ -120,16 +115,17 @@ export async function handleMcp(req: Request, who: { env: Env; buyerId: string; 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: toolDefinitions }));
   server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
     const tool = tools.find((t) => t.name === params.name);
-    if (!tool) return result({ error: 'UNKNOWN_TOOL', detail: `no tool ${params.name}` }, true);
+    if (!tool) throw new McpError(ErrorCode.InvalidParams, `unknown tool ${params.name}`);
     const parsed = tool.input.safeParse(params.arguments ?? {});
-    if (!parsed.success) return result({ error: 'INVALID_REQUEST', detail: parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ') }, true);
+    if (!parsed.success) return refusal('INVALID_REQUEST', parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '));
     try {
       const reply = await tool.run(parsed.data, { ...who, auth: req.headers.get('Authorization') ?? undefined });
-      return result(reply, tool.failed?.(reply) ?? false);
+      return tool.failed?.(reply) ? { ...result(reply), isError: true } : result(reply);
     } catch (err) {
       const known = errorBody(err);
-      if (!known) throw err;
-      return result({ error: known.code, detail: known.detail }, true);
+      if (known) return refusal(known.code, known.detail);
+      console.error(err);
+      return refusal('INTERNAL_ERROR', 'unexpected failure');
     }
   });
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
@@ -137,12 +133,13 @@ export async function handleMcp(req: Request, who: { env: Env; buyerId: string; 
   return transport.handleRequest(req);
 }
 
-/** The `/mcp` route: the same bearer key as `/v1`, answered by `handleMcp`. */
+/** The `/mcp` route (POST only; stateless, so no event stream): the same bearer key as `/v1`, answered by `handleMcp`. */
 export function mcpRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }> {
   const app = new Hono<{ Bindings: Env }>();
-  app.all('/mcp', async (c) => {
+  app.post('/mcp', async (c) => {
     const { buyerId } = await requireBuyer(c);
     return handleMcp(c.req.raw, { env: c.env, buyerId, fetchFn });
   });
+  app.all('/mcp', (c) => c.json({ error: 'METHOD_NOT_ALLOWED', detail: 'POST JSON-RPC to /mcp' }, 405, { Allow: 'POST' }));
   return app;
 }

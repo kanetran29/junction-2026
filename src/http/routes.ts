@@ -125,10 +125,7 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   app.openapi(searchRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
     const q = c.req.valid('json');
-    const found = await searchProducts(c.env, { category: q.category, claims: q.claims, subtype: q.subtype });
-    await logEvent(c.env, { buyerId, type: 'search.done', data: { count: found.length, categories: [...new Set(found.map((p) => p.category))] } });
-    const products = found.map((p) => ({ id: p.id, category: p.category, subtype: p.subtype, name: productName([p], p.id), brand: p.brand, salesUnit: p.salesUnit, claims: p.claims }));
-    return c.json({ products, valioCalls: 0 as const }, 200);
+    return c.json(await searchReply(c.env, buyerId, q), 200);
   });
 
   /** Quotes a stored draft, a posted draft or a product list for the caller. */
@@ -201,6 +198,14 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   app.route('/', adminRoutes());
   app.route('/', uiRoutes(fetchFn));
   return app;
+}
+
+/** Catalogue search by category and claims for a buyer, logged as `search.done`; shared by the HTTP route and the MCP tool. */
+export async function searchReply(env: Env, buyerId: string, q: { category: string; claims: string[]; subtype?: string }): Promise<{ products: z.infer<typeof S.SearchProduct>[]; valioCalls: 0 }> {
+  const found = await searchProducts(env, { category: q.category, claims: q.claims, subtype: q.subtype });
+  await logEvent(env, { buyerId, type: 'search.done', data: { count: found.length, categories: [...new Set(found.map((p) => p.category))] } });
+  const products = found.map((p) => ({ id: p.id, category: p.category, subtype: p.subtype, name: productName([p], p.id), brand: p.brand, salesUnit: p.salesUnit, claims: p.claims }));
+  return { products, valioCalls: 0 };
 }
 
 /** Maps a thrown error from any module onto an HTTP status, machine-readable code and message; null for a bug. */
