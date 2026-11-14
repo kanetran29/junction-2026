@@ -1,3 +1,12 @@
+/** Every Try it sandbox buyer id starts with this; sandbox orders live in their own stock world (see `sameWorld`). */
+export const SANDBOX_BUYER_PREFIX = 'visitor-';
+
+/**
+ * SQL: true when two buyer id expressions are in the same stock world. Try it sandboxes and the real buyers each count only
+ * their own accepted lines, so a keyless visitor can never take the stock the hotels' orders are checked against.
+ */
+export const sameWorld = (a: string, b: string) => `((${a}) LIKE '${SANDBOX_BUYER_PREFIX}%') = ((${b}) LIKE '${SANDBOX_BUYER_PREFIX}%')`;
+
 /** The audience every mandate is signed for; one constant for dev and deployed so no request origin is trusted. */
 export const MANDATE_AUD = 'lazydoor';
 

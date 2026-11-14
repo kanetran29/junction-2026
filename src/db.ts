@@ -61,10 +61,12 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS decided_at TEXT;
 CREATE INDEX IF NOT EXISTS idx_events_order ON events(order_id);
 CREATE INDEX IF NOT EXISTS idx_events_buyer ON events(buyer_id, id);
 CREATE TABLE IF NOT EXISTS rate_limits (key_hash TEXT NOT NULL, minute INTEGER NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (key_hash, minute));
+CREATE TABLE IF NOT EXISTS try_visitors (token_hash TEXT PRIMARY KEY, buyer_id TEXT NOT NULL UNIQUE, address_hash TEXT, created_at TEXT NOT NULL, last_used BIGINT);
+ALTER TABLE try_visitors ADD COLUMN IF NOT EXISTS address_hash TEXT, ADD COLUMN IF NOT EXISTS last_used BIGINT;
 `;
 
 /** Every table in SCHEMA, in an order that deletes children first. */
-export const TABLES = ['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'mandates', 'buyer_keys', 'api_keys', 'settings'];
+export const TABLES = ['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'try_visitors', 'mandates', 'buyer_keys', 'api_keys', 'settings'];
 
 /** The advisory lock every batch takes: writes that must not interleave (the stock ledger above all) run one at a time. */
 const WRITE_LOCK = 1;

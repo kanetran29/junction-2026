@@ -123,3 +123,31 @@ export const AuditVerifyReply = z
     jws: z.string().openapi({ description: 'Compact EdDSA JWS over every other field plus aud "lazydoor:audit"; verify with /.well-known/jwks.json' }),
   })
   .openapi('AuditVerifyReply');
+
+/** `POST /v1/try`: a new request as text (1..200 characters after trimming), or the answer to the question about a stored draft. */
+export const TryBody = z
+  .object({
+    text: z.string().trim().min(1).max(200).optional(),
+    visitor: z.string().min(1).max(64).optional().openapi({ description: 'The token from an earlier reply; omit it to open a new sandbox kitchen' }),
+    draftId: z.string().min(1).max(64).optional(),
+    answer: z.object({ field: z.literal('deliverBy'), value: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).optional(),
+  })
+  .refine((b) => (b.draftId !== undefined ? b.visitor !== undefined && b.answer !== undefined : b.text !== undefined), {
+    message: 'send text for a new request, or visitor, draftId and answer to answer a question',
+  })
+  .openapi('TryBody');
+const ShownReason = z.object({ code: z.string(), detail: z.string() });
+export const TryReply = z
+  .looseObject({
+    visitor: z.string(),
+    buyerId: z.string(),
+    step: z.enum(['needs_input', 'no_offer', 'decided']),
+    draft: InterpretedDraft.optional(),
+    question: z.object({ field: z.string(), readings: z.array(z.object({ model: z.string(), value: z.unknown() })) }).optional(),
+    quote: z.looseObject({ quoteId: z.string(), offers: z.array(z.looseObject({ offerId: z.string() })), rejections: z.array(z.looseObject({ productId: z.string(), code: z.string() })), jws: z.string().optional() }).optional(),
+    order: z.object({ orderId: z.string(), state: z.string(), reasons: z.array(ShownReason), netCents: z.number(), grossCents: z.number() }).optional(),
+    approval: z.object({ token: z.string(), expiresAt: z.string() }).optional().openapi({ description: "The approval token of this sandbox's held order: the visitor is its kitchen manager" }),
+  })
+  .openapi('TryReply');
+export const TryDecisionBody = z.object({ visitor: z.string().min(1).max(64), token: z.string().min(1).max(128), decision: z.enum(['approve', 'reject']) }).openapi('TryDecisionBody');
+export const TryDecisionReply = z.object({ order: z.object({ orderId: z.string(), state: z.string(), reasons: z.array(ShownReason) }) }).openapi('TryDecisionReply');

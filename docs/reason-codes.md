@@ -45,4 +45,6 @@ The same table is served live at `GET /v1/reason-codes`.
 | `SUBTYPE_UNVERIFIED` | The product type could not be confirmed against a reviewed subtype. | `requires_buyer_review` | no |
 | `NOT_SELECTED` | The basket offered options for this need but none was chosen. | `requires_buyer_review` | no |
 | `BRAND_NOT_CARRIED` | Valio does not carry the requested brand. | `requires_buyer_input` | no |
+| `TRY_RATE_LIMITED` | Try it is limited to a few calls a minute per address and for all visitors together; wait retryAfter seconds. | `recoverable` | yes |
+| `TRY_SANDBOXES_FULL` | Every Try it sandbox kitchen is taken until the next demo reset. | `recoverable` | no |
 | `QUOTE_SIGNATURE_INVALID` | The quote signature sent with the order does not verify against the door's key or does not match the offer as quoted. | `requires_buyer_input` | no |

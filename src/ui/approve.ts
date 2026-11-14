@@ -54,9 +54,9 @@ async function draftsOf(env: Env, m: Meta): Promise<Draft[]> {
 }
 
 /** The free stock of each product and day now, from the shared `freeStock` rule; empty when Valio does not answer (the page then says unknown). */
-async function pageStock(env: Env, lines: OfferLine[], fetchFn: typeof fetch): Promise<Map<string, number | null>> {
+async function pageStock(env: Env, lines: OfferLine[], buyerId: string, fetchFn: typeof fetch): Promise<Map<string, number | null>> {
   try {
-    return await freeStock(env, lines, await now(env), fetchFn);
+    return await freeStock(env, lines, await now(env), buyerId, fetchFn);
   } catch (err) {
     if ((err instanceof OrderError && err.status === 502) || err instanceof ValioRateLimited) return new Map();
     throw err;
@@ -80,7 +80,7 @@ export async function renderApprovePage(env: Env, token: string, fetchFn: typeof
   const drafts = await draftsOf(env, m);
   const nowMs = (await now(env)).getTime();
   const live = order.state === 'HELD' && nowMs < Date.parse(m.expires_at!);
-  const stock = live ? await pageStock(env, order.lines, fetchFn) : new Map<string, number | null>();
+  const stock = live ? await pageStock(env, order.lines, m.buyer_id, fetchFn) : new Map<string, number | null>();
   const products = await getProducts(env, order.lines.map((l) => l.productId));
 
   const lineHtml = order.lines.map((l) => {

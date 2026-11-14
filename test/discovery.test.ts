@@ -42,7 +42,8 @@ describe('/.well-known/agent-gateway.json', () => {
     const urls = ownUrls(await (await get('/.well-known/agent-gateway.json')).json());
     expect(urls.length).toBeGreaterThanOrEqual(9);
     for (const url of urls) {
-      const r = await app.request(url, {}, e);
+      const post = /\/v1\/try(\/decision)?$/.test(url);
+      const r = await app.request(url, post ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' } : {}, e);
       expect([url, r.status === 404]).toEqual([url, false]);
       await r.body?.cancel();
     }

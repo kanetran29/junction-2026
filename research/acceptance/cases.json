@@ -1356,6 +1356,57 @@
         {"call": "http_get", "input": {"path": "/.well-known/agent-gateway.json"}, "expect": [["name", "=", "Lazydoor"], ["mcp.transport", "=", "streamable-http"], ["openapi", "matches", "/openapi\\.json$"], ["jwks", "matches", "/\\.well-known/jwks\\.json$"], ["audit.verify", "matches", "/v1/audit/verify$"], ["approval.agentCanApprove", "=", false], ["demo", "matches", "/demo/$"], ["repository", "=", "https://github.com/kanetran29/junction-2026"]]},
         {"call": "http_get", "input": {"path": "/openapi.json"}, "expect": [["info.description", "contains", "/.well-known/agent-gateway.json"]]}
       ]
+    },
+    {
+      "id": "AC56",
+      "tier": 1,
+      "title": "Try it: a visitor's small order runs the agent's path in a sandbox kitchen and is accepted with no human",
+      "rubric": ["e2e 30", "openness 15"],
+      "steps": [
+        {"call": "try", "input": {"text": "20 litres of lactose-free milk by Monday"}, "expect": [["step", "=", "decided"], ["buyerId", "matches", "^visitor-[0-9a-f]{8}$"], ["order.state", "=", "ACCEPTED"], ["quote.jws", "matches", "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"], ["approval", "=", null]]}
+      ]
+    },
+    {
+      "id": "AC57",
+      "tier": 1,
+      "title": "Try it: a large order is held under the kitchen limit and the visitor approves it as the kitchen manager",
+      "rubric": ["controls 20", "e2e 30"],
+      "steps": [
+        {"call": "try", "input": {"text": "1,000 litres of lactose-free milk by Monday"}, "expect": [["order.state", "=", "HELD"], ["order.reasons[*].code", "contains", "OVER_ORDER_AUTO"], ["approval.token", "matches", "^[A-Za-z0-9_-]{20,}$"]]},
+        {"call": "try_decision", "input": {"decision": "approve"}, "expect": [["order.state", "=", "ACCEPTED"]]}
+      ]
+    },
+    {
+      "id": "AC58",
+      "tier": 1,
+      "title": "Try it: the visitor can reject their held order",
+      "rubric": ["controls 20"],
+      "steps": [
+        {"call": "try", "input": {"text": "1,000 litres of lactose-free milk by Monday"}, "expect": [["order.state", "=", "HELD"]]},
+        {"call": "try_decision", "input": {"decision": "reject"}, "expect": [["order.state", "=", "REJECTED"]]}
+      ]
+    },
+    {
+      "id": "AC59",
+      "tier": 1,
+      "title": "Try it: a visitor can never decide another kitchen's order, and an agent key can never decide",
+      "rubric": ["controls 20"],
+      "steps": [
+        {"call": "try", "input": {"text": "1,000 litres of lactose-free milk by Monday"}, "expect": [["order.state", "=", "HELD"]]},
+        {"call": "try_other_visitor", "input": {"text": "20 litres of lactose-free milk by Monday"}, "expect": [["step", "=", "decided"]]},
+        {"call": "try_decision", "input": {"decision": "approve", "visitor": "other"}, "expect": [["httpStatus", "=", 404], ["error", "=", "TOKEN_UNKNOWN"]]},
+        {"call": "try_decision_as_agent", "input": {"decision": "approve"}, "expect": [["httpStatus", "=", 403], ["error", "=", "AGENT_CANNOT_APPROVE"]]}
+      ]
+    },
+    {
+      "id": "AC60",
+      "tier": 1,
+      "title": "Try it refuses text over 200 characters and an empty request",
+      "rubric": ["controls 20"],
+      "steps": [
+        {"call": "try_raw", "input": {"text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}, "expect": [["httpStatus", "=", 400], ["error", "=", "INVALID_REQUEST"]]},
+        {"call": "try_raw", "input": {"text": "   "}, "expect": [["httpStatus", "=", 400]]}
+      ]
     }
   ],
   "decisions": {
@@ -1368,6 +1419,7 @@
     "New steps: approve_as_agent (calls approve with the agent key), quote_basket, place_basket ({offers:[i,...]} picks offer i of need i; null skips a need), resolve, list_families, set_replay_variant, place_order_without_key, place_order_same_key_other_body.",
     "`as` on a step sets the buyer whose agent key is used (default hotel-a). `given.priorAccepted` seeds accepted order lines before the steps.",
     "Signing and audit steps (AC50-AC55): verify_offer_jws ({offer:i}) and verify_receipt_jws check a door JWS with only /.well-known/jwks.json; place_order_with_jws ({offer:i, tamper?:\"price\"}) sends the offer JWS back, optionally with a changed price; audit_verify checks /v1/audit/verify and its signed head; all_events reads every buyer's events with the admin key; tamper_and_verify calls /admin/tamper then verify; reset_and_verify resets with the case state and verifies the fresh chain.",
+    "Try it steps (AC56-AC60): try ({text} for a new request with the case's visitor, or {answer}); try_other_visitor opens a second sandbox; try_raw posts the body as given; try_decision ({decision, visitor?: \"other\"}) uses the first visitor's approval token; try_decision_as_agent sends the agent key. All Try it calls are keyless; each case resets, which clears the Try it rate counters.",
     "A case whose steps call `interpret` needs a live model: when GET /health reports models.gemini = false, the runner marks it BLOCKED_ON_GEMINI instead of running it."
   ]
 }

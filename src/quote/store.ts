@@ -10,6 +10,7 @@ import { newId } from '../util';
 import { buildQuote, type Draft, type Offer, type Quote } from './build';
 import { db } from '../db';
 import { lineNet } from '../domain/money';
+import { sameWorld } from '../domain/constants';
 import { AUD, doorKey, signJws } from '../sign/door';
 
 /** A quote request that cannot be answered: Valio failed (UPSTREAM_ERROR) or the named draft is missing or not confirmed. */
@@ -101,14 +102,14 @@ async function findCandidates(env: Env, d: Draft): Promise<CatalogProduct[]> {
 }
 
 /**
- * Sales units per product already taken by ACCEPTED order lines for the delivery day the product would arrive on
- * (HELD orders and quotes reserve nothing); only products Valio currently lets us order are considered.
+ * Sales units per product already taken by ACCEPTED order lines of the buyer's stock world (`sameWorld`) for the delivery day
+ * the product would arrive on (HELD orders and quotes reserve nothing); only products Valio currently lets us order are considered.
  */
-async function acceptedUnits(env: Env, products: CatalogProduct[], offers: Offers, at: Date, deliverBy: string): Promise<Map<string, number>> {
+async function acceptedUnits(env: Env, buyerId: string, products: CatalogProduct[], offers: Offers, at: Date, deliverBy: string): Promise<Map<string, number>> {
   const { results } = await db(env).prepare(
-    "SELECT product_id, delivery_date, SUM(sales_units) AS units FROM order_lines WHERE state = 'ACCEPTED' AND product_id IN (SELECT jsonb_array_elements_text(?::text::jsonb)) GROUP BY product_id, delivery_date",
+    `SELECT product_id, delivery_date, SUM(sales_units) AS units FROM order_lines WHERE state = 'ACCEPTED' AND product_id IN (SELECT jsonb_array_elements_text(?1::text::jsonb)) AND ${sameWorld('buyer_id', '?2::text')} GROUP BY product_id, delivery_date`,
   )
-    .bind(JSON.stringify(products.map((p) => p.id)))
+    .bind(JSON.stringify(products.map((p) => p.id)), buyerId)
     .all<{ product_id: string; delivery_date: string; units: number }>();
   const taken = new Map<string, number>();
   for (const r of results) {
@@ -179,7 +180,7 @@ export async function createQuote(env: Env, buyerId: string, input: QuoteInput, 
     products,
     offers,
     now: at,
-    acceptedUnits: await acceptedUnits(env, products, offers, at, draft.deliverBy),
+    acceptedUnits: await acceptedUnits(env, buyerId, products, offers, at, draft.deliverBy),
     brandsNotCarried: await brandsNotCarried(env, draft),
   });
   for (const o of q.offers) o.jws = await signJws(env, offerClaims(q, o));

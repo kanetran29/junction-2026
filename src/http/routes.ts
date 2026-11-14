@@ -1,4 +1,6 @@
 import { OpenAPIHono, createRoute, type z } from '@hono/zod-openapi';
+import type { MiddlewareHandler } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
@@ -20,14 +22,15 @@ import { readEvents, streamEvents } from './events';
 import * as S from './schemas';
 import { storeKind } from '../db';
 import { AUD, jwks, signJws } from '../sign/door';
+import { tryDecision, tryIt } from '../try/sandbox';
 import { VERSION, discovery } from './discovery';
 
 export const INTERPRET_PER_MINUTE = 20;
 /** `/v1/audit/verify` recomputes the whole chain, so anonymous callers get at most this many a minute per client address. */
 export const AUDIT_PER_MINUTE = 30;
 
-/** The only `/v1` routes that need no key: the published rules and reason codes, and the audit check (it shows only hashes). */
-const PUBLIC_PATHS = ['/v1/rules', '/v1/reason-codes', '/v1/audit/verify'];
+/** The only `/v1` routes that need no key: the published rules and reason codes, the audit check (it shows only hashes) and Try it (demo door only). */
+const PUBLIC_PATHS = ['/v1/rules', '/v1/reason-codes', '/v1/audit/verify', '/v1/try', '/v1/try/decision'];
 
 /** One documented JSON reply: its description and the zod schema of the body. */
 const json = <T extends z.ZodType>(schema: T, description: string) => ({ description, content: { 'application/json': { schema } } });
@@ -82,6 +85,20 @@ const streamRoute = createRoute({
   responses: { 200: { description: 'text/event-stream', content: { 'text/event-stream': { schema: S.EventStream } } }, 401: json(S.ErrorBody, 'Missing or unknown API key'), 403: json(S.ErrorBody, "Another buyer's events") },
 });
 const auditRoute = createRoute({ method: 'get', path: '/v1/audit/verify', summary: 'Recompute the hash chain of the whole event log and sign the result (head hash, first bad seq if any) with the door key; public, it shows only hashes; 30 a minute per client address', responses: { 200: json(S.AuditVerifyReply, 'OK'), 429: json(S.ErrorBody, 'Rate limited') } });
+const tryRoute = createRoute({
+  method: 'post',
+  path: '/v1/try',
+  summary: 'Demo door only, no key: order as the chef of your own sandbox kitchen (interpret, confirm, quote, place offer 0); a HELD order comes with its approval token, because you are its kitchen manager. 3 calls a minute per address, 12 for all visitors, 50 sandboxes',
+  request: body(S.TryBody),
+  responses: { 200: json(S.TryReply, 'OK'), 400: json(S.ErrorBody, 'Invalid request'), 404: json(S.ErrorBody, 'Not a demo door, or an unknown visitor or draft'), 409: json(S.ErrorBody, 'The draft is already confirmed or still unclear'), 429: json(S.ErrorBody, 'TRY_RATE_LIMITED (with retryAfter) or TRY_SANDBOXES_FULL'), 502: json(S.ErrorBody, 'Upstream failure'), 503: json(S.ErrorBody, 'Model unavailable or Valio rate-limited') },
+});
+const tryDecisionRoute = createRoute({
+  method: 'post',
+  path: '/v1/try/decision',
+  summary: "Demo door only: approve or reject a held order of your own sandbox through the normal approval path (re-check included); any other buyer's token is 404, an agent key 403",
+  request: body(S.TryDecisionBody),
+  responses: { 200: json(S.TryDecisionReply, 'OK'), 400: json(S.ErrorBody, 'Invalid request'), 403: json(S.ErrorBody, 'An agent or judge key'), 404: json(S.ErrorBody, 'Not a demo door, or an unknown visitor or token'), 409: json(S.ErrorBody, 'Already decided'), 429: json(S.ErrorBody, 'TRY_RATE_LIMITED') },
+});
 const healthRoute = createRoute({ method: 'get', path: '/health', summary: 'Liveness, the gateway clock, replay mode, whether a Gemini key is configured and the write store', responses: { 200: json(S.Health, 'OK') } });
 
 /**
@@ -120,6 +137,15 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   const eventsCors = cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'], allowHeaders: ['Authorization', 'Last-Event-ID'] });
   app.use('/v1/events', eventsCors);
   app.use('/v1/events/stream', eventsCors);
+  /** Try it exists only on a demo door: elsewhere it is 404 before any validation, like the admin routes. */
+  const demoOnly: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+    if (c.env.DEMO_MODE !== '1') throw new HttpError(404, 'NOT_FOUND', 'no such route');
+    await next();
+  };
+  const tryCors = cors({ origin: '*', allowMethods: ['POST', 'OPTIONS'], allowHeaders: ['Content-Type'] });
+  // a keyless route reads no body over 4 KB, so oversized bodies cost nothing before the rate limits apply
+  const tryBodyLimit = bodyLimit({ maxSize: 4096, onError: (c) => c.json({ error: 'PAYLOAD_TOO_LARGE', detail: 'at most 4 KB' }, 413) });
+  for (const path of ['/v1/try', '/v1/try/decision']) app.use(path, demoOnly, tryCors, tryBodyLimit);
   app.use('/v1/*', authenticate(PUBLIC_PATHS, ['/v1/events', '/v1/events/stream']));
 
   app.notFound((c) => c.json({ error: 'NOT_FOUND', detail: 'no such route' }, 404));
@@ -223,13 +249,19 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   });
 
   /** The public decision register. */
-  app.openapi(rulesRoute, (c) => c.json({ decisions: decisionRegister() }, 200));
+  app.openapi(rulesRoute, (c) => c.json({ decisions: decisionRegister(c.env.DEMO_MODE === '1') }, 200));
   /** The public reason-code table. */
   app.openapi(reasonCodesRoute, (c) => c.json({ codes: reasonCodes() }, 200));
   /** Polls the event log; the key decides which buyers are visible. */
   app.openapi(eventsRoute, async (c) => c.json(await readEvents(c), 200));
   /** Streams the event log as Server-Sent Events. */
   app.openapi(streamRoute, (c) => streamEvents(c) as never);
+  /** One Try it step for a visitor (demo door only, no key); the client address comes from Cloudflare. */
+  app.openapi(tryRoute, async (c) => c.json((await tryIt(c.env, c.req.valid('json'), c.req.header('CF-Connecting-IP') ?? 'unknown', fetchFn)) as never, 200));
+  /** The visitor approves or rejects their own sandbox's held order. */
+  app.openapi(tryDecisionRoute, async (c) =>
+    c.json(await tryDecision(c.env, c.req.valid('json'), { address: c.req.header('CF-Connecting-IP') ?? 'unknown', authorization: c.req.header('Authorization') }, fetchFn), 200),
+  );
   /** Recomputes the event chain and signs the result, stamped with the door clock; rate limited per client address. */
   app.openapi(auditRoute, async (c) => {
     await rateLimit(c.env, `Bearer audit:${c.req.header('CF-Connecting-IP') ?? 'unknown'}`, AUDIT_PER_MINUTE);
@@ -240,7 +272,7 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   app.get('/.well-known/jwks.json', async (c) => c.json(await jwks(c.env), 200, { 'Cache-Control': 'public, max-age=300' }));
 
   /** What any agent fetches first: where the API, MCP, rules, events, audit, keys and demo are. */
-  app.get('/.well-known/agent-gateway.json', (c) => c.json(discovery(new URL(c.req.url).origin)));
+  app.get('/.well-known/agent-gateway.json', (c) => c.json(discovery(new URL(c.req.url).origin, c.env.DEMO_MODE === '1')));
 
   app.doc('/openapi.json', (c) => {
     const discoveryUrl = `${new URL(c.req.url).origin}/.well-known/agent-gateway.json`;
@@ -267,6 +299,7 @@ export async function searchReply(env: Env, buyerId: string, q: { category: stri
 /** Maps a thrown error from any module onto an HTTP status, machine-readable code and message (plus the wait in seconds for a Valio rate limit); null for a bug. */
 export function errorBody(err: unknown): { status: 400 | 401 | 403 | 404 | 409 | 415 | 422 | 429 | 502 | 503; code: string; detail: string; retryAfter?: number } | null {
   if (err instanceof ValioRateLimited) return { status: 503, code: 'VALIO_RATE_LIMITED', detail: err.message, retryAfter: err.retryAfter };
+  if (err instanceof HttpError && err.retryAfter) return { status: err.status, code: err.code, detail: err.message, retryAfter: err.retryAfter };
   if (err instanceof HttpError || err instanceof OrderError || err instanceof InterpretError) return { status: err.status, code: err.code, detail: err.message };
   if (err instanceof QuoteError) {
     const status = err.code === 'DRAFT_NOT_FOUND' ? 404 : err.code === 'UPSTREAM_ERROR' ? 502 : 409;

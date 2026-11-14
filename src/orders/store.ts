@@ -1,6 +1,6 @@
 import { getProducts, type CatalogProduct } from '../catalog/search';
 import { helsinkiIso, now } from '../clock';
-import { MANDATE_AUD, type Mandate } from '../domain/constants';
+import { MANDATE_AUD, sameWorld, type Mandate } from '../domain/constants';
 import { grossCents, halfUp, lineNet } from '../domain/money';
 import type { ReasonCode } from '../domain/reasons';
 import type { Env } from '../env';
@@ -186,9 +186,12 @@ export async function getOrder(env: Env, buyerId: string, id: string): Promise<O
   return r ? signedView(env, r) : null;
 }
 
-/** SQL: true when no checked product has less free stock than the order needs; `n` numbers the parameter holding the checks JSON. */
-const noShortLine = (n: number) =>
-  `NOT EXISTS (SELECT 1 FROM jsonb_array_elements(?${n}::text::jsonb) c WHERE c->>'limit' IS NOT NULL AND (c->>'limit')::float8 - COALESCE((SELECT SUM(l.sales_units) FROM order_lines l WHERE l.product_id = c->>'productId' AND l.delivery_date = c->>'deliveryDate' AND l.state = 'ACCEPTED'), 0) < (c->>'needed')::float8 - 1e-9)`;
+/**
+ * SQL: true when no checked product has less free stock than the order needs, counting only accepted lines of the ordering
+ * buyer's stock world (`sameWorld`); `n` numbers the parameter holding the checks JSON, `buyer` is the SQL for the buyer id.
+ */
+const noShortLine = (n: number, buyer: string) =>
+  `NOT EXISTS (SELECT 1 FROM jsonb_array_elements(?${n}::text::jsonb) c WHERE c->>'limit' IS NOT NULL AND (c->>'limit')::float8 - COALESCE((SELECT SUM(l.sales_units) FROM order_lines l WHERE l.product_id = c->>'productId' AND l.delivery_date = c->>'deliveryDate' AND l.state = 'ACCEPTED' AND ${sameWorld('l.buyer_id', buyer)}), 0) < (c->>'needed')::float8 - 1e-9)`;
 
 /** Appends the order's lines to the ledger (state ACCEPTED) as the lines JSON in parameter 3 says. */
 const INSERT_LINES = `INSERT INTO order_lines(order_id, buyer_id, product_id, delivery_date, sales_units, state)
@@ -246,9 +249,12 @@ async function readLimits(env: Env, lines: OfferLine[], at: Date, ref: Ref, fetc
   return { ...(await limitsFrom(env, lines, at, offers)), offers };
 }
 
-/** Sales units of ACCEPTED ledger lines for a product on a delivery day. */
-async function acceptedUnits(env: Env, productId: string, deliveryDate: string): Promise<number> {
-  const r = await db(env).prepare("SELECT COALESCE(SUM(sales_units), 0) AS u FROM order_lines WHERE product_id = ? AND delivery_date = ? AND state = 'ACCEPTED'").bind(productId, deliveryDate).first<{ u: number }>();
+/** Sales units of ACCEPTED ledger lines for a product on a delivery day, in the given buyer's stock world. */
+async function acceptedUnits(env: Env, productId: string, deliveryDate: string, buyerId: string): Promise<number> {
+  const r = await db(env)
+    .prepare(`SELECT COALESCE(SUM(sales_units), 0) AS u FROM order_lines WHERE product_id = ?1 AND delivery_date = ?2 AND state = 'ACCEPTED' AND ${sameWorld('buyer_id', '?3::text')}`)
+    .bind(productId, deliveryDate, buyerId)
+    .first<{ u: number }>();
   return r!.u;
 }
 
@@ -257,22 +263,22 @@ async function acceptedUnits(env: Env, productId: string, deliveryDate: string):
  * null when Valio's stock is unknown. The rule `approve` enforces, read without events or writes (the approval page uses it). A Valio
  * failure is an OrderError 502.
  */
-export async function freeStock(env: Env, lines: OfferLine[], at: Date, fetchFn: typeof fetch = fetch): Promise<Map<string, number | null>> {
+export async function freeStock(env: Env, lines: OfferLine[], at: Date, buyerId: string, fetchFn: typeof fetch = fetch): Promise<Map<string, number | null>> {
   const { limits } = await limitsFrom(env, lines, at, await fetchLineOffers(env, lines, fetchFn));
   const out = new Map<string, number | null>();
   for (const [k, limit] of limits) {
     const [productId, deliveryDate] = k.split('|');
-    out.set(k, limit === null ? null : Math.max(0, round3(limit - (await acceptedUnits(env, productId, deliveryDate)))));
+    out.set(k, limit === null ? null : Math.max(0, round3(limit - (await acceptedUnits(env, productId, deliveryDate, buyerId)))));
   }
   return out;
 }
 
-/** The checks whose free stock (limit less accepted lines, now) is below what the order needs, with what is left. */
-async function shortChecks(env: Env, checks: Check[]): Promise<{ productId: string; needed: number; remaining: number }[]> {
+/** The checks whose free stock (limit less the buyer's world's accepted lines, now) is below what the order needs, with what is left. */
+async function shortChecks(env: Env, checks: Check[], buyerId: string): Promise<{ productId: string; needed: number; remaining: number }[]> {
   const out: { productId: string; needed: number; remaining: number }[] = [];
   for (const c of checks) {
     if (c.limit === null) continue;
-    const remaining = c.limit - (await acceptedUnits(env, c.productId, c.deliveryDate));
+    const remaining = c.limit - (await acceptedUnits(env, c.productId, c.deliveryDate, buyerId));
     if (remaining < c.needed - EPS) out.push({ productId: c.productId, needed: c.needed, remaining: Math.max(0, round3(remaining)) });
   }
   return out;
@@ -309,7 +315,7 @@ async function finalize(env: Env, row: Row): Promise<{ reply: PlaceReply; decisi
   if (row.state === 'HELD' && decision.outcome === 'AUTO') {
     decision = { outcome: 'NEEDS_APPROVAL', reasons: [{ code: 'OVER_DAY_AUTO', detail: 'the day total crossed the automatic limit while this order was placed' }] };
   } else if (row.state === 'REJECTED' && row.reason === 'STOCK_TAKEN') {
-    shorts = await shortChecks(env, (JSON.parse(row.body) as { checks: Check[] }).checks);
+    shorts = await shortChecks(env, (JSON.parse(row.body) as { checks: Check[] }).checks, row.buyer_id);
     const detail = shorts.map((s) => `${s.productId}: ${s.remaining} available, ${s.needed} needed`).join('; ');
     decision = { outcome: 'REJECT', reasons: [...decision.reasons.filter((r) => r.code !== 'STOCK_TAKEN'), { code: 'STOCK_TAKEN', detail }] };
     Object.assign(extra, { available: shorts[0]?.remaining ?? 0, retryable: false, resolution: 'requote' as const });
@@ -462,7 +468,7 @@ async function commitOrder(env: Env, id: string, req: PlaceRequest, at: Date, fe
       req.buyerId, deliveryDate, decision.outcome, net, hardDay, autoDay, firstReject, gross, JSON.stringify(decision), JSON.stringify({ lines, unmet, checks }),
       req.agentReason ?? null, mandate?.version ?? null, approver, mandate ? await linesHash(lines, req.buyerId, mandate.version) : null, token, closing, id,
     ),
-    s.prepare(`${INSERT_LINES} WHERE (SELECT state FROM orders WHERE id = ?1) = 'ACCEPTED' AND ${noShortLine(4)}`).bind(id, req.buyerId, linesJson, checksJson),
+    s.prepare(`${INSERT_LINES} WHERE (SELECT state FROM orders WHERE id = ?1) = 'ACCEPTED' AND ${noShortLine(4, '?2::text')}`).bind(id, req.buyerId, linesJson, checksJson),
     s.prepare("UPDATE orders SET state = 'REJECTED', reason = 'STOCK_TAKEN' WHERE id = ?1 AND state = 'ACCEPTED' AND NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = ?1)").bind(id),
     s.prepare("UPDATE orders SET approval_token = NULL, expires_at = NULL, decided_at = ? WHERE id = ? AND state <> 'HELD'").bind(helsinkiIso(at), id),
   ]);
@@ -527,7 +533,7 @@ export async function approve(env: Env, token: string, opts: { callerRole: 'appr
   const linesJson = JSON.stringify(lines.map((l) => ({ productId: l.productId, deliveryDate: l.deliveryDate, salesUnits: l.salesUnits })));
   const s = db(env);
   const res = await s.batch([
-    s.prepare(`UPDATE orders SET state = 'ACCEPTED', reason = NULL, decided_at = ?3 WHERE id = ?1 AND state = 'HELD' AND ${noShortLine(2)}`).bind(row.id, checksJson, helsinkiIso(at)),
+    s.prepare(`UPDATE orders SET state = 'ACCEPTED', reason = NULL, decided_at = ?3 WHERE id = ?1 AND state = 'HELD' AND ${noShortLine(2, '(SELECT buyer_id FROM orders WHERE id = ?1)')}`).bind(row.id, checksJson, helsinkiIso(at)),
     s.prepare(`${INSERT_LINES} WHERE (SELECT state FROM orders WHERE id = ?1) = 'ACCEPTED' AND NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = ?1)`).bind(row.id, row.buyer_id, linesJson),
     s.prepare("UPDATE orders SET state = 'EXPIRED', reason = 'STOCK_TAKEN', decided_at = ? WHERE id = ? AND state = 'HELD'").bind(helsinkiIso(at), row.id),
   ]);
@@ -537,7 +543,7 @@ export async function approve(env: Env, token: string, opts: { callerRole: 'appr
     return { orderId: row.id, state: 'ACCEPTED' };
   }
   if (!res[2].meta.changes) throw new OrderError(409, 'TOKEN_USED', 'this approval was already resolved');
-  const shorts = await shortChecks(env, checks);
+  const shorts = await shortChecks(env, checks, row.buyer_id);
   await logEvent(env, { ...ref, type: 'approval.expired', data: {} });
   for (const s of shorts) await logEvent(env, { ...ref, type: 'stock.denied', data: { productId: s.productId, remaining: s.remaining } });
   return { orderId: row.id, state: 'EXPIRED', reason: 'STOCK_TAKEN', available: shorts[0]?.remaining ?? 0 };

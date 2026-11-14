@@ -11,12 +11,13 @@ export interface Caller {
   buyerId: string | null;
 }
 
-/** A refusal that maps straight onto a status and the `{ error, detail }` body. */
+/** A refusal that maps straight onto a status and the `{ error, detail }` body (plus `retryAfter` seconds when given). */
 export class HttpError extends Error {
   constructor(
     readonly status: 400 | 401 | 403 | 404 | 429,
     readonly code: string,
     message: string,
+    readonly retryAfter?: number,
   ) {
     super(message);
     this.name = 'HttpError';
@@ -85,16 +86,21 @@ export async function requireBuyer(c: Context<{ Bindings: Env }>): Promise<{ buy
 }
 
 /**
- * Counts one use of a key in the current minute (Postgres counter keyed by key hash and wall-clock minute) and answers 429
- * once it exceeds `limit`; older minutes are swept in the same call so the table stays tiny.
+ * Counts one use of a bucket in the current wall-clock minute and returns the count so far (Postgres counter keyed by the
+ * bucket's sha256, so an address or key is never stored as is); older minutes are swept in the same call so the table stays tiny.
  */
-export async function rateLimit(env: Env, header: string | undefined, limit: number): Promise<void> {
-  const keyHash = await sha256Hex(bearerOf(header) ?? '');
+export async function countUse(env: Env, bucket: string): Promise<number> {
+  const keyHash = await sha256Hex(bucket);
   const minute = Math.floor(Date.now() / 60_000);
   const s = db(env);
   const [, bump] = await s.batch([
     s.prepare('DELETE FROM rate_limits WHERE minute < ?').bind(minute),
     s.prepare('INSERT INTO rate_limits(key_hash, minute, n) VALUES (?, ?, 1) ON CONFLICT(key_hash, minute) DO UPDATE SET n = rate_limits.n + 1 RETURNING n').bind(keyHash, minute),
   ]);
-  if ((bump.results[0] as { n: number }).n > limit) throw new HttpError(429, 'RATE_LIMITED', `at most ${limit} requests a minute for this key`);
+  return (bump.results[0] as { n: number }).n;
+}
+
+/** Counts one use of a bearer key (`countUse`) and answers 429 RATE_LIMITED once it exceeds `limit` this minute. */
+export async function rateLimit(env: Env, header: string | undefined, limit: number): Promise<void> {
+  if ((await countUse(env, bearerOf(header) ?? '')) > limit) throw new HttpError(429, 'RATE_LIMITED', `at most ${limit} requests a minute for this key`);
 }

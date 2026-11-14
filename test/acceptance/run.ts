@@ -22,6 +22,9 @@ type Ctx = {
   mcpSession?: string;
   /** The reset body this case started from, for a step that resets again. */
   resetBody: Json;
+  /** Try it: the last reply of this case's visitor, and of a second visitor. */
+  tryReply?: Json;
+  otherTry?: Json;
 };
 type Handler = (ctx: Ctx, step: Step, buyer: string, given: Json) => Promise<Json>;
 
@@ -261,6 +264,18 @@ const handlers: Record<string, Handler> = {
     const v = await auditVerify();
     return { tampered: t.tampered, verify: v, namesTheSeq: v.firstBadSeq === t.tampered };
   },
+  try: async (ctx, step) => {
+    const body = step.input.answer ? { visitor: ctx.tryReply?.visitor, draftId: ctx.tryReply?.draft?.id, answer: step.input.answer } : { text: step.input.text, ...(ctx.tryReply?.visitor ? { visitor: ctx.tryReply.visitor } : {}) };
+    ctx.tryReply = await http('/v1/try', { body });
+    return ctx.tryReply;
+  },
+  try_other_visitor: async (ctx, step) => (ctx.otherTry = await http('/v1/try', { body: { text: step.input.text } })),
+  try_raw: (_ctx, step) => http('/v1/try', { body: step.input }),
+  try_decision: (ctx, step) => {
+    const visitor = step.input.visitor === 'other' ? ctx.otherTry?.visitor : ctx.tryReply?.visitor;
+    return http('/v1/try/decision', { body: { visitor, token: ctx.tryReply?.approval?.token, decision: step.input.decision } });
+  },
+  try_decision_as_agent: (ctx, step, buyer) => http('/v1/try/decision', { key: ctx.agentKeys[buyer], body: { visitor: ctx.tryReply?.visitor, token: ctx.tryReply?.approval?.token, decision: step.input.decision } }),
   reset_and_verify: async (ctx) => {
     const r = await admin('/admin/reset', ctx.resetBody);
     ctx.agentKeys = r.agentKeys;

@@ -8,10 +8,10 @@ export const REPOSITORY = 'https://github.com/kanetran29/junction-2026';
 
 /**
  * The discovery document served at `/.well-known/agent-gateway.json`: everything an agent or a judge needs to find and check
- * the door (API, MCP, rules, reason codes, events, audit, signing keys, approval model, demo page, code), as absolute URLs on
- * the origin it was requested from.
+ * the door (API, MCP, rules, reason codes, events, audit, signing keys, approval model, demo page, code, and Try it on a demo
+ * door: `demo`), as absolute URLs on the origin it was requested from.
  */
-export function discovery(origin: string) {
+export function discovery(origin: string, demo: boolean) {
   return {
     name: 'Lazydoor',
     punchline: 'Lazy at the order, strict at the border.',
@@ -32,6 +32,17 @@ export function discovery(origin: string) {
       agentCanApprove: false,
       rule: "An order over the buyer's signed limits is HELD; only the named human approver accepts it, through their own link. Agent and judge keys get 403 AGENT_CANNOT_APPROVE.",
     },
+    ...(demo
+      ? {
+          tryIt: {
+            url: `${origin}/v1/try`,
+            decision: `${origin}/v1/try/decision`,
+            demoOnly: true,
+            auth: 'none',
+            note: "POST; a visitor orders as the chef of a sandbox kitchen (its own stock world) and approves its held orders as that kitchen's manager; 3 calls a minute per address, 12 for all visitors, 50 sandboxes, 3 per address",
+          },
+        }
+      : {}),
     demo: `${origin}/demo/`,
     repository: REPOSITORY,
   };

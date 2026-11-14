@@ -69,6 +69,43 @@ node scripts/verify-audit.mjs $D            # recompute the chain yourself and c
   receipt carry `jws` over the order id, buyer, state, lines, totals, who approved it and when it was decided
   (`aud: "lazydoor:receipt"`). A held order gets its receipt when the approver decides.
 
+## Try it (demo door only)
+
+A visitor can order as the chef of their own sandbox kitchen, with no key, and decide held orders as its kitchen manager.
+The door runs the same path as the reference agent, with no model choosing anything: interpret (Gemini, read again by
+Gemma), confirm with the agent's profile default, quote, place the cheapest covering offer. It exists only where
+`DEMO_MODE=1`; elsewhere both routes are 404 before any validation.
+
+`POST /v1/try` takes `{ text }` (1 to 200 characters after trimming) for a new request, or `{ visitor, draftId, answer: { field: "deliverBy", value: "YYYY-MM-DD" } }` to answer the question about a draft. Add `visitor` to a new request to keep the same sandbox.
+- **First call.** It opens a sandbox kitchen: buyer `visitor-<8 hex>`, the kitchen mandate (automatic up to 500 € an order and
+  1,500 € a day, hard stop at 5,000 and 10,000, no new allergen, default reliability floor), approver "You (kitchen manager)".
+  It returns a `visitor` token (24 random bytes; the door stores only its sha256).
+- **Reply 200.** `{ visitor, buyerId, step, draft?, question?, quote?, order?, approval? }`:
+  - `step: "needs_input"` when a field is still open. `question` is `{ field, readings: [{ model, value }] }`. When `field`
+    is `deliverBy`, answer with the date; any other field means the sentence needs rewording.
+  - `step: "no_offer"` with `quote.rejections` when nothing can be ordered.
+  - `step: "decided"` with `quote` (`quoteId`, `offers`, `rejections`, and `jws` of the placed offer) and
+    `order` (`orderId`, `state`, `reasons: [{ code, detail }]`, `netCents`, `grossCents`).
+  - A `HELD` order also carries `approval: { token, expiresAt }`, because the visitor is that sandbox's kitchen manager.
+- **Deciding.** `POST /v1/try/decision` with `{ visitor, token, decision: "approve" | "reject" }` goes through the normal
+  approval path, re-check included (`APPROVAL_EXPIRED`, `STOCK_TAKEN`, `PRICE_CHANGED` still apply), and answers
+  `{ order: { orderId, state, reasons } }`. Only a token of the visitor's own sandbox works: any other is 404 `TOKEN_UNKNOWN`.
+  An agent or judge key is 403 `AGENT_CANNOT_APPROVE`.
+- **Limits.**
+  - 3 calls a minute per client address, counting both routes. An IPv6 address counts by its /64.
+  - 12 calls a minute for all visitors together. Only calls that are about to ask the models count here: a new request,
+    not an answer and not a decision.
+  - Over either limit is 429 `TRY_RATE_LIMITED` with `retryAfter`.
+  - At most 50 open sandboxes, and at most 3 per address, else 429 `TRY_SANDBOXES_FULL`. A sandbox idle for 30 minutes is
+    freed when a new one opens.
+  - A first call that fails frees its sandbox again.
+  - Bodies over 4 KB get 413.
+  - A stale `visitor` is 404 `VISITOR_UNKNOWN`. `/admin/reset` ends every sandbox.
+  - Each new `text` is a new order: a retried text call orders again.
+- **Own stock world.** Sandbox orders count only against other sandbox orders. A visitor can never take the stock that the
+  real buyers' quotes and orders are checked against, but visitors do compete with each other.
+- **Events.** Every step logs events under the sandbox's buyer id, so Live shows them.
+
 ## Quick start
 
 You need Node 24, pnpm 10 and wrangler 4.
@@ -138,7 +175,7 @@ The scenarios use the demo-only admin routes (reset, clock, replay), so they wor
 | Receipt | `GET /v1/orders/{id}/receipt` (plain text, buyer key); `GET /receipt/{orderId}` (plain text, no key: the order id is the capability URL, so share it only with whoever may see the receipt) |
 | Health | `GET /health` |
 
-The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/search`, `/v1/quotes`, `/v1/baskets`, `/v1/orders`, `/v1/resolve`, and `GET /v1/families`, `/v1/quotes/{id}` and `/v1/orders/{id}`. Every `/v1` route except `/v1/rules`, `/v1/reason-codes` and `/v1/audit/verify` needs `Authorization: Bearer <key>`, and so does `/mcp`. The one exception is the event log on a demo door: with `DEMO_MODE=1`, `GET /v1/events` and `/v1/events/stream` also answer a request with no key at all, read-only and for every buyer, so the public demo page can watch the door (a wrong key is still 401). `/health` and `/openapi.json` are open. HTTP and MCP share one schema.
+The agent routes are `POST /v1/interpret`, `/v1/drafts/{id}/confirm`, `/v1/search`, `/v1/quotes`, `/v1/baskets`, `/v1/orders`, `/v1/resolve`, and `GET /v1/families`, `/v1/quotes/{id}` and `/v1/orders/{id}`. Every `/v1` route except `/v1/rules`, `/v1/reason-codes`, `/v1/audit/verify` and Try it (demo door only) needs `Authorization: Bearer <key>`, and so does `/mcp`. The one exception is the event log on a demo door: with `DEMO_MODE=1`, `GET /v1/events` and `/v1/events/stream` also answer a request with no key at all, read-only and for every buyer, so the public demo page can watch the door (a wrong key is still 401). `/health` and `/openapi.json` are open. HTTP and MCP share one schema.
 
 **Demo page.** The animated demo (story and Live mode) is served by the same Worker at [`/demo/`](https://lazydoor.lazydoor.workers.dev/demo/), as Workers static assets. `scripts/build-demo.mjs` copies only the files the page loads into `dist/assets/demo/` (wrangler runs it before every deploy, `pnpm test` before every run); `demo/dev/`, `demo/test/`, `demo/shots/`, the notes and `story.mp4` stay unpublished. Live mode reads `/v1/events` from the page's own origin.
 
