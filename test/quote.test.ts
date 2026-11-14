@@ -25,7 +25,7 @@ describe('buildQuote: the brief example', () => {
   it('best offer is 1,000 units of the 1 l product at 1,000 x price, gross by tax rate', () => {
     expect(q.offers[0]).toMatchObject({ productId: 'T1', filled: 1000, overage: 0, shortfall: 0, netCents: 101000, grossCents: 114635, closingTime: '2026-11-15T17:00:00+02:00', deliveryDate: '2026-11-16' });
     expect(q.offers[0].lines).toEqual([
-      { productId: 'T1', salesUnits: 1000, salesUnit: 'ST', contentPerSalesUnit: 1, contentUnit: 'l', netCentsPerSalesUnit: 101, taxRate: 13.5, deliveryDate: '2026-11-16' },
+      { productId: 'T1', salesUnits: 1000, salesUnit: 'ST', contentPerSalesUnit: 1, contentUnit: 'l', netCentsPerSalesUnit: 101, taxRate: 13.5, deliveryDate: '2026-11-16', stockNote: 'Stock unknown: Valio does not stock this product' },
     ]);
     expect(ids(q)).toEqual(['T1', 'T2']);
   });
@@ -33,6 +33,13 @@ describe('buildQuote: the brief example', () => {
     expect(code(q, 'T3')).toBe('CUTOFF_PASSED');
     expect(q.rejections[0].detail).toContain('cut-off');
   });
+  it('puts the stockNote on offer lines whose stock is unknown, and on no other', () => {
+    const q = quote({ ...draft, quantity: { value: 10, unit: 'l' } }, [product('K'), product('S')], { K: { price: 1 }, S: { price: 2, stock: 50 } });
+    const line = (id: string) => q.offers.find((o) => o.productId === id)!.lines[0];
+    expect(line('K').stockNote).toBe('Stock unknown: Valio does not stock this product');
+    expect(line('S')).not.toHaveProperty('stockNote');
+  });
+
   it('carries the quote envelope', () => {
     expect(q).toMatchObject({
       id: 'q1', buyerId: 'hotel-a', draftId: 'd1', createdAt: '2026-11-13T21:10:00+02:00', expiresAt: '2026-11-13T21:40:00+02:00',

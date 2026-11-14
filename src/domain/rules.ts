@@ -20,7 +20,7 @@ const seller = (id: string, rule: string, constants: Record<string, unknown> = {
 export function decisionRegister(): Decision[] {
   const mandate = defaultMandate('buyer');
   return [
-    seller('orderable', 'A product is orderable only with a valid price, stock for the delivery date, no sales block and the cut-off not passed.'),
+    seller('orderable', 'A product is orderable only with a valid price, stock for the delivery date, no sales block and the cut-off not passed. Valio availability of 999999 or more means the stock is unknown, not unlimited: any quantity is allowed and the quote line says so.'),
     seller('conversion', 'The requested quantity becomes whole sales units from the product content and lot step, rounded up; the offer shows the overage. Only a quantity that cannot be converted (unit mismatch, no usable content) is rejected.'),
     seller('rounding', 'Money is integer cents; products of price and units round half up.', { mode: 'half-up', unit: 'cent' }),
     seller('subtype', 'A product matches the need only inside the reviewed or tagged subtype of the requested category.'),

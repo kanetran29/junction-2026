@@ -18,6 +18,7 @@ The door decides by published rules. Each rule has a named owner. Models transla
 
 - **Seller (Valio) rules:** what is orderable, unit conversion, rounding, subtype match, ranking (by net total, no sponsored placement), the order in which rejections are picked, splits, substitutions, quote expiry (30 minutes or the earliest Valio cut-off), first-come-first-served allocation, and the re-check of a held order.
 - **Buyer rules:** the signed mandate. Default: auto-approve up to 500 EUR per order and per day. Hard stop at 5,000 EUR per order and 10,000 EUR per day. No new allergen. Delivery reliability at least 0.9.
+- **Stock unknown:** Valio reports availability of 999999 or more for products it does not stock. It means the availability is unknown, and Valio's own logic allows any quantity. Lazydoor does the same and labels the quote line (`stockNote`) and the approval page "Stock unknown: Valio does not stock this product".
 - **Approver:** a held order is accepted only when the named human approves it through their own link.
 - **The only model step:** turning free text into a typed draft (Gemini, `interpret_request`). Policy and money never read that output directly.
 

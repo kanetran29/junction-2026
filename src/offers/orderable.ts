@@ -1,11 +1,17 @@
 import type { ReasonCode } from '../domain/reasons';
 import type { AvailabilityRow, PriceRow } from '../valio/client';
 
-const UNLIMITED = 999999;
+const STOCK_UNKNOWN = 999999;
 
-/** Valio marks unlimited stock with 999999 (Terminal) or 1e10 (Stock); anything at or above the sentinel is unlimited. */
-export function isUnlimited(amount: number): boolean {
-  return amount >= UNLIMITED;
+/** The label shown on a quote line and on the approval page when Valio's stock for the product is unknown. */
+export const STOCK_UNKNOWN_NOTE = 'Stock unknown: Valio does not stock this product';
+
+/**
+ * Valio sends availableAmount >= 999999 for products it does not stock (typically Terminal products), meaning it does not
+ * know the availability; its own logic then allows any quantity, so the stock check skips these lines.
+ */
+export function isStockUnknown(amount: number): boolean {
+  return amount >= STOCK_UNKNOWN;
 }
 
 export type Orderable =
@@ -18,7 +24,7 @@ const no = (code: ReasonCode, detail: string): Orderable => ({ ok: false, code, 
 /**
  * Whether a product can be ordered at `now` for delivery by `deliverBy` (YYYY-MM-DD), following the oracle's checks in
  * order: price, then a positive schedule line in the product's own sales unit, then blocks, cut-off and delivery date.
- * `limit` is the sum of the unblocked amounts, or null when stock is unlimited.
+ * `limit` is the sum of the unblocked amounts, or null when Valio's stock is unknown (any quantity is allowed).
  */
 export function orderable(
   av: AvailabilityRow,
@@ -42,5 +48,5 @@ export function orderable(
   const deliveryDate = lines.map((s) => String(s.availableDate).slice(0, 10)).sort()[0];
   if (deliveryDate > deliverBy) return no('DATE_NOT_MET', `earliest delivery ${deliveryDate}, needed by ${deliverBy}`);
   const amount = lines.filter((s) => !s.salesBlock).reduce((sum, s) => sum + s.availableAmount, 0);
-  return { ok: true, limit: isUnlimited(amount) ? null : amount, closingTime: av.closingTime, deliveryDate };
+  return { ok: true, limit: isStockUnknown(amount) ? null : amount, closingTime: av.closingTime, deliveryDate };
 }

@@ -42,7 +42,7 @@ export interface Row {
   /** Litres or kilos per sales unit (default 1). */
   content?: number;
   unit?: 'L' | 'KG' | null;
-  /** Stock in sales units; null or omitted is unlimited. */
+  /** Stock in sales units; null or omitted is unknown (Valio's 999999: any quantity is orderable). */
   stock?: number | null;
   closing?: string | null;
   tax?: number;

@@ -69,9 +69,9 @@ describe('GET /approve/:token', () => {
     expect(html).toContain('&lt;i&gt;QS&lt;/i&gt;');
   });
 
-  it('says unlimited lines are not stock-limited', async () => {
+  it('says lines of unknown stock are "Stock unknown: Valio does not stock this product"', async () => {
     const { token } = await hold('QU');
-    expect(await (await get(`/approve/${token}`)).text()).toContain('not stock-limited');
+    expect(await (await get(`/approve/${token}`)).text()).toContain('Stock unknown: Valio does not stock this product');
   });
 
   it('while Valio rate-limits it says availability is unknown and makes no Valio call; approve answers 503 VALIO_RATE_LIMITED', async () => {

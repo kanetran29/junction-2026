@@ -84,7 +84,7 @@ interface Row {
   reply: string | null;
 }
 
-/** One product on one delivery day: how many sales units the order needs and Valio's limit read at commit (null = unlimited). */
+/** One product on one delivery day: how many sales units the order needs and Valio's limit read at commit (null = Valio's stock is unknown). */
 interface Check {
   productId: string;
   deliveryDate: string;
@@ -184,7 +184,7 @@ async function fetchLineOffers(env: Env, lines: OfferLine[], fetchFn: typeof fet
   }
 }
 
-/** Each line's limit per product and delivery day from Valio's rows (null = unlimited; a product no longer orderable counts as 0) and the first reason a product is not orderable, if any. Writes nothing. */
+/** Each line's limit per product and delivery day from Valio's rows (null = stock unknown; a product no longer orderable counts as 0) and the first reason a product is not orderable, if any. Writes nothing. */
 async function limitsFrom(env: Env, lines: OfferLine[], at: Date, offers: Offers): Promise<{ limits: Map<string, number | null>; failure: ReasonCode | null }> {
   const products = new Map((await getProducts(env, [...new Set(lines.map((l) => l.productId))])).map((p) => [p.id, p]));
   const limits = new Map<string, number | null>();
@@ -217,7 +217,7 @@ async function acceptedUnits(env: Env, productId: string, deliveryDate: string):
 
 /**
  * The free stock now per `limitKey` (product and delivery day): Valio's limit less the ACCEPTED ledger lines, never below 0,
- * null when unlimited. The rule `approve` enforces, read without events or writes (the approval page uses it). A Valio
+ * null when Valio's stock is unknown. The rule `approve` enforces, read without events or writes (the approval page uses it). A Valio
  * failure is an OrderError 502.
  */
 export async function freeStock(env: Env, lines: OfferLine[], at: Date, fetchFn: typeof fetch = fetch): Promise<Map<string, number | null>> {

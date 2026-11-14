@@ -43,7 +43,7 @@ correcting misspelt input; SD-JWT / AP2 key binding.
 ## Anti-goals
 
 - A language model deciding whether an order is allowed, or able to widen the agent's authority.
-- Selling what cannot arrive: a product past its cut-off, an unlimited-stock sentinel read as a quantity, a wrong unit.
+- Selling what cannot arrive: a product past its cut-off, a stock-unknown sentinel (availability >= 999999) read as a quantity, a wrong unit.
 - A substitute that adds an allergen or drops a required claim without a human seeing it.
 - Committing Valio data to this public repo.
 
@@ -52,7 +52,7 @@ correcting misspelt input; SD-JWT / AP2 key binding.
 - Mock = frozen snapshot of delivery Mon 16 Nov 2026; `requestedDate` is ignored, `availableDate` must be compared with the date asked.
 - "Orderable" = has a schedule line, `closingTime > now`, amount > 0, no sales block, unit understood. Stock products close Sun 15 Nov 17:00;
   Terminal products closed Thu 12 Nov yet still report 999999 for Monday. After Sun 17:00 nothing in the mock is orderable.
-- `availableAmount` 999999, 9999999999 and 1e10 / units-per-case mean "not limited".
+- `availableAmount` 999999, 9999999999 and 1e10 / units-per-case mean "stock unknown": Valio does not know the availability (typically a Terminal product it does not stock) and its own logic allows any quantity, so the stock check skips these lines and the quote line says "Stock unknown: Valio does not stock this product".
 - Content per sales unit = `catalogPrice / comparisonPrice` from the price API, snapped to Synkka or name value when within 2 %, else NOT_CONVERTIBLE.
 - `allowedLotSize` 0.01 means no rule: round up to whole sales units and show the overage; respect real steps (e.g. 4.4 kg).
 - Unknown product: HTTP 200 with empty lines and `error: true`. Max 1,000 ids per call. The firewall rejects the default Python user agent.

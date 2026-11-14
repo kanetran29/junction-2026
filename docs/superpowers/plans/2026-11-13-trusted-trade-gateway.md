@@ -16,7 +16,7 @@
 
 - No Valio dataset, recorded replies or API key in this repo. `research/fetch_data.sh` downloads the public challenge files into gitignored `.data/valio/data/` and, with `VALIO_API_KEY` set, records replies into `.data/valio/recordings/`; scripts load them into D1. `research/` holds only derived material (acceptance cases, oracle, analysis), approved by Kane. Unit-test fixtures are synthetic (made-up ids `T0001`…, made-up prices) with the real shapes.
 - Valio client: header `X-API-Key` from Worker secret `VALIO_API_KEY`; header `User-Agent: lazydoor/0.1`; at most 1,000 ids per call; base URL from var `VALIO_API_BASE`.
-- Mock facts to encode: `requestedDate` is ignored; unlimited sentinels are `>= 999999`; orderable = schedule line exists AND `closingTime > now` AND amount > 0 AND no `salesBlock` AND line unit understood; timestamps `+0200` normalised to `+02:00`.
+- Mock facts to encode: `requestedDate` is ignored; availability `>= 999999` means stock unknown (Valio allows any quantity); orderable = schedule line exists AND `closingTime > now` AND amount > 0 AND no `salesBlock` AND line unit understood; timestamps `+0200` normalised to `+02:00`.
 - Money: compute in integer cents; budgets compare **net** amounts; VAT from the price API's `tax.taxRate`.
 - Mandate default (seeded): per order auto 500 €, hard 5,000 €; per delivery day auto 500 €, hard 10,000 € counting accepted + held orders (D1); required claim `FREE_FROM_LACTOSE` only when the draft asks for it; no new allergen; reliability floor 0.9; `reliabilityUnknown: 'allow'` (D4: unknown reliability is a flag on the offer, not an approval reason); approver "Kitchen manager"; `exp`, `aud` (the gateway's URL).
 - Stock (D2): only ACCEPTED order lines take stock; quotes and HELD orders reserve nothing. Available = Valio amount read at commit − Σ accepted lines for that product and delivery day.
@@ -109,7 +109,7 @@ src/
   domain/reasons.ts        ReasonCode enum + human text per code
   valio/client.ts          price/availability calls, record + replay
   catalog/search.ts        D1 queries over the index
-  offers/orderable.ts      orderable(), isUnlimited()
+  offers/orderable.ts      orderable(), isStockUnknown()
   offers/conversion.ts     contentPerSalesUnit(), fillQuantity()
   quote/build.ts           buildQuote()
   mandate/jws.ts           signMandate(), verifyMandate()

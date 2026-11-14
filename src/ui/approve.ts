@@ -8,6 +8,7 @@ import { identify } from '../http/auth';
 import { OrderError, approve, approverInbox, freeStock, getOrder, limitKey, reject, type ApproveReply, type OrderView } from '../orders/store';
 import type { Draft, OfferLine } from '../quote/build';
 import { getQuote } from '../quote/store';
+import { STOCK_UNKNOWN_NOTE } from '../offers/orderable';
 import { ValioRateLimited } from '../valio/client';
 import { lineNet } from '../domain/money';
 import { eur, productName, qty, renderReceipt } from '../receipt/render';
@@ -83,7 +84,7 @@ export async function renderApprovePage(env: Env, token: string, fetchFn: typeof
 
   const lineHtml = order.lines.map((l) => {
     const free = stock.get(limitKey(l));
-    const note = !live ? '' : free === undefined ? 'availability unknown right now' : free === null ? 'not stock-limited' : `not reserved: ${qty(free)} available now`;
+    const note = !live ? '' : free === undefined ? 'availability unknown right now' : free === null ? STOCK_UNKNOWN_NOTE : `not reserved: ${qty(free)} available now`;
     const nm = productName(products, l.productId);
     return `<div class="card"><b>${escapeHtml(l.productId)}</b> ${escapeHtml(nm)}<br>${qty(l.salesUnits)} × ${qty(l.contentPerSalesUnit)} ${escapeHtml(l.contentUnit)} · ${eur(lineNet(l))} EUR<br><span class="muted">${escapeHtml(note)}</span></div>`;
   }).join('');

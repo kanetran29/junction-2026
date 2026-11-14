@@ -22,7 +22,7 @@ export const SearchReply = z.object({ products: z.array(SearchProduct), valioCal
 
 /** A quote request names a stored draft, a draft to confirm and use, or a bare need. */
 export const QuoteBody = z.union([z.object({ draftId: z.string().min(1) }), z.object({ draft: Draft }), Draft]).openapi('QuoteBody');
-export const Quote = z.looseObject({ id: z.string(), buyerId: z.string(), expiresAt: z.string(), offers: z.array(z.looseObject({ offerId: z.string(), netCents: z.number() })), rejections: z.array(z.looseObject({ productId: z.string(), code: z.string() })) }).openapi('Quote');
+export const Quote = z.looseObject({ id: z.string(), buyerId: z.string(), expiresAt: z.string(), offers: z.array(z.looseObject({ offerId: z.string(), netCents: z.number(), lines: z.array(z.looseObject({ productId: z.string(), stockNote: z.string().optional() })).optional() })), rejections: z.array(z.looseObject({ productId: z.string(), code: z.string() })) }).openapi('Quote');
 
 export const BasketBody = z.object({ needs: z.array(Draft).min(1).max(20) }).openapi('BasketBody');
 export const BasketReply = z.object({ basketId: z.string(), quotes: z.array(Quote), expiresAt: z.string() }).openapi('BasketReply');

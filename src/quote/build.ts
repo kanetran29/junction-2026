@@ -5,7 +5,7 @@ import { defaultMandate } from '../domain/constants';
 import { grossCents, halfUp, lineNetCents } from '../domain/money';
 import type { ReasonCode } from '../domain/reasons';
 import { contentPerSalesUnit, fillQuantity, type Quantity } from '../offers/conversion';
-import { orderable } from '../offers/orderable';
+import { STOCK_UNKNOWN_NOTE, orderable } from '../offers/orderable';
 import { checkSubstitute } from '../policy/substitute';
 import type { Offers } from '../valio/client';
 
@@ -35,6 +35,8 @@ export interface OfferLine {
   netCentsPerSalesUnit: number;
   taxRate: number;
   deliveryDate: string;
+  /** Set to STOCK_UNKNOWN_NOTE when Valio's stock for the product is unknown; absent otherwise. */
+  stockNote?: string;
 }
 
 export interface Offer {
@@ -133,7 +135,7 @@ interface Feasible {
   taxRate: number;
   content: { value: number; unit: Quantity['unit'] };
   salesUnits: number;
-  /** Sales units still free: Valio's limit less accepted lines, Infinity when unlimited. */
+  /** Sales units still free: Valio's limit less accepted lines, Infinity when Valio's stock is unknown. */
   available: number;
   centsPerContentUnit: number;
   flags: ReasonCode[];
@@ -245,6 +247,7 @@ function makeOffer(lines: { f: Feasible; salesUnits: number }[], x: Ctx): Omit<O
       netCentsPerSalesUnit: halfUp(f.priceEuros * 100),
       taxRate: f.taxRate,
       deliveryDate: f.deliveryDate,
+      ...(f.available === Infinity ? { stockNote: STOCK_UNKNOWN_NOTE } : {}),
     })),
     filled,
     overage: Math.max(0, round(filled - x.qty.value, 3)),

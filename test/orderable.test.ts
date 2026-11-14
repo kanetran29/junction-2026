@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUnlimited, orderable } from '../src/offers/orderable';
+import { isStockUnknown, orderable } from '../src/offers/orderable';
 import { withIsoOffsets, type AvailabilityRow, type PriceRow } from '../src/valio/client';
 import fixture from './fixtures/valio-replies.json';
 
@@ -31,7 +31,7 @@ describe('orderable', () => {
     expect(orderable(av('T0001'), pr('T0001'), new Date(closing.getTime() - 1000), '2026-11-16', { salesUnit: 'ST' }).ok).toBe(true);
   });
 
-  it('stock open and unlimited: no limit, normalised closing time and delivery date', () => {
+  it('stock unknown (999999): no limit, normalised closing time and delivery date', () => {
     expect(run('T0001')).toEqual({ ok: true, limit: null, closingTime: '2026-11-15T17:00:00+02:00', deliveryDate: '2026-11-16' });
   });
 
@@ -70,11 +70,11 @@ describe('orderable', () => {
   });
 });
 
-describe('isUnlimited', () => {
+describe('isStockUnknown', () => {
   it.each([
     [1e10, true],
     [15, false],
     [999999, true],
     [999998, false],
-  ])('%s -> %s', (amount, unlimited) => expect(isUnlimited(amount)).toBe(unlimited));
+  ])('%s -> %s', (amount, unknown) => expect(isStockUnknown(amount)).toBe(unknown));
 });
