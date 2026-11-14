@@ -24,8 +24,18 @@ describe('/demo (the animated demo page, Workers static assets)', () => {
     const js = await get('/demo/main.mjs');
     expect(js.status).toBe(200);
     expect(js.headers.get('Content-Type')).toContain('javascript');
-    for (const path of ['/demo/scene.mjs', '/demo/kit/iso-kit.mjs', '/demo/compare.mjs', '/demo/fixtures/story-v2.json', '/demo/assets/fonts/Geist-Variable.woff2', '/demo/assets/sfx/rewind.mp3'])
+    for (const path of ['/demo/scene.mjs', '/demo/kit/iso-kit.mjs', '/demo/compare.mjs', '/demo/fixtures/story-v2.json', '/demo/assets/fonts/Geist-Variable.woff2', '/demo/assets/sfx/rewind.mp3', '/demo/inside.mjs', '/demo/inside-view.mjs'])
       expect((await get(path)).status, path).toBe(200);
+  });
+
+  it('serves the Inside tab proof: proof.json and the agent-run video, seekable', async () => {
+    const proof = await get('/demo/proof.json');
+    expect(proof.headers.get('Content-Type')).toContain('application/json');
+    expect(await proof.json()).toMatchObject({ acceptance: { confirmed: true }, agentRun: { src: 'assets/proof/agent-run.mp4' } });
+    const video = await get('/demo/assets/proof/agent-run.mp4', { Range: 'bytes=0-1023' });
+    expect(video.status).toBe(206);
+    expect(video.headers.get('Content-Type')).toContain('video/mp4');
+    expect((await video.arrayBuffer()).byteLength).toBe(1024);
   });
 
   it('answers a Range request for the narration with 206, so the player can seek', async () => {
@@ -42,7 +52,7 @@ describe('/demo (the animated demo page, Workers static assets)', () => {
   });
 
   it('publishes only what the page needs', async () => {
-    for (const path of ['/demo/dev/fake-gateway.mjs', '/demo/test/live.test.mjs', '/demo/shots/after-scene.png', '/demo/SCRIPT.md', '/demo/STATUS.md', '/demo/story.mp4', '/demo/.assetsignore'])
+    for (const path of ['/demo/dev/fake-gateway.mjs', '/demo/test/live.test.mjs', '/demo/test/inside.test.mjs', '/demo/shots/after-scene.png', '/demo/SCRIPT.md', '/demo/STATUS.md', '/demo/story.mp4', '/demo/.assetsignore'])
       expect((await get(path)).status, path).toBe(404);
   });
 
