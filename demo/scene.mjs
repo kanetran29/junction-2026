@@ -54,9 +54,13 @@ const SLOT_BOTTOM = 770;
 /** Width of the decision card (Z5); sizes of the receipt and of the kitchen's rule board (Z6). */
 const STAMP_W = 470;
 const RECEIPT = { w: 340, h: 140 };
-const RULES = { w: 400, h: 140 };
+const RULES = { w: 440, h: 140 };
 /** The day-total gauge on the rule board: left edge and width in board units, and the kitchen's limits in cents. */
-const GAUGE = { x: 16, y: 82, w: 368, h: 14, day: 150000, order: 50000 };
+const GAUGE = { x: 16, y: 82, w: 408, h: 14, day: 150000, order: 50000 };
+/** The mandate rack on the front face of the door's front post: plan corner, face plane, bottom and size; card 1 is Hotel Aurora's. */
+const MANDATE_RACK = { x: GATE_X - 11, y: 50, z: 56, w: 22, h: 24 };
+/** Top of the pole at the dock, behind the parked truck, that carries the next delivery day. */
+const DOCK_FLAG = [304, 104, 86];
 
 const P = k.fitProjection(
   [...k.boxCorners(PLATE, -24, 0), [PLATE.x + 262, PLATE.y, WALL.h + 6], [PLATE.x + PLATE.w, PLATE.y, WALL.h + 6], [GATE_X, 0, 150]],
@@ -192,7 +196,7 @@ function kitchen() {
 /** Wall calendar in the kitchen: the delivery day flips to Monday when the truck arrives. */
 function calendar() {
   const plate = { x: CAL.x, y: WALL_Y, w: CAL.w, d: 2, r: 1 };
-  return `${M("cream", slab(plate, CAL.z, CAL.h, { tone: "hi", crease: "lo" }, 2, 0.4))}<g transform="${face(CAL.x, WALL_Y + 2.1, CAL.z + CAL.h)}"><rect class="cal-head" x="0" y="0" width="${CAL.w}" height="12" rx="1"/><circle class="cal-ring" cx="7" cy="0" r="1.6"/><circle class="cal-ring" cx="${CAL.w - 7}" cy="0" r="1.6"/><text data-id="calday" class="cal-day" x="${CAL.w / 2}" y="9.6" font-size="9.5" text-anchor="middle">FRI</text><text data-id="caldate" class="cal-date" x="${CAL.w / 2}" y="29" font-size="17" text-anchor="middle">13</text></g>`;
+  return `${M("cream", slab(plate, CAL.z, CAL.h, { tone: "hi", crease: "lo" }, 2, 0.4))}<g transform="${face(CAL.x, WALL_Y + 2.1, CAL.z + CAL.h)}"><rect class="cal-head" x="0" y="0" width="${CAL.w}" height="12" rx="1"/><circle class="cal-ring" cx="7" cy="0" r="1.6"/><circle class="cal-ring" cx="${CAL.w - 7}" cy="0" r="1.6"/><text data-id="calday" class="cal-day" x="${CAL.w / 2}" y="9.6" font-size="9.5" text-anchor="middle">FRI</text><text data-id="caldate" class="cal-date" x="${CAL.w / 2}" y="29" font-size="17" text-anchor="middle">13</text><g data-id="nomilk" class="nomilk" style="opacity:0" transform="rotate(-12 ${CAL.w / 2} 21)"><rect x="-1.5" y="15.5" width="${CAL.w + 3}" height="11" rx="1.5"/><text x="${CAL.w / 2}" y="24.2" font-size="7.6" text-anchor="middle">NO MILK</text></g></g>`;
 }
 
 /** The chef's frame: u runs left to right across the screen (level shoulders), f points at the viewer. */
@@ -402,6 +406,8 @@ function phone() {
 const FLAG_TOP = [MPHONE.x + MPHONE.w + 1.5, MPHONE.y - 2, 88];
 /** Screen point at the middle of the manager's phone screen: where letters land and the fingertip taps. */
 const PHONE_AT = at([MPHONE.x + MPHONE.w / 2, MPHONE.y + 2.3, MPHONE.z + 2.4 + MPHONE.h / 2]);
+/** Screen point at the middle of the mandate rack, where the kitchens' signed cards land. */
+const RACK_AT = at([MANDATE_RACK.x + MANDATE_RACK.w / 2, MANDATE_RACK.y + 1.9, MANDATE_RACK.z + MANDATE_RACK.h / 2]);
 /** A small envelope glyph for a chip, 14 × 10 with its top-left at x, y. */
 const envelope = (x, y) => `<rect class="env-body" x="${x}" y="${y}" width="14" height="10" rx="1.4"/><path class="env-flap" d="M${x + 0.8} ${y + 0.8}L${x + 7} ${y + 5.6}L${x + 13.2} ${y + 0.8}"/>`;
 
@@ -418,6 +424,25 @@ function managerPhone() {
   const [fx, fy] = at(FLAG_TOP);
   const flag = `<g class="nametag" transform="translate(${f1(fx)} ${f1(fy)})"><path class="nametag-box" d="M0 0H128L122 11L128 22H0Z"/><text class="nametag-text" x="8" y="15.5">Kitchen manager</text></g>`;
   return `<g data-id="mphone">${stand}${body}${screen}</g>${pole}${flag}`;
+}
+
+/**
+ * The mandate rack on the door's front post: a dark holder with three card slots. Every kitchen that orders through this
+ * one door slots its signed rules here; Hotel Aurora's card is the middle one (drawRack lights it).
+ */
+function mandateRack() {
+  const { x, y, z, w, h } = MANDATE_RACK;
+  const holder = M("dark", slab({ x, y, w, d: 1.8, r: 0.6 }, z, h, { tone: "mid" }, 2, 0.3));
+  const cards = [0, 1, 2].map((i) => `<rect class="mcard" data-i="${i}" x="${2.2 + i * 6.4}" y="4.5" width="4.8" height="15" rx="0.8" style="opacity:0"/>`).join("");
+  const slots = [0, 1, 2].map((i) => `<rect class="mslot" x="${2 + i * 6.4}" y="3.5" width="5.2" height="1.4" rx="0.5"/>`).join("");
+  return `<g data-id="mrack">${holder}<g transform="${face(x, y + 1.9, z + h)}">${slots}${cards}</g></g>`;
+}
+
+/** A pole at the dock behind the parked truck with a flag naming the next delivery day: orders wait for it, the truck runs then. */
+function dockFlag() {
+  const [fx, fy] = at(DOCK_FLAG);
+  const pole = M("dark", cyl(DOCK_FLAG[0], DOCK_FLAG[1], 0.9, 0, DOCK_FLAG[2], { tone: "mid" }, 10));
+  return `<g data-id="dockflag" style="opacity:0">${pole}<g class="nametag" transform="translate(${f1(fx)} ${f1(fy)})"><path class="nametag-box" d="M0 0H200L194 11L200 22H0Z"/><text data-id="dockflagtext" class="nametag-text" x="8" y="15.5">Next delivery Mon 16 Nov</text></g></g>`;
 }
 
 /**
@@ -617,13 +642,14 @@ export function buildScene(host) {
 <g data-id="leaf"></g>
 <g data-id="chef">${chef()}</g>
 <g data-id="agent">${robot()}${card()}</g>
-<g data-id="gate-front">${post(36, false)}${beam()}</g>
+<g data-id="gate-front">${post(36, false)}${beam()}${mandateRack()}</g>
 <g data-id="gate-sign">${sign()}</g>
 <g data-id="trail"></g>
 <g data-id="letter" class="letter" style="opacity:0">${LETTER}</g>
 ${truck()}
 <g data-id="exhaust"></g>
 <g>${barrier()}</g>
+${dockFlag()}
 <g data-id="scan"></g>
 <g data-id="flying"></g>
 <g data-id="doorfly"></g>
@@ -632,6 +658,7 @@ ${truck()}
 <g data-id="confetti"></g>
 <g data-id="letter2" class="letter" style="opacity:0">${LETTER}</g>
 <g data-id="mail" class="letter" style="opacity:0">${LETTER}</g>
+<g data-id="mandfly">${[0, 1, 2].map((i) => `<g class="letter" data-kind="kitchen${i}" style="opacity:0">${LETTER}</g>`).join("")}</g>
 <g data-id="rules" class="rules" style="opacity:0"></g>
 <g data-id="receipt" class="receipt" style="opacity:0"><rect class="receipt-box" width="${RECEIPT.w}" height="${RECEIPT.h}" rx="12"/><g class="receipt-icon">${icon("receipt", 14, 12, 28)}</g><text class="receipt-title" x="52" y="32"></text><text class="receipt-line" x="16" y="60"></text><text class="receipt-line" x="16" y="82"></text><text class="receipt-line" x="16" y="104"></text><text class="receipt-day" x="16" y="127"></text></g>
 <g data-id="gateshock" style="opacity:0"><circle class="stamp-shock" r="20"/><circle class="stamp-shock s2" r="20"/></g>
@@ -645,7 +672,7 @@ ${truck()}
   const root = host.querySelector(".scene-front");
   const stage = host.closest(".stage") ?? host;
   const q = (id) => root.querySelector(`[data-id="${id}"]`);
-  const ids = ["agent", "gate-fence", "gate-post", "gate-front", "gate-sign", "stopline", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "zone3", "zone4", "link3", "link4", "letter2", "exhaust", "doorfly", "bursts", "rings", "confetti", "stampfx", "gateshock", "receipt", "flying", "counter", "chef", "letter", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "dockled", "mphone", "mphonei", "tap", "mail", "rules", "pcrates", "palletsign"];
+  const ids = ["agent", "gate-fence", "gate-post", "gate-front", "gate-sign", "stopline", "leaf", "asks", "sneak", "scan", "truck", "trail", "phone", "zone3", "zone4", "link3", "link4", "letter2", "exhaust", "doorfly", "bursts", "rings", "confetti", "stampfx", "gateshock", "receipt", "flying", "counter", "chef", "letter", "boom", "boom-stripes", "blamp", "hands", "calday", "caldate", "dockled", "mphone", "mphonei", "tap", "mail", "rules", "pcrates", "palletsign", "nomilk", "mrack", "mandfly", "dockflag", "dockflagtext"];
   const el = Object.fromEntries(ids.map((id) => [id, q(id)]));
   const racks = [...root.querySelectorAll(".rack")].sort((a, b) => a.dataset.rack - b.dataset.rack);
   const counterCrates = [...el.counter.querySelectorAll(".ccrate")];
@@ -857,6 +884,7 @@ ${truck()}
     drawStamp(stamp, state.door.reasons, state.door.since, state.phone.status, t, calm, shippedAt);
     drawPhone(state.phone, t, calm);
     drawMail(state.mail, t, calm);
+    drawMandates(state, t, calm);
     drawRules(state, t, dt, snap, calm);
     drawPallet(state, t, calm);
     drawClock(state.now);
@@ -1185,7 +1213,7 @@ ${truck()}
     const key = JSON.stringify([sp?.step ?? "", total > GAUGE.day]);
     if (el.rules.dataset.key !== key) {
       el.rules.dataset.key = key;
-      const parts = [`<rect class="zone-box" width="${RULES.w}" height="${RULES.h}" rx="12"/><text class="zone-title" x="16" y="27">Kitchen's rule · signed by the kitchen</text>`];
+      const parts = [`<rect class="zone-box" width="${RULES.w}" height="${RULES.h}" rx="12"/><text class="zone-title" x="16" y="27">Hotel Aurora's rules · signed by its kitchen</text>`];
       if (!sp) parts.push(`<text class="zone-line" x="16" y="50">Agent alone: up to 500 € an order,</text><text class="zone-line" x="16" y="71">1,500 € a day · approver: Kitchen manager</text>`);
       else {
         const chips = sp.step === "merge" ? [{ text: "Basket · 666.00 €", x: 16, w: 170 }] : sp.cents.map((c, i) => ({ text: euro(c), x: 16 + i * 122, w: 112, i }));
@@ -1216,12 +1244,39 @@ ${truck()}
   }
 
   /**
+   * One door for every kitchen: the signed rules of Kitchen B and Kitchen C fly in from the left edge, Hotel Aurora's from
+   * the manager's phone, each card drops into its slot in the rack, and Aurora's lights up once all three are in.
+   */
+  function drawMandates(state, t, calm) {
+    const m = state.mandates;
+    const letters = [...el.mandfly.children];
+    const cards = [...el.mrack.querySelectorAll(".mcard")];
+    const order = [0, 0.5, 1];
+    cards.forEach((card, i) => {
+      const landed = m && (calm || t >= m.since + order[i] + 1.3);
+      setAttr(card, "style", landed ? null : "opacity:0");
+      setAttr(card, "data-lit", landed && i === 1 && (calm || t >= m.since + 2.6) ? "" : null);
+    });
+    letters.forEach((node, i) => {
+      const u = m ? (t - m.since - order[i]) / 1.3 : -1;
+      if (calm || u < 0 || u >= 1) return setAttr(node, "style", "opacity:0");
+      const a = i === 1 ? PHONE_AT : [-20, RACK_AT[1] + 60 + i * 30];
+      const c = [(a[0] + RACK_AT[0]) / 2, Math.min(a[1], RACK_AT[1]) - 150];
+      const e = ease(u);
+      const q = (j) => (1 - e) * (1 - e) * a[j] + 2 * e * (1 - e) * c[j] + e * e * RACK_AT[j];
+      placeLetter(node, q(0), q(1), 0.9 - 0.4 * e, u > 0.85 ? (1 - u) / 0.15 : 1);
+    });
+  }
+
+  /**
    * Crates on the dock pallet: one place per accepted crate, each new one dropping in from above. Its "MON 16 NOV" sign
    * stands only while orders wait for Monday (Story), and goes once the truck has taken the pallet, so the truck never drives over words.
    */
   function drawPallet(state, t, calm) {
     const p = state.pallet;
     setAttr(el.palletsign, "style", state.hold && !state.truck.fromPallet ? null : "opacity:0");
+    setAttr(el.dockflag, "style", state.hold && state.gate.built ? null : "opacity:0");
+    setText(el.dockflagtext, state.truck.fromPallet ? "Delivery day · Mon 16 Nov" : "Next delivery Mon 16 Nov");
     const added = p.added ?? 0;
     palletCrates.forEach((node, i) => {
       if (i >= p.crates) return setAttr(node, "style", "opacity:0");
@@ -1293,10 +1348,11 @@ ${truck()}
     });
     live.happy = run.accepted && age >= run.unloadDone - 0.2 && age < run.unloadDone + 3.4;
     const delivered = run.accepted && age >= run.arrive && age < run.home + 1.5;
-    const [day, date] = delivered ? ["MON", "16"] : live.today;
+    const [day, date] = delivered || state.nomilk ? ["MON", "16"] : live.today;
     setText(el.caldate, date);
     setText(el.calday, day);
     setAttr(el.caldate, "data-flip", delivered ? "" : null);
+    setAttr(el.nomilk, "style", state.nomilk ? null : "opacity:0");
     if (run.accepted && age >= run.arrive + 0.2 && age < run.home + 1.5) {
       const r = state.receipt ?? {};
       const lines = r.lines?.every((l) => typeof l === "string") && r.lines.length ? r.lines : [[r.netCents != null ? `Net ${euro(r.netCents)}` : "", r.grossCents != null ? `Gross ${euro(r.grossCents)}` : ""].filter(Boolean).join(" · "), r.approvedBy ? `Approved by ${r.approvedBy}` : "Accepted", "Accepted (simulated) · Mon 16 Nov"];
@@ -1385,7 +1441,7 @@ ${truck()}
       typing = shown < text.length + 8;
     }
     const box3 = drawCard(el.zone3, Z3, card);
-    const target = card?.link === "agent" ? at([ax, ay - 1, 34]) : card?.link === "terminal" ? at([PHONE.x + PHONE.w / 2, PHONE.y + PHONE.d, PHONE.z + PHONE.h]) : card?.link === "phone" ? at([MPHONE.x + MPHONE.w / 2, MPHONE.y + 2.3, MPHONE.z + 2.4 + MPHONE.h]) : null;
+    const target = card?.link === "agent" ? at([ax, ay - 1, 34]) : card?.link === "terminal" ? at([PHONE.x + PHONE.w / 2, PHONE.y + PHONE.d, PHONE.z + PHONE.h]) : card?.link === "phone" ? at([MPHONE.x + MPHONE.w / 2, MPHONE.y + 2.3, MPHONE.z + 2.4 + MPHONE.h]) : card?.link === "rack" ? RACK_AT : null;
     drawLink(el.link3, box3 && target && [Math.min(Math.max(target[0], box3[0] + 24), box3[2] - 24), box3[3]], target);
     const list = story ? state.list : liveList(state);
     const box4 = drawCard(el.zone4, Z4, list && { title: list.title, mono: list.mono, lines: list.rows, note: list.note });

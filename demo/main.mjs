@@ -74,7 +74,8 @@ function overlays(state) {
   const remaining = !state.now ? "-" : left === "closed" ? "Closed" : left;
   if (big.textContent !== remaining) big.textContent = remaining;
   big.toggleAttribute("data-closed", left === "closed");
-  const now = state.now ? `Now ${clockText(state.now).replace(/ \d+ \w+ /, " ")}` : "";
+  const time = state.now ? clockText(state.now).replace(/ \d+ \w+ /, " ") : "";
+  const now = !time ? "" : state.gate.built ? `Cut-off Sun 17:00 · now ${time}` : `Now ${time}`;
   if ($("hud-now").textContent !== now) $("hud-now").textContent = now;
   $("replay").hidden = !state.replay;
   $("endcard").hidden = !ending;

@@ -44,6 +44,8 @@ export function initialState() {
     rulesSince: 0,
     mail: null,
     split: null,
+    nomilk: false,
+    mandates: null,
   };
 }
 
@@ -252,6 +254,12 @@ export function reduce(state, ev, t) {
     case "story.mail":
       s.mail = d.kind ? { kind: d.kind, from: d.from, to: d.to, since: t } : null;
       break;
+    case "story.nomilk":
+      s.nomilk = d.on !== false;
+      break;
+    case "story.mandates":
+      s.mandates = { since: t };
+      break;
     case "story.split":
       s.split = d.step ? { step: d.step, cents: d.cents ?? [], since: t } : null;
       break;
@@ -278,7 +286,7 @@ export function reduce(state, ev, t) {
       break;
     case "story.reset": {
       const fresh = initialState();
-      Object.assign(s, { draft: null, quote: null, door: fresh.door, shelves: fresh.shelves, naive: fresh.naive, card: null, list: null, flash: null, rival: null, mail: null, split: null });
+      Object.assign(s, { draft: null, quote: null, door: fresh.door, shelves: fresh.shelves, naive: fresh.naive, card: null, list: null, flash: null, rival: null, mail: null, split: null, nomilk: false });
       if (d.truck) s.truck = fresh.truck;
       if (d.phone) s.phone = fresh.phone;
       if (d.agent) s.agent = { ...fresh.agent, since: t };

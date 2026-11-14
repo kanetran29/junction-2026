@@ -52,15 +52,18 @@ const SCRIPT = [
   [0, 9.5, ...caption("It orders 50 cases: 1,565.50 €. No one is asked.")],
   [0, 12.5, "story.naive", { step: "stuck" }],
   [0, 12.5, "story.list", RAW(true)],
-  [0, 12.5, ...caption("The same reply also said: closed Thu 12 Nov 15:00.")],
+  [0, 12.5, ...caption("Closed Thu 15:00. Monday: no milk.")],
+  [0, 12.5, "story.card", card("The agent's order · never ships", ["50 cases × 31.31 € = 1,565.50 €", "Past the Thu 15:00 cut-off", "Monday: no milk in the kitchen"], { tone: "reject", link: "agent" })],
   [0, 13.2, "story.agent", { at: "home", carry: null }],
+  [0, 13.2, "story.nomilk", { on: true }],
 
   // 2 · Friday evening: the door goes up and the kitchen manager's phone sends it the kitchen's signed rules.
   [1, 0, "story.reset", { truck: true, agent: true }],
   [1, 0, "story.clock", { now: "2026-11-13T19:40:00+02:00" }],
-  [1, 0.1, ...caption("Friday evening: a door, carrying the kitchen's own signed rules.")],
+  [1, 0.1, ...caption("One door at Valio. Each kitchen brings its own signed rules.")],
   [1, 0.3, "story.gate", { built: true }],
-  [1, 2.6, "story.mail", { kind: "signed", from: "phone", to: "gate" }],
+  [1, 2.2, "story.mandates", {}],
+  [1, 2.2, "story.card", card("One door, each kitchen's own rules", ["Hotel Aurora · signed by its kitchen", "Kitchen B · its own signed rules", "Kitchen C · its own signed rules"], { link: "rack" })],
   [1, 4, "story.rules", { on: true }],
 
   // 3 · 21:10, the same sentence through the door: typed, searched, refused with reasons, quoted.
@@ -108,10 +111,11 @@ const SCRIPT = [
   [4, 3.6, ...caption("Two agents, six boxes: ours wins, the other learns 2 are left.")],
   [4, 4.2, ...gw("policy.decided")],
   [4, 4.4, ...gw("order.accepted")],
+  [4, 4.4, "story.card", card("Typed order · ACCEPTED", ["470746 · 4 × 5 kg = 190.92 €", "Accepted Fri · ships Mon 16 Nov"], { tone: "auto", link: "agent" })],
   [4, 5, ...gw("policy.decided")],
   [4, 5.2, ...gw("stock.denied")],
-  [4, 5.2, "story.list", { title: "470746 Chicken breast fillet 5 kg", product: "470746", rows: [{ text: "6 left before the two orders" }, { text: "Hotel Aurora: ACCEPTED · 190.92 €", tone: "auto" }, { text: "Another hotel: ✕ STOCK_TAKEN · 2 left", tone: "reject" }] }],
-  [4, 7.4, ...caption("190.92 €: inside both limits. No human needed.")],
+  [4, 5.2, "story.list", { title: "470746 Chicken breast fillet 5 kg · 6 left", product: "470746", rows: [{ text: "Hotel Aurora: ACCEPTED · 190.92 €", tone: "auto" }, { text: "Another hotel: ✕ STOCK_TAKEN · 2 left", tone: "reject" }], note: "Another hotel: same door, its own rules." }],
+  [4, 7.4, ...caption("190.92 €: inside both limits, no human. On the pallet for Monday.")],
 
   // 6 · Still Friday evening: "for Friday" reads as two different Fridays, so the door asks.
   [5, 0, "story.card", {}],
@@ -134,6 +138,7 @@ const SCRIPT = [
   [6, 1.2, ...gw("approval.approved")],
   [6, 1.2, "story.mail", { kind: "approved", from: "phone", to: "gate" }],
   [6, 2.6, ...gw("order.accepted")],
+  [6, 2.6, "story.card", card("Milk · ACCEPTED", ["1,000 × 1 l · 1,010.00 €", "Accepted Sat · ships Mon 16 Nov"], { tone: "auto", link: "agent" })],
 
   // 8 · Saturday afternoon: the gluten-free oat drink is out; Valio's substitute adds gluten, so the door refuses it.
   [7, 0, "story.reset", {}],

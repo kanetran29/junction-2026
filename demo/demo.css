@@ -287,6 +287,18 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .pallet-label { fill: #13262e; font-family: var(--sans); font-weight: 800; letter-spacing: .04em; }
 .letter[data-kind="signed"] .letter-seal { fill: #13262e; }
 .letter[data-kind="approved"] .letter-seal { fill: var(--auto); }
+.letter[data-kind="kitchen0"] .letter-seal { fill: #5ab8ff; }
+.letter[data-kind="kitchen2"] .letter-seal { fill: #54e0b0; }
+.letter[data-kind="kitchen1"] .letter-seal { fill: var(--brand); }
+/* The mandate rack on the door: one card per kitchen (B, Hotel Aurora, C); Aurora's lights up. */
+.mslot { fill: #0a1a20; }
+.mcard { stroke: #0a1a20; stroke-width: .5px; }
+.mcard[data-i="0"] { fill: #5ab8ff; }
+.mcard[data-i="1"] { fill: var(--brand-soft); }
+.mcard[data-i="2"] { fill: #54e0b0; }
+.mcard[data-lit] { fill: #fff; stroke: var(--brand); stroke-width: 1.2px; filter: drop-shadow(0 0 3px var(--brand)); }
+.nomilk rect { fill: var(--reject); stroke: #fff; stroke-width: .8px; }
+.nomilk text { fill: #fff; font-family: var(--sans); font-weight: 900; letter-spacing: .04em; }
 
 /* The kitchen's rule board (Z6) with the day-total gauge: accepted solid, held hatched, the Sunday split part in red. */
 .gauge-track { fill: rgb(255 255 255 / .07); stroke: rgb(255 255 255 / .3); stroke-width: 1px; }

@@ -501,3 +501,23 @@ Trước khi dựng hình, cần chạy **một lần liền, không reset giữ
 - Duyệt v2.1: sữa ngay sau khi dựng cổng; luật của bếp **500 € một đơn, 1.500 € một ngày**.
 - Các câu còn lại ở 14.8 đi theo đề xuất: (1) điện thoại của manager là một vật riêng trên quầy bếp, cờ tên "Kitchen manager"; (3) chia đơn chỉ kể bằng thanh đo; (4) giữ giỏ hết hạn; (5) session build chạy chuỗi 14.6 một lần liền trên door thật, event thật làm fixture; (6) giọng dài quá 1:50 thì cắt cảnh 6 trước, rồi phần yến mạch.
 - Chưa quay story.mp4, chưa merge vào main cho tới khi Kane xem bản dựng.
+
+## 16. Ba sửa của Kane cho v2.1 (14/11), chỉ hình và chữ trên màn hình
+
+Giọng đọc (11 đoạn đã duyệt) và mốc `VOICE` giữ nguyên; Story vẫn 1:50.
+
+1. **Hậu quả của đơn không qua door (cảnh 1).**
+   - Lúc robot về tay không (0:13,2): lịch bếp lật sang MON 16 với dấu đỏ "NO MILK".
+   - Thẻ Z3 đổi thành "The agent's order · never ships": "50 cases × 31.31 € = 1,565.50 €", "Past the Thu 15:00 cut-off", "Monday: no milk in the kitchen".
+   - Caption 0:12,5 đổi thành "Closed Thu 15:00. Monday: no milk."
+2. **Vì sao xe tải chỉ chạy cuối truyện.**
+   - Từ lúc cổng dựng xong: cột cờ ở bến, ngay sau xe tải đang đỗ, ghi "Next delivery Mon 16 Nov"; Thứ Hai, khi xe nhận pallet, cờ đổi thành "Delivery day · Mon 16 Nov".
+   - Gà được nhận (0:56): thẻ Z3 "Typed order · ACCEPTED", hai dòng "470746 · 4 × 5 kg = 190.92 €" và "Accepted Fri · ships Mon 16 Nov".
+   - Caption 0:59 đổi thành "190.92 €: inside both limits, no human. On the pallet for Monday."
+   - Sữa được nhận (1:15): thẻ Z3 "Milk · ACCEPTED", dòng "Accepted Sat · ships Mon 16 Nov".
+3. **Một door ở Valio, mọi bếp dùng chung.**
+   - Cảnh 2: trụ trước của cổng có giá thẻ ba khe. Thẻ luật có chữ ký của Kitchen B và Kitchen C bay vào từ mép trái, thẻ của Hotel Aurora bay từ điện thoại của manager. Khi đủ ba thẻ, thẻ Aurora sáng lên.
+   - Thẻ Z3 "One door, each kitchen's own rules" nối tới giá thẻ.
+   - Caption 0:15,7 đổi thành "One door at Valio. Each kitchen brings its own signed rules."
+   - Đổi tên hai bảng: Z2 "Valio's rules · same for every buyer" (dòng dưới "Cut-off Sun 17:00 · now …"); bảng ở Z6 "Hotel Aurora's rules · signed by its kitchen".
+   - Danh sách Z4 lúc khách sạn kia thua cuộc tranh hàng có thêm ghi chú "Another hotel: same door, its own rules."; tiêu đề gộp thành "470746 Chicken breast fillet 5 kg · 6 left" để thẻ vẫn nằm trên nóc thùng xe tải.

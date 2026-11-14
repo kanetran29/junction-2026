@@ -5,6 +5,8 @@ import { dayTotal } from "../model.mjs";
 import fixture from "../fixtures/story-v2.json" with { type: "json" };
 
 const firstAt = (pred) => STORY.find((item) => pred(item.ev))?.at;
+/** Second at which scene 2 (the door goes up) starts. */
+const START_OF_2 = STORY.find((item) => item.ev.type === "story.gate" && item.ev.data.built === true).at - 0.3;
 const decided = (outcome, ...codes) => (ev) => ev.type === "policy.decided" && ev.data.outcome === outcome && codes.every((c) => ev.data.reasons.includes(c));
 /** Every word the Story puts on screen: captions, the chef's typed words, zone cards, lists and the receipt. */
 const words = () => STORY.flatMap(({ ev }) => {
@@ -145,4 +147,15 @@ test("story: every caption stays up at least 3 s and long enough to read at 17 c
     const need = Math.max(3, item.ev.data.text.length / 17);
     assert.ok(shown >= need - 1e-9, `${item.ev.data.text} is up ${shown.toFixed(2)} s, needs ${need.toFixed(2)} s`);
   });
+});
+
+test("story: Kane's fixes (SCRIPT.md 16): no milk on Monday, one door for every kitchen, accepted orders ship Monday", () => {
+  const all = words();
+  assert.ok(all.includes("Closed Thu 15:00. Monday: no milk."));
+  assert.equal(stateAt(14).nomilk, true);
+  assert.equal(stateAt(START_OF_2 + 0.01).nomilk, false);
+  assert.ok(all.includes("One door at Valio. Each kitchen brings its own signed rules."));
+  assert.ok(stateAt(START_OF_2 + 3).mandates, "the kitchens' signed cards go into the door's rack in scene 2");
+  assert.ok(all.includes("Accepted Fri · ships Mon 16 Nov") && all.includes("Accepted Sat · ships Mon 16 Nov"));
+  assert.ok(all.includes("Another hotel: same door, its own rules."));
 });

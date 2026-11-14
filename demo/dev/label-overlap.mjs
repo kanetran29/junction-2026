@@ -44,6 +44,7 @@ const collect = () => {
   add("logo sign", scene.querySelector('image[href*="valio-aimo-logo"]'));
   add("manager name flag", scene.querySelector(".nametag"));
   add("pallet sign", scene.querySelector(".pallet-label"));
+  add("dock flag", scene.querySelector('[data-id="dockflag"] .nametag'));
   const solid = (id, name) => {
     const before = items.length;
     add(name, scene.querySelector(`[data-id="${id}"]`));
