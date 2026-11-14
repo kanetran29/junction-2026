@@ -544,3 +544,15 @@ Giọng đọc (11 đoạn đã duyệt) và mốc `VOICE` giữ nguyên; Story 
    - **Ở bếp:** xe dừng ở chỗ đỗ trước bếp. Thùng nhảy thấp từ thùng xe xuống thành chồng 2 × 2 trên sàn bếp, cạnh chef, trước đầu quầy. Rồi chef giơ ngón cái và biên nhận hiện ra.
    - **Live dùng cùng đường đi:** `deliveryStops()` trong `scene.mjs`; test kiểm không có điểm nào của đường đi thùng ở gần cổng.
    - Mốc thời gian, caption, giọng và biên nhận giữ nguyên.
+8. **So sánh ở cuối Story và trang Compare.** Story **1:58,9** (118,9 s), dưới giới hạn 1:59,0.
+   - **Lấy thêm thời gian:** cắt khoảng nghỉ cuối cảnh, không bỏ cảnh nào: cảnh 2 −0,3, cảnh 4 −0,3, cảnh 5 −0,4, cảnh 6 −0,2, cảnh 7 −0,2, cảnh 8 −0,3, cảnh 9 −0,2 s. Caption "17:05: …" sớm 0,1 s để vẫn hiện đủ thời gian đọc.
+   - **Cảnh cuối (11,6 s, từ 1:47,3):** bảng "Without the door / With Lazydoor". Cột trái ✕ đỏ nhạt, cột phải ✓ xanh, 8 dòng, mỗi dòng hiện sau dòng trước 0,45 s. Dòng chân: "Any agent connects: HTTP API · /openapi.json   MCP · /mcp (9 tools) · 49 acceptance cases pass."
+   - Đoạn đọc 11 phát trên bảng (1:47,6–1:52,4). Màn kết hiện từ 1:55,9 tới hết.
+   - Ở khung 1280×720 đọc được cả 8 dòng, nên giữ cả 8.
+   - **Trang Compare** (`?mode=compare`, tab thứ ba):
+     - Tiêu đề "Why a door?" và câu dẫn.
+     - Bảng ba cột: "Agent calls Valio's API directly" | "Person orders in the webshop" | "Lazydoor", gồm 8 điểm mạnh và 4 dòng thêm: ai kiểm cut-off, nhật ký mọi bước, dùng được với mọi agent, luật công bố.
+     - Mỗi ô Lazydoor có thẻ bằng chứng (AC, mã lý do hoặc endpoint). Cột webshop chỉ ghi "the person, if they notice" hoặc "—".
+     - Chân trang có link door thật và repo GitHub.
+     - Trên điện thoại mỗi dòng thành một thẻ, không cuộn ngang ở 375 px.
+   - Cảnh cuối và trang Compare dùng chung dữ liệu từ `demo/compare.mjs`.

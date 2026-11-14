@@ -49,6 +49,7 @@ export function initialState() {
     nomilk: false,
     mandates: null,
     warp: null,
+    compare: null,
   };
 }
 
@@ -340,6 +341,9 @@ export function reduce(state, ev, t) {
       if (!d.to) break;
       s.warp = { from: s.now ?? d.to, to: d.to, since: t, dur: d.dur ?? 1, back: Date.parse(d.to) < Date.parse(s.now ?? d.to) };
       Object.assign(s, { now: d.to, clockSet: true });
+      break;
+    case "story.compare":
+      s.compare = { since: t };
       break;
     case "story.nomilk":
       s.nomilk = d.on !== false;

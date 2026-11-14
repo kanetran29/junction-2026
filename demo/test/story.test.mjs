@@ -18,8 +18,8 @@ const words = () => STORY.flatMap(({ ev }) => {
   return [];
 }).join("\n");
 
-test("story: at most 1:58 so the pitch video stays under the hard 2:00 limit; sorted; seq strictly increasing", () => {
-  assert.ok(DURATION >= 100 && DURATION <= 118, `DURATION ${DURATION}`);
+test("story: at most 1:59 (119 s) so the pitch video stays under Junction's hard 2:00 limit; sorted; seq strictly increasing", () => {
+  assert.ok(DURATION >= 100 && DURATION <= 119, `DURATION ${DURATION}`);
   STORY.forEach((item, i) => i && assert.ok(item.at >= STORY[i - 1].at));
   assert.ok(STORY.at(-1).at <= DURATION);
   STORY.forEach((item, i) => i && assert.ok(item.ev.seq > STORY[i - 1].ev.seq));
@@ -186,4 +186,13 @@ test("story: scene 1 jumps to Monday 07:00 with no milk, then rewinds to Friday 
   assert.equal(stateAt(warps[1].at + 0.01).warp.back, true);
   assert.equal(stateAt(warps[1].at + warps[1].ev.data.dur).now, "2026-11-13T16:30:00+02:00");
   assert.ok(STORY.some((item) => item.ev.type === "story.caption" && item.ev.data.text.startsWith("Rewind to Friday")));
+});
+
+test("story: it closes on Without the door / With Lazydoor, with line 11 over it, then the end card", () => {
+  const compare = firstAt((ev) => ev.type === "story.compare");
+  const close = firstAt((ev) => ev.type === "story.close");
+  const last = VOICE.at(-1);
+  assert.ok(compare < last.at && last.at + last.dur <= close, "line 11 plays over the comparison");
+  assert.ok(close - compare >= 8, "the eight rows stay up long enough to read");
+  assert.ok(DURATION - close >= 2.5, "the end card stays up");
 });

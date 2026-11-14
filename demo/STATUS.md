@@ -221,6 +221,11 @@ Vấn đề tìm thấy:
 - Thứ Hai: thùng trên pallet "MON 16 NOV" nhảy thấp vào xe từng cái một ở bến Valio (thùng ở trên pallet tới lúc được nhấc); bỏ pháo giấy (xoá hẳn hiệu ứng). Ở bếp: thùng nhảy thấp từ thùng xe xuống chồng 2 × 2 trên sàn bếp cạnh chef (thay chỗ trên quầy cũ); chỗ "thùng sữa trống" ở cảnh 1 cũng dời về đó.
 - `deliveryStops(n)` (scene.mjs) là đường đi duy nhất của thùng, dùng cho cả Story và Live; test mới: không điểm nào ở gần cổng, xếp lên xe ở phía Valio, dỡ xuống sàn bếp. 48 test pass, `label overlaps: 0`.
 
+### 28. So sánh "Without the door / With Lazydoor" và trang Compare (SCRIPT.md 16.8)
+- Story 118,9 s (≤ 1:59,0): cắt khoảng nghỉ ở cảnh 2, 4–9 (tổng 1,9 s), cảnh cuối thành 11,6 s: 8 dòng so sánh hiện lần lượt dưới đoạn đọc 11, rồi màn kết từ 1:55,9. Caption bị ẩn khi bảng hiện.
+- Tab "Compare" (`?mode=compare`): trang tĩnh "Why a door?", bảng ba cột 12 dòng có thẻ bằng chứng, cột webshop chỉ "the person, if they notice" hoặc "—", chân trang có door thật và GitHub; ≤ 760 px thì mỗi dòng là một thẻ. Dữ liệu chung ở `demo/compare.mjs` (dựng bằng `textContent`).
+- Test mới: Story ≤ 119 s, cảnh so sánh có đoạn 11 và màn kết đủ lâu, dữ liệu so sánh (12 dòng, cột webshop chỉ hai giá trị), trang Compare không cuộn ngang ở 375 px (cần `PLAYWRIGHT_CORE`, không có thì bỏ qua). 51 test pass khi có Playwright (50 + 1 bỏ qua khi không có); `label overlaps: 0`.
+
 ## Còn lại / cần làm sau
 - Quay `demo/story.mp4` khi Kane duyệt Story mới (ghép giọng từ `VOICE`).
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.

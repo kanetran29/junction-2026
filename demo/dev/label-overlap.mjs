@@ -23,8 +23,8 @@ const collect = () => {
     return true;
   };
   const items = [];
-  const end = document.getElementById("endcard");
-  if (!end.hidden) {
+  const end = [document.getElementById("endcard"), document.getElementById("compare")].find((node) => !node.hidden);
+  if (end) {
     const r = end.getBoundingClientRect();
     const s = document.querySelector(".stage").getBoundingClientRect();
     return { items: [{ name: "end card", x: r.left, y: r.top, w: r.width, h: r.height }], stage: { x: s.left, y: s.top, w: s.width, h: s.height } };

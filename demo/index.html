@@ -15,6 +15,7 @@
     <div class="modes" role="group" aria-label="Mode">
       <button type="button" data-mode="story" aria-pressed="true">Story</button>
       <button type="button" data-mode="live" aria-pressed="false">Live</button>
+      <button type="button" data-mode="compare" aria-pressed="false">Compare</button>
     </div>
     <div class="right">
       <span id="chip" class="chip" hidden></span>
@@ -37,6 +38,11 @@
     <div id="rewind" class="rewind" hidden><span aria-hidden="true">◀◀</span> Rewind</div>
     <!-- Phosphor Icons "device-rotate" (bold), @phosphor-icons/core 2.1.1, MIT licence (assets/LICENSE-phosphor-icons.txt). -->
     <div id="rotate" class="rotate" hidden><svg viewBox="0 0 256 256" aria-hidden="true"><path d="M208.49,224.49l-24,24a12,12,0,0,1-17-17L171,228H80a28,28,0,0,1-28-28V108a12,12,0,0,1,24,0v92a4,4,0,0,0,4,4h91l-3.52-3.51a12,12,0,0,1,17-17l24,24A12,12,0,0,1,208.49,224.49ZM80,76a12,12,0,0,0,8.49-20.49L85,52h91a4,4,0,0,1,4,4v92a12,12,0,0,0,24,0V56a28,28,0,0,0-28-28H85l3.52-3.52a12,12,0,0,0-17-17l-24,24a12,12,0,0,0,0,17l24,24A12,12,0,0,0,80,76Z"/></svg><p>Rotate for the full scene</p><button type="button" id="watch">Watch anyway</button></div>
+    <div id="compare" class="compare" hidden>
+      <div class="compare-head"><span class="cmp-without">Without the door</span><span class="cmp-with">With Lazydoor</span></div>
+      <ol id="compare-rows" class="compare-rows"></ol>
+      <div class="compare-foot" id="compare-foot"></div>
+    </div>
     <div id="endcard" class="endcard" hidden>
       <div class="brands"><span class="lazy">Lazydoor</span><span class="x">for</span><span class="logo-plate"><img src="assets/valio-aimo-logo.svg" alt="Valio Aimo"></span></div>
       <div class="connect">
@@ -58,6 +64,16 @@
     <button type="button" id="mute" aria-pressed="false">Sound on</button>
   </section>
 
+  <section id="compare-page" class="compare-page" aria-labelledby="why" hidden>
+    <h1 id="why">Why a door?</h1>
+    <p class="lede">Agents will order on behalf of kitchens. Lazydoor sits at Valio and checks every order before it becomes real.</p>
+    <table class="cmp-table">
+      <thead><tr><th scope="col"><span class="sr-only">What</span></th><th scope="col">Agent calls Valio's API directly</th><th scope="col">Person orders in the webshop</th><th scope="col">Lazydoor</th></tr></thead>
+      <tbody id="cmp-body"></tbody>
+    </table>
+    <p class="cmp-note">Every Lazydoor line was measured on the deployed door; the tag under it names the acceptance case, reason code or endpoint. In the webshop column, "—" means we do not know.</p>
+    <footer class="cmp-foot">Live door: <a href="https://lazydoor.lazydoor.workers.dev">lazydoor.lazydoor.workers.dev</a> · Code: <a href="https://github.com/kanetran29/junction-2026">github.com/kanetran29/junction-2026</a> · 49 acceptance cases pass.</footer>
+  </section>
   <p id="live-note" class="live-note" hidden>Live: the scene follows Hotel Aurora's agent at the door, as it happens; other hotels' agents show as letters from the left. Nothing is sent from this page.</p>
 </main>
 <script type="module" src="main.mjs"></script>

@@ -4,8 +4,11 @@
 import { initialState, reduce } from "./model.mjs";
 import fixture from "./fixtures/story-v2.json" with { type: "json" };
 
-/** Seconds per scene: each is its narration line plus a short pause (scene 10 also holds for the delivery and receipt). */
-const SCENES = [20.4, 6.2, 16.6, 13.2, 12.8, 8, 5.2, 6.8, 13, 7, 5.6];
+/**
+ * Seconds per scene: each is its narration line plus a short pause (scene 10 also holds for the delivery and receipt, the
+ * last one holds the "Without the door / With Lazydoor" comparison and then the end card). The Story must stay under 1:59.
+ */
+const SCENES = [20.4, 5.9, 16.6, 12.9, 12.4, 7.8, 5, 6.5, 12.8, 7, 11.6];
 /** Second at which each scene starts. */
 const START_OF = SCENES.reduce((acc, len, i) => [...acc, Math.round((acc[i] + len) * 100) / 100], [0]);
 export const DURATION = START_OF.at(-1);
@@ -193,7 +196,7 @@ const SCRIPT = [
   [8, 8.3, "story.card", card("Kitchen manager's phone", ["Approve basket · 3 lines", "Net 666.00 € · Gross 755.91 €", "Decide by Sun 17:00"], { tone: "hold", link: "phone" })],
   [8, 9.2, "story.clock", { now: "2026-11-15T16:59:00+02:00" }],
   [8, 9.6, ...gw("clock.set")],
-  [8, 9.6, ...caption("17:05: the manager taps too late. Expired, nothing ships.")],
+  [8, 9.5, ...caption("17:05: the manager taps too late. Expired, nothing ships.")],
   [8, 10.4, ...gw("approval.expired")],
   [8, 10.4, "story.card", card("Kitchen manager's phone · 17:05", ["Approve tapped after the 17:00 cut-off", "→ EXPIRED · APPROVAL_EXPIRED"], { tone: "reject", link: "phone" })],
 
@@ -205,9 +208,10 @@ const SCRIPT = [
   [9, 0, "story.ship", {}],
   [9, 0.1, ...caption("Monday 16 Nov: milk and chicken arrive. Receipt in plain words.")],
 
-  // 11 · Close.
+  // 11 · Without the door / With Lazydoor, one row at a time under line 11; then the end card.
   [10, 0, "story.card", {}],
-  [10, 0, "story.close", {}],
+  [10, 0, "story.compare", {}],
+  [10, 8.6, "story.close", {}],
 ];
 
 /** The fixture's gateway events, oldest first (a bare array or { events }). */

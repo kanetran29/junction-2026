@@ -6,6 +6,7 @@ import { STORY, DURATION, VOICE, SFX, stateAt } from "./story.mjs";
 const CLIPS = [...VOICE, ...SFX].sort((a, b) => a.at - b.at);
 import { connectLive, readBacklog } from "./live.mjs";
 import { buildScene } from "./scene.mjs";
+import { STRENGTHS, PAGE_ONLY, CONNECT_LINE } from "./compare.mjs";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -21,13 +22,45 @@ if (kiosk) document.body.classList.add("kiosk");
 const scene = buildScene($("scene"));
 const still = matchMedia("(prefers-reduced-motion: reduce)");
 
-let mode = params.get("mode") === "live" ? "live" : "story";
+let mode = ["live", "compare"].includes(params.get("mode")) ? params.get("mode") : "story";
 const story = { t: 0, next: 0, state: initialState(), playing: false, snap: true };
 /** Live watches the door at ?gateway= (a local preview against the deployed door) or the page's own origin, and follows ?buyer=. */
 const GATEWAY = params.get("gateway") || location.origin;
 const BUYER = params.get("buyer") || "hotel-a";
 const live = { state: liveState(BUYER), t0: performance.now() / 1000, abort: null, queue: [], nextAt: 0, lines: [], caption: "", captionUntil: 0, snap: false };
 const voice = { audio: new Audio(), seg: -1, muted: store.get("muted") === "1" };
+
+/** An element with a class and text (never markup), for the comparison built from compare.mjs. */
+function el(tag, cls, text = "") {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  node.textContent = text;
+  return node;
+}
+
+/** Fills the Story's closing comparison (eight rows, ✕ without the door, ✓ with Lazydoor) and the Compare page's table. */
+function buildCompare() {
+  $("compare-rows").replaceChildren(...STRENGTHS.map((row) => {
+    const li = el("li");
+    li.append(el("span", "cmp-without", `✕ ${row.without}`), el("span", "cmp-with", `✓ ${row.with}`));
+    return li;
+  }));
+  $("compare-foot").textContent = CONNECT_LINE;
+  const labels = [...document.querySelectorAll(".cmp-table thead th")].slice(1).map((th) => th.textContent);
+  $("cmp-body").replaceChildren(...[...STRENGTHS, ...PAGE_ONLY].map((row) => {
+    const tr = el("tr");
+    const topic = el("th", "", row.topic);
+    topic.scope = "row";
+    const cells = [row.without, row.webshop, row.with].map((text, i) => {
+      const td = el("td", i === 2 ? "is-door" : "", text);
+      td.dataset.label = labels[i];
+      if (i === 2) td.append(el("span", "evidence", row.evidence));
+      return td;
+    });
+    tr.append(topic, ...cells);
+    return tr;
+  }));
+}
 
 /** Jumps the story to t seconds: state rebuilt from the timeline, moving parts snapped. */
 function seek(t) {
@@ -61,7 +94,7 @@ const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStar
 function overlays(state, t = 0) {
   const caption = mode === "story" ? state.caption : live.caption;
   const ending = mode === "story" && state.close;
-  const shown = ending ? "" : caption;
+  const shown = ending || (mode === "story" && state.compare) ? "" : caption;
   if ($("caption").textContent !== shown) $("caption").textContent = shown;
   const key = state.log.map((l) => `${l.seq}|${l.type}`).join(",");
   const ticker = $("ticker");
@@ -90,11 +123,15 @@ function overlays(state, t = 0) {
   if ($("hud-now").textContent !== now) $("hud-now").textContent = now;
   $("replay").hidden = !state.replay;
   $("endcard").hidden = !ending;
+  const comparing = mode === "story" && Boolean(state.compare) && !ending;
+  $("compare").hidden = !comparing;
+  if (comparing) [...$("compare-rows").children].forEach((li, i) => li.toggleAttribute("data-on", t >= state.compare.since + 0.4 + i * 0.45));
 }
 
 let last = performance.now();
 /** Draws one frame dt seconds after the previous one. */
 function render(dt) {
+  if (mode === "compare") return;
   if (mode === "story") {
     advance(dt);
     syncVoice();
@@ -228,6 +265,8 @@ function setMode(next) {
   document.querySelectorAll(".modes button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
   $("story-controls").hidden = mode !== "story";
   $("live-note").hidden = mode !== "live";
+  $("stage").hidden = mode === "compare";
+  $("compare-page").hidden = mode !== "compare";
   $("mode-tag").textContent = mode === "story" ? "Story" : "Live";
   $("chip").hidden = mode !== "live";
   if (mode === "live") {
@@ -235,7 +274,8 @@ function setMode(next) {
     connect();
   } else {
     live.abort?.abort();
-    seek(story.t);
+    if (mode === "compare") setPlaying(false);
+    else seek(story.t);
   }
 }
 
@@ -268,6 +308,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft") seek(story.t - 5);
 });
 
+buildCompare();
 seek(Number(params.get("t")) || 0);
 setMode(mode);
 if (params.get("autoplay") === "1" && mode === "story") setPlaying(true);
