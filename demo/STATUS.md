@@ -24,6 +24,8 @@ Sửa theo Kane (SCRIPT.md mục 16, giọng không đổi): cảnh 1 có hậu 
 
 Cảnh 1 nhảy tới Thứ Hai rồi tua về Thứ Sáu (SCRIPT.md 16.4): Story giờ dài **1:54** (114,0 s), giọng giữ nguyên, các cảnh sau lùi 4 s.
 
+Màn kết ghi cách agent nối vào (host, `/openapi.json`, `/mcp` 9 tool) thay cho hai icon phích cắm.
+
 Kiểm tra: 44 test pass; `node demo/dev/label-overlap.mjs` báo `label overlaps: 0` (Story mỗi 0,25 s và Live; thêm bảng luật, cờ tên điện thoại, biển pallet vào danh sách chữ, điện thoại manager vào vật cấm). Live phát file mẫu không lỗi console.
 
 ## Nhật ký
@@ -197,6 +199,10 @@ Vấn đề tìm thấy:
 - Model: cue `story.warp {to, dur}` đặt giờ mới ngay, `shownNow(state, t)` cho giờ chạy dần (tới hoặc lùi) trong `dur`; đồng hồ tường, lịch, bầu trời và Z2 dùng giờ này.
 - Cảnh 1 dài 19,6 s: Thứ Hai 07:00 (xe và pallet trống, thùng sữa trống mờ trên quầy, dấu "NO MILK"), rồi nhãn "◀◀ Rewind" và cảnh nhạt màu trong lúc tua về Fri 16:30. Cảnh 2 chạy giờ tới Fri 19:40. Trước khi có cổng Z2 ghi cả ngày ("Now Mon 16 Nov 07:00"); biển pallet chỉ hiện sau khi cổng dựng.
 - Story 114,0 s; `git diff ca42bc7 -- demo/assets/voice` rỗng. Test độ dài ≤ 114 s, thêm test nhảy Thứ Hai và tua ngược; overlap thêm nhãn Rewind. 44 test pass, `label overlaps: 0`.
+
+### 24. Màn kết: cách agent nối vào thay cho hai icon (SCRIPT.md 16.5)
+- Bỏ hai icon phích cắm "OpenAPI"/"MCP". Thay bằng "Any agent connects the same way:", `lazydoor.lazydoor.workers.dev`, "HTTP API · /openapi.json", "MCP · /mcp (9 tools)" (theo README trên `main`).
+- Chữ màn kết dùng `clamp` có cỡ tối thiểu. Đã chụp kiểm ở 1920×1080, điện thoại dọc 375×812 (sau "Watch anyway") và ngang 812×375: không tràn, không chồng chữ.
 
 ## Còn lại / cần làm sau
 - Quay `demo/story.mp4` khi Kane duyệt Story mới (ghép giọng từ `VOICE`).

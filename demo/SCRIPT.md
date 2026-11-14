@@ -528,3 +528,9 @@ Giọng đọc (11 đoạn đã duyệt) và mốc `VOICE` giữ nguyên; Story 
    - 0:17,6: nhãn "◀◀ Rewind" giữa trời và cảnh nhạt màu. Đồng hồ tường quay ngược, lịch lật MON → SUN → SAT → FRI 13, Z2 chạy lùi về "Fri 13 Nov 16:30" (1,8 s).
    - 0:18,5: caption "Rewind to Friday. This time, there is a door."
    - Cảnh 2 bắt đầu với đồng hồ chạy tới Fri 19:40. Caption "One door at Valio. Each kitchen brings its own signed rules." dời tới 1,9 s sau đầu cảnh để caption tua ngược đủ 3 s. Không thêm lời đọc.
+5. **Màn kết nói rõ agent nối vào bằng cách nào**. Bỏ hai icon phích cắm "OpenAPI" và "MCP" (người xem không hiểu). Thay bằng ba dòng, nối với câu đọc cuối "One door for any agent":
+   - "Any agent connects the same way:"
+   - `lazydoor.lazydoor.workers.dev`
+   - "HTTP API · /openapi.json" và "MCP · /mcp (9 tools)"
+
+   Theo README trên `main`: `/openapi.json` mở cho mọi người, `/mcp` là MCP qua streamable HTTP với 9 tool. Phần còn lại của màn kết giữ nguyên: câu chốt, "49 acceptance cases…", "Valio adds…". Chữ màn kết có cỡ tối thiểu nên vẫn đọc được trên điện thoại.
