@@ -111,3 +111,13 @@ Phiên build tự động, bắt đầu Thứ Bảy 14/11/2026. Mỗi bước xo
 - Kiểm tra cuối: **nghiệm thu 8 lần liên tiếp 49/49** (Gemini thật), **vitest 291/291**. Đã push `62463f4`.
 - MCP: lỗi trả về không còn làm SDK client ném lỗi; lỗi lạ bị che. Agent mua hàng vẫn đọc được lỗi.
 - Đang chạy: review toàn nhánh (Opus, cổng cuối). Sau đó: một đợt sửa (nếu có) → deploy lên account Cloudflare hackathon.
+
+### B10. Review toàn nhánh (Opus, cổng cuối) + chuẩn bị deploy
+- Kết luận: **không có lỗi Critical**; tiền/kho/token/policy giữ đúng dưới đua song song. 8 lỗi Important đang được sửa trong một đợt:
+  hàng thay thế thiếu dữ liệu dị ứng không bị cảnh báo; guard secret bỏ sót dòng `export` (cf.env); chưa có judge key; agent bỏ cuộc khi
+  REJECTED (spec nói phải thử lại); đồng hồ đếm ngược trên điện thoại dùng giờ máy; `/v1/rules` lệch với code; thiếu script deploy; trình
+  duyệt không gửi được header cho SSE.
+- **Thay đổi hợp đồng event cho trang demo** (`docs/events.md`): sẽ thêm CORS cho `GET /v1/events*` và hướng dẫn trình duyệt dùng `fetch()`
+  kèm header `Authorization` (EventSource không gửi được header); thêm `POST /admin/judge-key` để trang demo/giám khảo không cần admin key.
+  Schema event không đổi.
+- D1 trên account Cloudflare hackathon đã tạo và nạp dữ liệu (17.546 sản phẩm, 1.078 dòng replay, 349 tên nhóm). Worker deploy sau đợt sửa.
