@@ -5,6 +5,7 @@
  "tests": { "passed": 364, "label": "unit tests pass", "confirmed": false },
  "agentRun": {
   "src": "assets/proof/agent-run.mp4",
+  "poster": "assets/proof/agent-run-poster.webp",
   "caption": "A real Gemini agent on the deployed door: milk held, approved by the kitchen manager, accepted 1,010.00 €; chicken 154.00 € accepted with no human."
  },
  "pitchVideo": { "url": null, "label": "The 1:59 pitch video" }

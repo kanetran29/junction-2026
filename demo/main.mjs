@@ -6,7 +6,8 @@ import { STORY, DURATION, VOICE, SFX, stateAt } from "./story.mjs";
 const CLIPS = [...VOICE, ...SFX].sort((a, b) => a.at - b.at);
 import { connectLive, readBacklog } from "./live.mjs";
 import { buildScene } from "./scene.mjs";
-import { STRENGTHS, PAGE_ONLY, CONNECT_LINE } from "./compare.mjs";
+import { STRENGTHS, PAGE_ONLY, GROUPS, COMPARE_NOTE, CONNECT_LINE } from "./compare.mjs";
+import { ICONS } from "./icons.mjs";
 import { mountInside } from "./inside-view.mjs";
 import { runCheck, CHECKS } from "./inside.mjs";
 import { mountTry } from "./try-view.mjs";
@@ -53,20 +54,38 @@ function buildCompare() {
     return li;
   }));
   $("compare-foot").textContent = CONNECT_LINE;
-  const labels = [...document.querySelectorAll(".cmp-table thead th")].slice(1).map((th) => th.textContent);
-  $("cmp-body").replaceChildren(...[...STRENGTHS, ...PAGE_ONLY].map((row) => {
-    const tr = el("tr");
-    const topic = el("th", "", row.topic);
-    topic.scope = "row";
-    const cells = [row.without, row.webshop, row.with].map((text, i) => {
-      const td = el("td", i === 2 ? "is-door" : "", text);
-      td.dataset.label = labels[i];
-      if (i === 2) td.append(el("span", "evidence", row.evidence));
-      return td;
-    });
-    tr.append(topic, ...cells);
-    return tr;
+  $("compare-note").textContent = COMPARE_NOTE;
+  const rows = [...STRENGTHS, ...PAGE_ONLY];
+  $("compare-groups").replaceChildren(...GROUPS.map((g) => {
+    const group = el("section", "pair-group");
+    group.append(el("h2", "", g.heading));
+    for (const row of rows.filter((r) => r.group === g.id)) {
+      const pair = el("article", "pair");
+      const without = el("p", "side without");
+      without.append(glyph("cross"), el("span", "", row.without));
+      const withDoor = el("div", "side with");
+      const line = el("p");
+      line.append(glyph("check"), el("span", "", row.with));
+      const tags = el("span", "chips");
+      for (const e of row.evidence) tags.append(el("span", "chip proof", e));
+      withDoor.append(line, tags);
+      pair.append(el("h3", "", row.topic), without, withDoor);
+      group.append(pair);
+    }
+    return group;
   }));
+}
+
+/** A Phosphor glyph (check or cross) from icons.mjs, inline. */
+function glyph(name) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 256 256");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", `glyph ${name}`);
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", ICONS[name]);
+  svg.append(path);
+  return svg;
 }
 
 /** Jumps the story to t seconds: state rebuilt from the timeline, moving parts snapped. */
@@ -332,7 +351,10 @@ function setMode(next) {
   if (mode !== "live") $("audit-chip").hidden = true;
   if (mode === "inside" && !insideMounted) {
     insideMounted = true;
-    mountInside($("inside-page"), GATEWAY);
+    mountInside($("inside-page"), GATEWAY, (next, anchor) => {
+      setMode(next);
+      if (anchor) requestAnimationFrame(() => $(anchor)?.scrollIntoView({ behavior: still.matches ? "auto" : "smooth", block: "start" }));
+    });
   }
   $("mode-tag").textContent = mode === "story" ? "Story" : "Live";
   $("chip").hidden = mode !== "live";

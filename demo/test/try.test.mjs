@@ -26,7 +26,7 @@ test("try: each step of the door's reply renders as the panel shows it", () => {
 
   const held = viewOf(ok({ step: "decided", order: { state: "HELD", netCents: 101000, grossCents: 114635, reasons: [{ code: "OVER_ORDER_AUTO", detail: "over 500 €" }] }, approval: { token: "t1", expiresAt: "2026-11-15T17:00:00+02:00" } }));
   assert.equal(held.title, "You are the kitchen manager");
-  assert.deepEqual(held.lines, ["Net 1,010.00 € · Gross 1,146.35 €", "Held: OVER_ORDER_AUTO: over 500 €", "Decide before Sun 15 Nov 17:00"]);
+  assert.deepEqual(held.lines, ["Net 1,010.00 € · Gross 1,146.35 €", "OVER_ORDER_AUTO: over 500 €", "Decide before Sun 15 Nov 17:00"]);
   assert.deepEqual(held.actions.map((a) => a.decision), ["approve", "reject"]);
   assert.equal(held.token, "t1");
 

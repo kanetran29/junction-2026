@@ -251,6 +251,16 @@ Vấn đề tìm thấy:
 - `dev/fake-gateway.mjs`: hai route đó, trả lời cố định theo câu (Friday → needs_input rồi ACCEPTED, oat → no_offer, milk → HELD 1.010,00 € rồi duyệt/từ chối, còn lại → AUTO), giới hạn 8 lần/phút → 429, `--no-try` → 404; event ghi dưới buyer sandbox.
 - Test: 63 pass với Playwright (từng file một), 58 + 5 bỏ qua khi không có; `label overlaps: 0`; 375 px không cuộn ngang.
 
+### 33. Thiết kế lại Inside, Compare, Try it theo skill design-taste-frontend (Kane: "AI slop quá")
+- Đọc thiết kế: trang dự án cho giám khảo, giữ thương hiệu (sân khấu petrol tối, hồng #d65c84, Geist + Geist Mono, cảnh isometric), giọng bình tĩnh, kỹ thuật, kiểu editorial; CSS thuần + JS thuần. Dial VARIANCE 6, MOTION 3, DENSITY 4. Story và cảnh Live không đổi; tên tab giữ nguyên.
+- Ảnh thật từ cảnh của mình (`assets/stills/`, 1600×800 webp): held (hero), refusals (flow), nomilk (guardrails), delivery (path to production); poster cho video agent (`assets/proof/agent-run-poster.webp`).
+- Inside: hero chia đôi, canh trái (punchline 2 dòng ở mọi bề rộng, một câu 20 chữ, "Watch the story" và "Try it live" mở Live tại khung Try), ảnh bên phải; flow là một đường ray 7 nút có động từ và một dòng chi tiết (dọc trên điện thoại); guardrails 3 cụm, mã và số AC là chip riêng; bento đúng 4 ô live (audit, signing key, rules + codes, discovery có "All endpoints") và lệnh có nút Copy; proof là số lớn từ proof.json, video có poster, link pitch chỉ khi có URL; Built with 3 nhóm, logo Simple Icons (CC0, `assets/logos/`, Aiven không có trong Simple Icons nên dùng logo PostgreSQL). Không có eyebrow nào; 0 gạch ngang dài.
+- Compare: bỏ cột webshop, thay bằng một câu; các cặp "Without the door / With Lazydoor" theo 4 nhóm, glyph Phosphor ✕/✓, chip bằng chứng; 13 cặp.
+- Try it: nhãn trên ô nhập, chip là nút thật, trạng thái trống / đang gửi (skeleton, tắt khi reduced motion) / lỗi rõ ràng, thẻ điện thoại cho đơn bị giữ (thanh "Approval request from Lazydoor"); dòng lý do không còn "Held: " lặp dấu hai chấm.
+- Một màu nhấn (hồng); xanh và đỏ chỉ cho trạng thái; viền teal là bề mặt; bán kính 10 px, chip 6 px.
+- Kiểm: Pre-Flight Check của skill đạt; 63 test pass với Playwright (từng file một); `label overlaps: 0` (replay, LIVE_SECONDS=25); 375 px không cuộn ngang; file giọng không đổi. Ảnh trước/sau ở thư mục ghi chú chung `taste-shots/`.
+- Ngoại lệ còn lại (Story/Live, không đổi theo yêu cầu): HUD "Valio's rules · same for every buyer", dòng kết nối ở màn kết và CONNECT_LINE của Story có nhiều hơn một dấu chấm giữa.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

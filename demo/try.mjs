@@ -80,7 +80,7 @@ export function viewOf({ status, body, retryAfter }, codes = {}, byManager = fal
         kind: "held",
         tone: "hold",
         title: "You are the kitchen manager",
-        lines: [money(order), ...reasons.map((r) => `Held: ${r}`), body.approval?.expiresAt ? `Decide before ${clockText(body.approval.expiresAt)}` : ""].filter(Boolean),
+        lines: [money(order), ...reasons, body.approval?.expiresAt ? `Decide before ${clockText(body.approval.expiresAt)}` : ""].filter(Boolean),
         actions: body.approval?.token ? [{ label: "Approve", decision: "approve" }, { label: "Reject", decision: "reject" }] : [],
         token: body.approval?.token ?? null,
       };

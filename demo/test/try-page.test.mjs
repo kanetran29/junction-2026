@@ -54,8 +54,8 @@ test("try panel: a 429 says when to try again; a door without the sandbox (404) 
   await page.goto(`http://localhost:${PORT + 10}/?mode=live`);
   await page.fill("#try-text", "20 kg of chicken breast fillet by Monday");
   await page.click("#try-panel .try-send");
-  await page.waitForSelector(".try-box");
-  assert.equal((await page.textContent(".try-box .try-title")).trim(), "Busy: try again in 12 s");
+  await page.waitForSelector('.try-box[data-kind="error"]');
+  assert.equal((await page.textContent('.try-box[data-kind="error"] .try-title')).trim(), "Busy: try again in 12 s");
   reply = { status: 404, body: { error: "not found" } };
   await page.click("#try-panel .try-send");
   await page.waitForFunction(() => getComputedStyle(document.getElementById("try-panel")).display === "none");

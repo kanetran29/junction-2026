@@ -1,6 +1,7 @@
 // The "Try it: you are the chef" panel under Live: input, example chips, Send, and one result area that shows the door's
 // question, offer refusal, decision or the manager's phone card. Built with DOM calls only (text, never markup).
 import { EXAMPLES, MAX_TEXT, postTry, viewOf } from "./try.mjs";
+import { ICONS } from "./icons.mjs";
 
 const STORE_KEY = "lazydoor.try";
 
@@ -30,6 +31,21 @@ function el(tag, cls = "", text = "") {
   return node;
 }
 
+/** A Phosphor icon from icons.mjs as inline SVG. */
+function icon(name) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 256 256");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "icon");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", ICONS[name]);
+  svg.append(path);
+  return svg;
+}
+
+/** The result area before any try: what to do, in one line. */
+const EMPTY = "Pick an example or type your own. The door's answer shows here.";
+
 /** A real button with a label and a click handler. */
 function button(label, cls, onClick) {
   const b = el("button", cls, label);
@@ -49,11 +65,11 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
   let draftId = null;
   let busy = false;
 
-  const label = el("label", "try-label", "Your request to the door");
+  const label = el("label", "try-label", "Your request, as the chef");
   label.htmlFor = "try-text";
   const input = el("input", "try-input");
   Object.assign(input, { id: "try-text", type: "text", maxLength: MAX_TEXT, placeholder: EXAMPLES[0], autocomplete: "off", spellcheck: false });
-  const send = el("button", "try-send", "Send");
+  const send = el("button", "btn btn-primary try-send", "Send");
   send.type = "submit";
   const form = el("form", "try-form");
   form.append(label, input, send);
@@ -61,12 +77,13 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
   for (const text of EXAMPLES) chips.append(button(text, "try-chip", () => { input.value = text; input.focus(); }));
   const result = el("div", "try-result");
   result.setAttribute("aria-live", "polite");
-  const back = button("Back to Hotel Aurora", "try-back", () => {
+  result.append(el("p", "try-empty", EMPTY));
+  const back = button("Back to Hotel Aurora", "btn btn-ghost try-back", () => {
     follow(null);
     back.hidden = true;
   });
   back.hidden = true;
-  root.replaceChildren(el("h2", "", "Try it: you are the chef"), el("p", "try-note", "Type a request as the kitchen's chef. The door decides; if it holds the order, you decide as the kitchen manager. Your orders use a sandbox buyer of their own."), form, chips, result, back);
+  root.replaceChildren(el("h2", "", "Try it: you are the chef"), el("p", "try-note", "Type a request. The door decides. If it holds the order, you decide as the kitchen manager. Your orders use a sandbox buyer of their own."), form, chips, result, back);
 
   fetchImpl(`${String(base).replace(/\/+$/, "")}/v1/reason-codes`)
     .then((res) => (res.ok ? res.json() : null))
@@ -81,14 +98,20 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
       root.dataset.off = "";
       return;
     }
-    const box = el("div", "try-box");
+    const box = el("div", view.kind === "held" ? "try-box phone-card" : "try-box");
     box.dataset.kind = view.kind;
     box.dataset.tone = view.tone ?? "";
+    if (view.kind === "held") {
+      const bar = el("p", "phone-bar");
+      bar.append(icon("bell"), el("span", "", "Approval request from Lazydoor"));
+      box.append(bar);
+    }
     box.append(el("p", "try-title", view.title), ...view.lines.map((line) => el("p", "try-line", line)));
     const row = el("div", "try-actions");
-    for (const c of view.choices ?? []) row.append(button(c.label, "try-choice", () => run({ answer: { field: c.field, value: c.value } })));
-    for (const a of view.actions ?? []) row.append(button(a.label, `try-decide ${a.decision}`, () => decide(view.token, a.decision)));
+    for (const c of view.choices ?? []) row.append(button(c.label, "btn btn-ghost try-choice", () => run({ answer: { field: c.field, value: c.value } })));
+    for (const a of view.actions ?? []) row.append(button(a.label, `btn ${a.decision === "approve" ? "btn-primary" : "btn-ghost"} try-decide ${a.decision}`, () => decide(view.token, a.decision)));
     if (row.children.length) box.append(row);
+    result.removeAttribute("aria-busy");
     result.replaceChildren(box);
   };
 
@@ -96,9 +119,17 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
   const run = async (extra = {}) => {
     if (busy) return;
     const text = extra.answer ? lastText : input.value.trim();
+    if (!text) {
+      input.focus();
+      show({ kind: "error", tone: "reject", title: "Type a request first, or pick an example.", lines: [] });
+      return;
+    }
     busy = true;
     send.disabled = true;
-    result.replaceChildren(el("p", "try-title", "The door is working…"));
+    const loading = el("div", "try-box try-loading");
+    loading.append(el("p", "try-title", "Sending to the door"), el("p", "try-line", "Reading, searching and quoting takes a few seconds."), el("span", "skeleton"));
+    result.setAttribute("aria-busy", "true");
+    result.replaceChildren(loading);
     started();
     if (sandbox?.buyerId) follow(sandbox.buyerId);
     const res = await postTry(base, "/v1/try", { text, visitor: sandbox?.visitor, ...(extra.answer ? { draftId, answer: extra.answer } : {}) }, fetchImpl);
