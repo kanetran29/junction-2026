@@ -139,6 +139,10 @@ export const TryBody = z
     message: 'send text for a new request, or visitor, draftId and answer to answer a question',
   })
   .openapi('TryBody');
+/** The raw audio bytes of a `/v1/try/voice` request body (documentation only: the route reads the bytes itself). */
+export const AudioClip = z.string().openapi({ format: 'binary', description: 'A MediaRecorder clip, at most 1 MB' });
+/** The reply of `/v1/try/voice`: the spoken words as text, at most 200 characters. */
+export const VoiceReply = z.object({ transcript: z.string().max(200) }).openapi('VoiceReply');
 const ShownReason = z.object({ code: z.string(), detail: z.string() });
 export const TryReply = z
   .looseObject({

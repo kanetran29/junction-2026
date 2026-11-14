@@ -47,4 +47,5 @@ The same table is served live at `GET /v1/reason-codes`.
 | `BRAND_NOT_CARRIED` | Valio does not carry the requested brand. | `requires_buyer_input` | no |
 | `TRY_RATE_LIMITED` | Try it is limited per visitor, per address and for everyone (free text most, since it uses the shared models); wait retryAfter seconds. | `recoverable` | yes |
 | `MODELS_BUSY` | Gemini is over its request quota right now; retry after retryAfter seconds (in Try it, the example sentences need no model call). | `recoverable` | yes |
+| `TRANSCRIPT_EMPTY` | The spoken clip held no clear speech, so nothing was transcribed; record it again or type the request. | `requires_buyer_input` | no |
 | `QUOTE_SIGNATURE_INVALID` | The quote signature sent with the order does not verify against the door's key or does not match the offer as quoted. | `requires_buyer_input` | no |

@@ -181,6 +181,12 @@ function jsonObject(text: string): unknown {
   return JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
 }
 
+/** The seconds to wait from a Gemini 429 reply (its RetryInfo `retryDelay`; 30 when it gives none), kept within 1 to 120. */
+export async function retryAfterOf(res: Response): Promise<number> {
+  const delay = /"retryDelay":\s*"(\d+)s"/.exec(await res.text().catch(() => ''));
+  return Math.min(120, Math.max(1, Number(delay?.[1] ?? 30)));
+}
+
 /**
  * Asks one model (Gemini, or Gemma as the second reader) for the structured draft with the same prompt and schema; any
  * transport, status or parse failure is MODEL_UNAVAILABLE.
@@ -208,8 +214,7 @@ async function askModel(env: Env, model: string, text: string, today: string, re
       }),
     });
     if (res.status === 429) {
-      const delay = /"retryDelay":\s*"(\d+)s"/.exec(await res.text().catch(() => ''));
-      throw new InterpretError('MODELS_BUSY', 503, `${model} is over its request quota for now`, Math.min(120, Math.max(1, Number(delay?.[1] ?? 30))));
+      throw new InterpretError('MODELS_BUSY', 503, `${model} is over its request quota for now`, await retryAfterOf(res));
     }
     if (!res.ok) throw new Error(`model ${res.status}`);
     const j = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };

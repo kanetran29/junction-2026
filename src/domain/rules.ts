@@ -3,6 +3,7 @@ import { REJECTION_PRECEDENCE, defaultMandate } from './constants';
 import { REASONS } from './reasons';
 import { AUD } from '../sign/door';
 import { MAX_SANDBOXES, SANDBOXES_PER_ADDRESS, SANDBOX_IDLE_MS, TRY_AGENT_REASON, TRY_ALL_PER_MINUTE, TRY_APPROVER, TRY_FREE_TEXT_PER_MINUTE, TRY_PER_ADDRESS_PER_MINUTE, TRY_PER_VISITOR_PER_MINUTE } from '../try/sandbox';
+import { TRANSCRIPT_MAX, VOICE_MAX_BYTES } from '../try/voice';
 
 export interface Decision {
   id: string;
@@ -47,7 +48,7 @@ export function decisionRegister(demo = true): Decision[] {
     ...(demo ? [seller(
       'tryIt',
       'Demo door only: a visitor orders as the chef of a sandbox kitchen with no key. The door interprets the text (Gemini, read again by Gemma), fills only the reference agent\'s profile default, asks the visitor about any open field, then quotes and places the cheapest covering offer exactly as an agent would; the sandbox mandate decides, and a held order is approved or rejected by the visitor as that kitchen\'s manager through the normal approval path. A sandbox never sees or decides another buyer\'s orders and orders from its own stock world, so it never takes the stock real buyers are checked against; the page\'s example sentences use recorded Gemini and Gemma readings (marked cached) so they need no model call; a sandbox idle for 20 minutes is removed with its orders, past 500 the least recently used is recycled, and all end at a demo reset.',
-      { perVisitorPerMinute: TRY_PER_VISITOR_PER_MINUTE, perAddressPerMinute: TRY_PER_ADDRESS_PER_MINUTE, freeTextPerMinute: TRY_FREE_TEXT_PER_MINUTE, allCallsPerMinute: TRY_ALL_PER_MINUTE, maxSandboxes: MAX_SANDBOXES, sandboxesPerAddress: SANDBOXES_PER_ADDRESS, idleMinutes: SANDBOX_IDLE_MS / 60_000, recordedExamples: true, approver: TRY_APPROVER, agentReason: TRY_AGENT_REASON, mandate: { perOrderAutoEur: 500, perDayAutoEur: 1500, perOrderHardEur: 5000, perDayHardEur: 10000 } },
+      { perVisitorPerMinute: TRY_PER_VISITOR_PER_MINUTE, perAddressPerMinute: TRY_PER_ADDRESS_PER_MINUTE, freeTextPerMinute: TRY_FREE_TEXT_PER_MINUTE, allCallsPerMinute: TRY_ALL_PER_MINUTE, maxSandboxes: MAX_SANDBOXES, sandboxesPerAddress: SANDBOXES_PER_ADDRESS, voiceMaxBytes: VOICE_MAX_BYTES, transcriptMaxChars: TRANSCRIPT_MAX, idleMinutes: SANDBOX_IDLE_MS / 60_000, recordedExamples: true, approver: TRY_APPROVER, agentReason: TRY_AGENT_REASON, mandate: { perOrderAutoEur: 500, perDayAutoEur: 1500, perOrderHardEur: 5000, perDayHardEur: 10000 } },
     )] : []),
     seller('auditChain', 'Every event is hash-chained in commit order: hash = sha256(prevHash + canonical JSON of the event), starting from 64 zeros after a reset. /v1/audit/verify recomputes the whole chain and signs the result.', { hash: 'sha256', canonicalJson: 'RFC 8785 (JCS)', genesis: '0'.repeat(64) }),
   ];

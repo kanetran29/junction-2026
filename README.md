@@ -97,6 +97,15 @@ Gemma), confirm with the agent's profile default, quote, place the cheapest cove
   Every `needs_input` reply has `question: { field, text, readings }`, where `text` is a plain question such as "When should
   it arrive?", "How much?" or "Which product?". An answer in words counts like a free-text try. Another visitor's draft is
   404.
+- **Speaking a request.** Behind the feature flag `voice` (off: 404), `POST /v1/try/voice` takes the raw audio clip a
+  browser MediaRecorder sends (`Content-Type` `audio/webm`, `audio/ogg`, `audio/mp4` or `audio/wav`, parameters such as
+  `;codecs=opus` allowed; else 415 `UNSUPPORTED_MEDIA_TYPE`; over 1 MB is 413) and returns `{ transcript }` (at most 200
+  characters). Gemini only transcribes (temperature 0, no tools); it never interprets, quotes or orders, so the page sends
+  the transcript to `/v1/try` as a normal request. The 30 s limit is the page recorder's; the door enforces size only.
+  Optional `X-Visitor-Token` counts against that visitor (unknown: 404 `VISITOR_UNKNOWN`); every clip also counts against
+  the address and the shared free-text model bucket (429 `TRY_RATE_LIMITED`). No clear speech is 400 `TRANSCRIPT_EMPTY`;
+  Gemini over quota is 503 `MODELS_BUSY` with `retryAfter`, any other model failure 503 `MODEL_UNAVAILABLE`. The audio
+  and transcript are never logged.
 - **Deciding.** `POST /v1/try/decision` with `{ visitor, token, decision: "approve" | "reject" }` goes through the normal
   approval path, re-check included (`APPROVAL_EXPIRED`, `STOCK_TAKEN`, `PRICE_CHANGED` still apply), and answers
   `{ order: { orderId, state, reasons } }`. Only a token of the visitor's own sandbox works: any other is 404 `TOKEN_UNKNOWN`.
