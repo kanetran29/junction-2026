@@ -555,3 +555,57 @@ Tắt Try it ngay lập tức: `node scripts/demo-admin.mjs try-off`. Bật lạ
   - có cookie: PDF, WebP 200, mp3 với Range 206;
   - API (`/health`, `/v1/rules`, `/openapi.json`, `/.well-known/*`) 200; `/mcp` không key vẫn 401.
 - Test 412/412. Commit `afba0f2`. Đã reset chuẩn.
+
+### C14. Ba tính năng mới: kết nối Claude (OAuth), nói trong Try it, xuất Peppol (xong, **chưa push**)
+Cả ba nằm sau cờ (`node scripts/demo-admin.mjs feature <connector|voice|peppol> <on|off>`), mặc định tắt; chỉ bật sau
+khi kiểm live. **Hiện cả ba đang BẬT** trên door (đã kiểm live, xem dưới). Tắt một cái: `feature <tên> off`, có hiệu lực ngay,
+reset không đụng tới.
+
+**1. Kết nối Claude bằng một cú click (MCP + OAuth 2.1), cờ `connector`, chỉ door demo.**
+- Giám khảo làm trong Claude: Settings → Connectors → Add custom connector → URL
+  `https://lazydoor.lazydoor.workers.dev/mcp`. Không cần key. Claude mở trang đồng ý "Connect Claude to Lazydoor", hiện
+  hạn mức đã ký của bếp (500 €/đơn và 1.500 €/ngày tự đi; vượt thì HELD chờ người duyệt; quá 5.000 €/đơn hay 10.000 €/ngày
+  thì từ chối). Bấm Allow → trang "Your kitchen is ready" có link bếp (hộp duyệt `/approver/ap_…`, mở tab mới, giữ lại)
+  và link quay về Claude.
+- Rồi bảo Claude "Order 1,000 litres of lactose-free milk by Monday": Claude quote và đặt qua `/mcp`, đơn HELD (khoảng
+  1.010 € net). Claude không bao giờ thấy link duyệt; token của nó bị 403 ở mọi đường duyệt, 401 ở `/v1`. Giám khảo duyệt
+  trong tab bếp → ACCEPTED.
+- Bếp sandbox giống Try it: tự hết sau 20 phút không dùng hoặc khi reset demo; token chết theo bếp, Claude sẽ xin kết nối lại.
+- Kỹ thuật: metadata RFC 9728 và RFC 8414; `/mcp` trả 401 kèm `WWW-Authenticate: Bearer resource_metadata=…`; đăng ký
+  client động (RFC 7591) hoặc client ID metadata document (Claude dùng
+  `https://claude.ai/oauth/mcp-oauth-client-metadata`, Worker đọc được live); chỉ PKCE S256; redirect URI khớp chính xác
+  (loopback thì cổng nào cũng được); code dùng một lần (10 phút); access 1 giờ, refresh 24 giờ có xoay vòng; dùng lại code
+  hay refresh token cũ thì thu hồi cả grant; mọi thứ lưu dạng sha256 trong Aiven; CSRF double-submit cookie SameSite=Strict;
+  trang đồng ý không nhúng được (frame-ancestors 'none'). Giới hạn: 60 lần gọi MCP/phút mỗi token, 240/phút mọi token
+  cộng lại; interpret dùng chung ngân sách model 6/phút của Try it. API key trên `/mcp` vẫn như cũ.
+- Tự viết server OAuth nhỏ trong door thay vì dùng `@cloudflare/workers-oauth-provider`: thư viện đó lưu token trong KV và
+  bọc cả Worker, còn yêu cầu là token băm trong Aiven và API key giữ nguyên.
+- Review bảo mật bằng Opus: không có lỗi critical hay high. Đã sửa 1 medium (không tự redirect trước khi đồng ý, vì ai cũng
+  đăng ký được redirect URI của mình) và 6 low (thu hồi khi dùng lại, rate limit, bảng có giới hạn, không tự fetch chính
+  mình, loopback mọi cổng, discovery theo cờ). Ghi trong README, không sửa: link bếp là capability, một chương trình tự trả
+  lời trang đồng ý (thay vì người) sẽ cầm link đó; token thì không bao giờ duyệt được. Access token cũ còn sống tới 1 giờ sau
+  khi refresh.
+
+**2. Nói trong Try it, cờ `voice`.** `POST /v1/try/voice` nhận clip âm thanh thô (webm, ogg, mp4, wav; tối đa 1 MB), Gemini
+chỉ chép lời, trả `{transcript}` (≤200 ký tự); trang gửi text đó vào `/v1/try` như gõ tay. Tính vào giới hạn địa chỉ,
+visitor và ngân sách model 6/phút.
+
+**3. Xuất Peppol BIS Order 3.0, cờ `peppol`.** `GET /v1/orders/{id}/peppol` (key của buyer, hoặc `X-Visitor-Token` cho đơn
+Try it) và `GET /approve/{token}/peppol` (người duyệt): file UBL 2.1 Order, chỉ đơn ACCEPTED (khác thì 409). Chỉ xuất file,
+không gửi đi đâu; endpoint id là placeholder. Hợp lệ theo XSD UBL 2.1 của OASIS (đã kiểm cả file xuất từ door live bằng
+xmllint). Schematron Peppol chưa chạy được (máy không có XSLT 2.0).
+
+**Kiểm live (door `751c00be`, rồi deploy tài sản demo `76eb57e6`, cùng code door):**
+- Connector: `node scripts/connector-e2e.mjs` dùng client MCP TypeScript chính thức, 14/14 (401 kèm challenge → metadata →
+  đăng ký → PKCE → trang đồng ý → token → 9 tool → đơn 1.000 l HELD → token bị 403 khi duyệt, 401 ở `/v1` → người duyệt từ
+  link bếp → ACCEPTED). Trang đồng ý với client_id thật của Claude hiện "Connect Claude to Lazydoor" (Worker đọc được
+  metadata document của claude.ai). Chưa thử trực tiếp trong claude.ai (không có tài khoản ở đây).
+- Voice + Peppol: `node scripts/voice-peppol-e2e.mjs <clip.wav> <out.xml>`: clip do `say` đọc "Fifteen kilos of chicken
+  breast fillet by Monday" → transcript đúng → Try it đặt đơn ACCEPTED 123,20 € → file Peppol của đơn Try it đó (bằng
+  `X-Visitor-Token`) hợp lệ theo XSD UBL 2.1 (xmllint).
+- Acceptance **66/66** (thêm AC64 Peppol, AC65 voice, AC66 connector), scenarios **11/11**, unit test **447/447**, test demo
+  66 pass (11 bỏ qua vì cần Playwright). Load 2 phút: 0 lỗi (100 người xem SSE, 60 lượt ví dụ p50 7,5 s, 15 quyết định,
+  4 câu tự do).
+- Merge demo `3564108` (nút mic, link Peppol, Connect Claude hiện khi metadata OAuth có). `proof.json` và
+  `acceptance.json` của trang đã cập nhật số đo. Ghi chú slide deck đổi 63 → 66; ảnh slide và PDF deck có thể vẫn ghi 63.
+- `/demo` vẫn ẩn tới 07:45Z. Đã reset chuẩn. Commit cuối `9ba78ea` trở về trước, **chưa push**.
