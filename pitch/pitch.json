@@ -1,0 +1,113 @@
+{
+  "title": "Lazydoor",
+  "punchline": "Lazy at the order, strict at the border.",
+  "challenge": "Valio Aimo · Trusted Trade Agents · Junction 2026",
+  "slides": [
+    {
+      "id": "hook",
+      "heading": "Agents will order for kitchens. Who checks the agent?",
+      "bullets": [
+        "Buying is moving from people in a webshop to agents",
+        "Valio's API answers availability and price",
+        "It cannot tell whether an order makes sense"
+      ],
+      "notes": "Kitchens will let AI agents do the ordering. Valio's API answers availability and price, but nothing in it checks whether the agent's order makes sense. So who checks the agent?"
+    },
+    {
+      "id": "problem",
+      "heading": "Friday 16:30: an agent orders milk for Monday",
+      "bullets": [
+        "Reads 999999 as stock; it means \"unknown\"",
+        "Misses the cut-off: closed Thursday 15:00",
+        "1,565.50 € spent, nobody asked",
+        "Monday morning: no milk"
+      ],
+      "notes": "Hotel Aurora's chef needs 1,000 litres of lactose-free milk by Monday. The agent calls Valio's API, sees 999999 and Monday, orders 50 cases of 10-litre boxes. But 999999 means stock unknown, and that box closed on Thursday at 15:00. Nobody checked, nobody approved. Monday morning, there is no milk. And this is not a corner case: in 539 recorded availability replies, 58% of stock figures are the 999999 placeholder and 40% of lines past their cut-off still show a delivery date; 29 of Valio's 250 substitution pairs add an allergen.",
+      "fact": "Not rare: 58% of Valio's stock figures are the 999999 placeholder; 40% of lines past cut-off still show a delivery date."
+    },
+    {
+      "id": "solution",
+      "heading": "One door at Valio for every agent",
+      "bullets": [
+        "Valio's rules: the same for every buyer",
+        "Each kitchen's own signed rules",
+        "Inside the limits: done. Above: the manager decides",
+        "Never guesses: when unsure, it asks"
+      ],
+      "notes": "Lazydoor is one door at Valio that any agent goes through. It applies two layers of rules: Valio's, the same for everyone, and each kitchen's own signed mandate. Inside the kitchen's limits the agent is done alone; above them the door holds the order and asks the kitchen manager. Lazy at the order, strict at the border."
+    },
+    {
+      "id": "flow",
+      "heading": "Words in, a checked order out",
+      "bullets": [
+        "Gemini drafts a typed request; Gemma reads it again",
+        "Search 17,546 products; ask Valio about 35 only",
+        "Fixed-price quote; every refusal has a reason code",
+        "AUTO, NEEDS APPROVAL or REJECT, with a receipt"
+      ],
+      "notes": "The same sentence again, through the door. Gemini turns it into a typed request and Gemma reads it a second time on its own. The door searches the catalogue and asks Valio only about the 35 lactose-free milks, not everything. 20 are past their cut-off and say so with a reason code. Best offer: one-litre cartons, 1,010 euros, price held for 30 minutes."
+    },
+    {
+      "id": "guardrails",
+      "heading": "Strict at the border",
+      "bullets": [
+        "The agent cannot approve itself: 403",
+        "Splitting fails: the day total is counted",
+        "A substitute that adds gluten is refused",
+        "Last 6 boxes: first come wins, the other is told 2 left"
+      ],
+      "notes": "This is the part judges asked for: autonomy with controls. The agent cannot approve its own order. It cannot split an order to slip under the limit. A Valio substitute that adds gluten is refused. Two agents racing for six boxes: one wins, the other is told two are left. And an approval after Valio's cut-off expires."
+    },
+    {
+      "id": "demo",
+      "heading": "Try it: type a request, decide as the manager",
+      "bullets": [
+        "Story: one kitchen, Friday to Monday",
+        "Live: type or say the order, then decide as the manager",
+        "Your own Claude: one connector URL, your kitchen's limits",
+        "Compare and Inside: every claim with its evidence"
+      ],
+      "notes": "DEMO, about two minutes. Open the demo page on the deployed door. Show the Story from the door going up to the held order and the manager's phone. Then Live: hand the laptop to the reviewer and let them type a request in Try it, or click a chip. If the door holds it, they approve as the kitchen manager. End on Inside: the audit chain is valid, checked live. Two more ways in: say the order with the mic, or connect your own Claude with one URL; the same rules apply, and Claude can never approve."
+    },
+    {
+      "id": "built",
+      "heading": "Built to be trusted",
+      "bullets": [
+        "Aiven PostgreSQL: one transaction per order, hash-chained log",
+        "Gemini drafts and turns voice into text, Gemma double-checks",
+        "Signed quotes and receipts (Ed25519); Peppol BIS Order 3.0 export",
+        "OpenAPI + MCP from one schema, 10 tools; Claude connects over OAuth 2.1"
+      ],
+      "notes": "Every write lives in Aiven PostgreSQL through Hyperdrive. Each order commits in one transaction under an advisory lock, so the stock ledger never oversells, and every step is an event in a hash-chained log. Quotes and receipts are signed with the door's Ed25519 key, published at /.well-known/jwks.json. Gemini drafts, Gemma double-checks. Any agent connects through the typed HTTP API or the MCP server. Every accepted order also exports as a Peppol BIS Order 3.0 document (UBL 2.1), export only, and Claude connects over OAuth 2.1 to a sandbox kitchen of its own."
+    },
+    {
+      "id": "proof",
+      "heading": "It works, and you can check it",
+      "bullets": [
+        "69/69 acceptance cases, 11/11 scenarios, 458 tests",
+        "Real agent run: held, approved, accepted 1,010.00 €",
+        "/v1/audit/verify: the chain, signed by the door",
+        "A tampered quote is refused: QUOTE_SIGNATURE_INVALID"
+      ],
+      "notes": "This is not a mock-up. 69 acceptance cases and 11 scenarios pass on the deployed door. A real Gemini agent ordered milk: held, approved by the manager, accepted at 1,010 euros. And you don't have to trust us: /v1/audit/verify recomputes the hash chain and signs the result, and our verify script checks it from outside. Change one byte of a quote and the door refuses it."
+    },
+    {
+      "id": "next",
+      "heading": "Path to production",
+      "bullets": [
+        "Valio adds an order endpoint and its allocation rule",
+        "Kitchens sign their own limits once",
+        "Any agent plugs in: /.well-known/agent-gateway.json",
+        "Demo: lazydoor.lazydoor.workers.dev/demo"
+      ],
+      "notes": "Ordering is simulated today because Valio's API has no order endpoint. Valio adds that endpoint and its allocation rule; the door, the rules and the agents stay as they are. Kitchens sign their limits once, and any agent can plug in. Lazy at the order, strict at the border. Thank you. The pitch video: youtu.be/etiVUAh1mYw."
+    }
+  ],
+  "video": [
+    {
+      "visual": "slide:hook",
+      "say": "The pitch video is the demo Story, demo/story.mp4; this deck is for the live pitch."
+    }
+  ],
+  "demo": "demo.mp4"
+}

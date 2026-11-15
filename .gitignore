@@ -5,3 +5,7 @@ __pycache__/
 node_modules/
 dist/
 .vitest/
+pitch/out/voice/
+pitch/out/build/
+pitch/out/*.mp4
+pitch/demo.mp4
