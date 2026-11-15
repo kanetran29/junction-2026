@@ -4,6 +4,9 @@
 import { HERO, FLOW, FLOW_NOTE, FLOW_STILL, GUARDRAILS, GUARD_STILL, BUILT_WITH, PRODUCTION, CHECKS, COMMANDS, DOOR_URL, REPO_URL, runCheck } from "./inside.mjs";
 import { ICONS } from "./icons.mjs";
 import { AC_ID, acChip, acNote, labelAcChips, fillAcceptance, openCase } from "./acceptance-view.mjs";
+import { mountConnect } from "./connect.mjs";
+import { peppolOn } from "./features.mjs";
+import { PEPPOL_CAPTION } from "./try.mjs";
 
 /** An element with a class and text. */
 function el(tag, cls = "", text = "") {
@@ -237,7 +240,9 @@ function production(go) {
   links.append(link(REPO_URL, "Code on GitHub", "btn btn-ghost"), link(DOOR_URL, "The live door", "btn btn-ghost"), deck);
   const mcp = el("p", "mcp-line");
   mcp.append(document.createTextNode("MCP endpoint: "), el("code", "", `${DOOR_URL}/mcp`));
-  text.append(el("h2", "", "Path to production"), el("p", "closing-sentence", PRODUCTION.sentence), links, mcp);
+  const peppol = el("p", "peppol-line");
+  peppol.hidden = true;
+  text.append(el("h2", "", "Path to production"), el("p", "closing-sentence", PRODUCTION.sentence), links, mcp, peppol);
   return section("production", null, still(PRODUCTION.still, "closing-still"), text);
 }
 
@@ -250,7 +255,16 @@ export async function mountInside(root, base, go, proofUrl = "proof.json") {
   const live = checks(base);
   const proofSlot = section("proof", "Proof", el("p", "muted", "Loading the proof numbers."));
   const acSlot = section("acceptance", "Acceptance cases", el("p", "muted", "Loading the acceptance cases."));
-  root.replaceChildren(hero(go), flow(), guardrails(), live.s, proofSlot, acSlot, builtWith(), production(go));
+  const connectSlot = section("connect", null);
+  connectSlot.hidden = true;
+  root.replaceChildren(hero(go), flow(), guardrails(), live.s, proofSlot, acSlot, builtWith(), connectSlot, production(go));
+  mountConnect(connectSlot, base);
+  peppolOn(base).then((ok) => {
+    const line = root.querySelector(".peppol-line");
+    if (!ok || !line) return;
+    line.append(el("b", "", "Peppol export: "), PEPPOL_CAPTION);
+    line.hidden = false;
+  });
   labelAcChips(root);
   const smooth = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
   const acLoad = fillAcceptance(acSlot).then((ok) => ok && openCase(root, location.hash, false));

@@ -1,6 +1,7 @@
 // The "Try it: you are the chef" panel under Live: input, example chips, Send, and one result area that shows the door's
 // question, offer refusal, decision or the manager's phone card. Built with DOM calls only (text, never markup).
-import { EXAMPLES, MAX_TEXT, CACHED_NOTE, PROGRESS, SLOW, stepAt, postTry, viewOf } from "./try.mjs";
+import { EXAMPLES, MAX_TEXT, CACHED_NOTE, PROGRESS, SLOW, stepAt, postTry, viewOf, VOICE_MAX_S, VOICE_MAX_BYTES, pickMime, postVoice, voiceViewOf, getPeppol, PEPPOL_LABEL, PEPPOL_CAPTION } from "./try.mjs";
+import { voiceOn } from "./features.mjs";
 import { ICONS } from "./icons.mjs";
 
 const STORE_KEY = "lazydoor.try";
@@ -75,9 +76,17 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
   const input = el("input", "try-input");
   Object.assign(input, { id: "try-text", type: "text", maxLength: MAX_TEXT, placeholder: EXAMPLES[0], autocomplete: "off", spellcheck: false });
   const send = el("button", "btn btn-primary try-send", "Send");
+  const mic = el("button", "btn btn-ghost try-mic");
+  mic.type = "button";
+  const micTime = el("span", "try-mic-time");
+  micTime.hidden = true;
+  mic.append(icon("mic"), micTime);
+  mic.hidden = true;
+  const row = el("div", "try-row");
   send.type = "submit";
   const form = el("form", "try-form");
-  form.append(label, input, send);
+  row.append(input, mic, send);
+  form.append(label, row);
   const chips = el("div", "try-chips");
   for (const text of EXAMPLES) chips.append(button(text, "try-chip", () => {
     if (pending) reset();
@@ -171,13 +180,13 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
     return box;
   };
 
-  /** Shows a view: an error under the thread (the thread stays), the door's message in it, or hides the panel (404). */
+  /** Shows a view: an error under the thread (the thread stays), the door's message in it, or hides the panel (404). Returns its box. */
   const show = (view) => {
     result.removeAttribute("aria-busy");
     if (view.kind === "hide") {
       clearInterval(waitTimer);
       root.dataset.off = "";
-      return;
+      return null;
     }
     chips.toggleAttribute("data-highlight", Boolean(view.examples));
     const box = boxOf(view);
@@ -189,6 +198,20 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
     }
     empty.hidden = thread.children.length > 0 || status.children.length > 0;
     if (view.wait) holdSend(box.querySelector(".try-title"), view.wait);
+    return box;
+  };
+
+  /**
+   * Under an accepted order: its Peppol export, fetched with the visitor's token (a plain link cannot send the header),
+   * saved through a Blob URL, with one line. Nothing shows unless the door answers 200 (flag off, not accepted, unknown).
+   */
+  const attachPeppol = async (box, { orderId, approvalToken }) => {
+    if (!box || !(orderId || approvalToken) || !sandbox?.visitor) return;
+    const res = await getPeppol(base, { orderId, approvalToken }, sandbox.visitor, fetchImpl);
+    if (res.status !== 200 || !res.blob) return;
+    const a = el("a", "try-peppol", PEPPOL_LABEL);
+    Object.assign(a, { href: URL.createObjectURL(res.blob), download: `lazydoor-order-${orderId ?? "approved"}.xml` });
+    box.append(a, el("p", "try-peppol-note", PEPPOL_CAPTION));
   };
 
   /** Posts to /v1/try; never throws. */
@@ -267,7 +290,8 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
       pending = null;
       asking(null);
     }
-    show(view);
+    const box = show(view);
+    if (view.kind === "accepted") attachPeppol(box, { orderId: res.body?.order?.orderId });
     if (pending) input.focus();
   };
 
@@ -280,8 +304,116 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
     busy = false;
     const view = viewOf(res, codes, true);
     if (view.kind === "error") box.querySelectorAll("button").forEach((b) => (b.disabled = false));
-    show(view);
+    const shown = show(view);
+    if (view.kind === "accepted") attachPeppol(shown, { orderId: res.body?.order?.orderId, approvalToken: token });
   };
+
+  let rec = null;
+
+  /** The mic button at rest (record) or while recording (stop, with the time so far out of the limit). */
+  const micState = (recording) => {
+    mic.replaceChildren(icon(recording ? "stop" : "mic"), micTime);
+    mic.setAttribute("aria-pressed", String(recording));
+    mic.setAttribute("aria-label", recording ? "Stop recording" : "Speak your request");
+    mic.title = recording ? "Stop recording" : `Speak your request (up to ${VOICE_MAX_S} s)`;
+    micTime.hidden = !recording;
+    send.disabled = recording;
+  };
+
+  /** Records the chef's request from the microphone, at most VOICE_MAX_S seconds; a second press stops it. */
+  const startVoice = async () => {
+    if (busy || waitTimer) return;
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      const denied = err?.name === "NotAllowedError" || err?.name === "SecurityError";
+      show({ kind: "error", tone: "reject", title: denied ? "The microphone is blocked for this page. Allow it in the browser, or type your request." : "No microphone was found. Type your request instead.", lines: [] });
+      return;
+    }
+    const mime = pickMime((t) => MediaRecorder.isTypeSupported(t));
+    const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    const chunks = [];
+    const startedAt = performance.now();
+    rec = { recorder, stream, tooLong: false, tick: null };
+    recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    recorder.onstop = () => finishVoice(new Blob(chunks, { type: recorder.mimeType || mime || "audio/webm" }));
+    recorder.start(250);
+    micState(true);
+    const tick = () => {
+      const s = Math.min(VOICE_MAX_S, Math.floor((performance.now() - startedAt) / 1000));
+      micTime.textContent = `0:${String(s).padStart(2, "0")} / 0:${VOICE_MAX_S}`;
+      if (performance.now() - startedAt >= VOICE_MAX_S * 1000) stopVoice(true);
+    };
+    tick();
+    rec.tick = setInterval(tick, 250);
+  };
+
+  /** Stops the recording; `tooLong` when it reached the limit. */
+  const stopVoice = (tooLong = false) => {
+    if (!rec || rec.recorder.state === "inactive") return;
+    rec.tooLong = tooLong;
+    clearInterval(rec.tick);
+    rec.recorder.stop();
+  };
+
+  /** Sends the recording to the door and puts the transcript in the input for the chef to check and send; never sends it. */
+  const finishVoice = async (blob) => {
+    const { stream, tooLong } = rec;
+    stream.getTracks().forEach((t) => t.stop());
+    rec = null;
+    micState(false);
+    if (!blob.size) {
+      show({ kind: "error", tone: "reject", title: "Nothing was recorded. Try again, or type your request.", lines: [] });
+      return;
+    }
+    if (blob.size > VOICE_MAX_BYTES) {
+      show({ kind: "error", tone: "reject", title: `Too long: keep a voice request under ${VOICE_MAX_S} s.`, lines: [] });
+      return;
+    }
+    busy = true;
+    send.disabled = true;
+    mic.disabled = true;
+    const loading = el("div", "try-box try-loading");
+    loading.append(el("p", "try-title", "Turning your voice into text"), ...(tooLong ? [el("p", "try-line", `Stopped at ${VOICE_MAX_S} s, the limit.`)] : []), el("span", "skeleton"));
+    result.setAttribute("aria-busy", "true");
+    status.replaceChildren(loading);
+    empty.hidden = true;
+    let res = await postVoice(base, blob, sandbox?.visitor, fetchImpl);
+    // The door forgot this visitor's sandbox (evicted): forget the token and send the clip once more without it.
+    if (voiceViewOf(res).kind === "stale-visitor") {
+      sandbox = null;
+      saveSandbox(null);
+      res = await postVoice(base, blob, null, fetchImpl);
+    }
+    busy = false;
+    send.disabled = false;
+    mic.disabled = false;
+    if (res.status === 200 && res.body?.visitor && res.body?.buyerId) {
+      sandbox = { visitor: res.body.visitor, buyerId: res.body.buyerId };
+      saveSandbox(sandbox);
+    }
+    const view = voiceViewOf(res);
+    if (view.kind === "hide-voice") {
+      mic.hidden = true;
+      show({ kind: "error", tone: "reject", title: "Voice is not available on this door. Type your request.", lines: [] });
+      return;
+    }
+    if (view.kind !== "transcript") {
+      show(view);
+      return;
+    }
+    result.removeAttribute("aria-busy");
+    input.value = view.text.slice(0, MAX_TEXT);
+    status.replaceChildren(el("p", "try-voice-note", "From your voice: check it, change it if you like, then press Send."));
+    empty.hidden = thread.children.length > 0 || status.children.length > 0;
+    input.focus();
+  };
+
+  mic.addEventListener("click", () => (rec ? stopVoice() : startVoice()));
+  micState(false);
+  // Voice needs a recorder in this browser and a door whose discovery document lists tryIt.voice.
+  if (typeof MediaRecorder !== "undefined" && navigator.mediaDevices?.getUserMedia) voiceOn(base, fetchImpl).then((ok) => (mic.hidden = !ok));
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();

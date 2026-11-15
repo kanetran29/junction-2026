@@ -309,6 +309,19 @@ Vấn đề tìm thấy:
 - `demo/acceptance.json` tạo lại từ `~/junction-2026/.data/acceptance-last-run.json`: 63/63 passed ngày 2026-11-15, door version e48a8c55; mỗi case có dấu "✓ passed" và số check theo lần chạy (tổng 333, khớp số expect trong cases.json). Không còn "not yet measured".
 - Test: 73 pass với Playwright; `label overlaps: 0`.
 
+### 42. Giọng nói trong Try it, Peppol, Connect Claude (phía trang; door do build session làm)
+- Mỗi tính năng chỉ hiện khi door có route: `features.mjs` đọc `/openapi.json` một lần (`/v1/try/voice`, `/v1/orders/{id}/peppol`) và GET `/.well-known/oauth-authorization-server` cho Connect Claude; route trả 404 thì ẩn.
+- Giọng nói: nút micro (icon Phosphor bold) cạnh Send, bấm để ghi, bấm lần nữa để dừng, tối đa 30 s, đồng hồ "0:07 / 0:30"; MediaRecorder webm hoặc ogg, Safari mp4. Gửi multipart `audio` + `visitor` tới `POST /v1/try/voice`, nhận `{ transcript }` vào ô nhập để chef sửa hoặc bấm Send (không tự gửi). Trạng thái: micro bị chặn, không có micro, quá 30 s (413), 400 không rõ, 429 đếm ngược, 503 MODELS_BUSY, 404 ẩn nút. Không có MediaRecorder thì không có nút.
+- Peppol: dưới đơn ACCEPTED trong Try it (cả sau khi manager duyệt), link "Peppol order (UBL XML)" tải `GET /v1/orders/{id}/peppol` với `Authorization: Bearer <visitor>` và dòng "Peppol BIS Order 3.0, …". Inside, Path to production: một dòng "Peppol export: …" khi door có route.
+- Connect Claude: dưới Try it trong Live, một mục trong Inside, một dòng trong notes slide demo của tab Deck (`deck.json` có thêm id slide). Lời nằm trong `connect.mjs`, chờ build session gửi bản xác nhận; link trang bếp tạm là `/kitchen`.
+- Test: 77 pass với Playwright (micro giả của Chrome, từng trạng thái); `label overlaps: 0`.
+
+### 43. Giọng nói và Peppol theo đúng hợp đồng của door; Connect Claude tắt hẳn
+- Giọng nói: gửi đúng đoạn âm thanh thô (Content-Type audio/webm, ogg, mp4), header `X-Visitor-Token`, tối đa 1.000.000 byte (lớn hơn thì báo "Too long" mà không gửi). Lỗi theo mã của door: 400 TRANSCRIPT_EMPTY, 404 VISITOR_UNKNOWN (quên token cũ, gửi lại một lần không token), 404 khác (ẩn nút), 413 PAYLOAD_TOO_LARGE, 415 UNSUPPORTED_MEDIA_TYPE, 429 TRY_RATE_LIMITED (đếm ngược), 503 MODELS_BUSY hoặc MODEL_UNAVAILABLE. Nút chỉ hiện khi `/.well-known/agent-gateway.json` có `tryIt.voice`.
+- Peppol: `GET /v1/orders/{id}/peppol` với `X-Visitor-Token`, không có Authorization; đơn held mà khách đã duyệt dùng được cả `GET /approve/{token}/peppol`. Chỉ 200 mới hiện link (lưu qua Blob URL); 401, 404, 409 thì không. Chú thích mới: "Peppol BIS Order 3.0 (UBL 2.1). Export only; nothing is sent." Dòng trong Inside chỉ hiện khi đơn giả `peppol-probe` trả lỗi khác 404 NOT_FOUND (cờ bật).
+- Connect Claude: `CONNECT.enabled = false` nên luôn ẩn, kể cả khi door có OAuth metadata, tới khi build session xác nhận luồng.
+- Test: 77 pass với Playwright; `label overlaps: 0`.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

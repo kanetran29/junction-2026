@@ -141,3 +141,69 @@ function replyView({ status, body, retryAfter }, codes, byManager) {
       return { kind: "final", tone: "", title: `Order ${order.state}.`, lines: reasons };
   }
 }
+
+/** The longest voice request, in seconds; the recording stops itself there. */
+export const VOICE_MAX_S = 30;
+/** The largest clip the door takes, in bytes. */
+export const VOICE_MAX_BYTES = 1_000_000;
+/** Recording formats in the order the panel asks MediaRecorder for them (Safari records mp4). */
+export const VOICE_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/ogg", "audio/mp4"];
+
+/** The first recording format `supported(type)` accepts, or "" to let the browser choose. */
+export const pickMime = (supported) => VOICE_TYPES.find((t) => supported(t)) ?? "";
+
+/**
+ * Sends a recording to POST /v1/try/voice as the raw clip (Content-Type its audio type), with the visitor's token in
+ * X-Visitor-Token when there is one; never throws: { status, body, retryAfter }, status 0 when the door does not answer.
+ */
+export async function postVoice(base, blob, visitor, fetchImpl = fetch) {
+  const headers = { "Content-Type": blob.type || "audio/webm", Accept: "application/json", ...(visitor ? { "X-Visitor-Token": visitor } : {}) };
+  try {
+    const res = await fetchImpl(`${String(base).replace(/\/+$/, "")}/v1/try/voice`, { method: "POST", headers, body: blob });
+    const body = await res.json().catch(() => null);
+    return { status: res.status, body, retryAfter: Number(body?.retryAfter ?? res.headers?.get?.("Retry-After")) || null };
+  } catch {
+    return { status: 0, body: null, retryAfter: null };
+  }
+}
+
+/**
+ * What the panel does with a voice reply: { kind: "transcript", text } to put in the input (never sent by itself),
+ * "stale-visitor" when the door no longer knows the visitor's sandbox (send again without it), "hide-voice" when the door
+ * has no voice route, else an error view (429 counts down, 503 MODELS_BUSY points at the examples).
+ */
+export function voiceViewOf(res) {
+  const code = res.body?.error;
+  const text = typeof res.body?.transcript === "string" ? res.body.transcript.trim() : "";
+  if (res.status === 200 && text) return { kind: "transcript", text };
+  if ((res.status === 200 && !text) || (res.status === 400 && code === "TRANSCRIPT_EMPTY")) return { kind: "error", tone: "reject", title: "No words came through. Try again, or type your request.", lines: [] };
+  if (res.status === 404 && code === "VISITOR_UNKNOWN") return { kind: "stale-visitor" };
+  if (res.status === 404) return { kind: "hide-voice" };
+  if (res.status === 400) return { kind: "error", tone: "reject", title: "The recording was not clear enough. Try again closer to the microphone, or type it.", lines: [] };
+  if (res.status === 413) return { kind: "error", tone: "reject", title: `Too long: keep a voice request under ${VOICE_MAX_S} s.`, lines: [] };
+  if (res.status === 415) return { kind: "error", tone: "reject", title: "This browser records in a format the door does not take. Type your request instead.", lines: [] };
+  if (res.status === 503 && code === "MODEL_UNAVAILABLE") return { kind: "error", tone: "reject", title: "Voice is not available right now. Type your request instead.", lines: [] };
+  return viewOf(res);
+}
+
+/** The link under an accepted order and its caption. */
+export const PEPPOL_LABEL = "Peppol order (UBL XML)";
+export const PEPPOL_CAPTION = "Peppol BIS Order 3.0 (UBL 2.1). Export only; nothing is sent.";
+
+/**
+ * Fetches an accepted order's Peppol XML for the visitor's sandbox: GET /v1/orders/{orderId}/peppol, or, for a held order
+ * the visitor approved and no order id, GET /approve/{approvalToken}/peppol; the visitor's token goes in X-Visitor-Token,
+ * never in Authorization. Never throws: { status, blob, error }, blob null unless 200.
+ */
+export async function getPeppol(base, { orderId, approvalToken }, visitor, fetchImpl = fetch) {
+  const path = orderId ? `/v1/orders/${encodeURIComponent(orderId)}/peppol` : approvalToken ? `/approve/${encodeURIComponent(approvalToken)}/peppol` : null;
+  if (!path) return { status: 0, blob: null, error: null };
+  try {
+    const res = await fetchImpl(`${String(base).replace(/\/+$/, "")}${path}`, { headers: { Accept: "application/xml", ...(visitor ? { "X-Visitor-Token": visitor } : {}) } });
+    if (res.ok) return { status: res.status, blob: await res.blob(), error: null };
+    const body = await res.json().catch(() => null);
+    return { status: res.status, blob: null, error: body?.error ?? null };
+  } catch {
+    return { status: 0, blob: null, error: null };
+  }
+}
