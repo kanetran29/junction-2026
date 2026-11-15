@@ -2,12 +2,12 @@
  "note": "Numbers shown on the Inside tab, read on the deployed door (measuredOn). confirmed = measured, not expected.",
  "measuredOn": {
   "door": "https://lazydoor.lazydoor.workers.dev",
-  "version": "751c00be-64e9-4100-bc9d-cf2b9f64a5a9",
+  "version": "f4b69950-3a54-4541-b1b7-f01f0eb7819e",
   "date": "2026-11-15"
  },
  "acceptance": {
-  "passed": 66,
-  "total": 66,
+  "passed": 69,
+  "total": 69,
   "label": "acceptance cases pass on the deployed door",
   "confirmed": true
  },
@@ -18,7 +18,7 @@
   "confirmed": true
  },
  "tests": {
-  "passed": 447,
+  "passed": 458,
   "label": "unit tests pass",
   "confirmed": true
  },
@@ -28,7 +28,7 @@
   "caption": "A real Gemini agent on the deployed door: milk held, approved by the kitchen manager, accepted 1,010.00 €; chicken 154.00 € accepted with no human."
  },
  "pitchVideo": {
-  "url": null,
+  "url": "https://youtu.be/etiVUAh1mYw",
   "label": "The 1:59 pitch video"
  },
  "features": {

@@ -1,9 +1,9 @@
 {
   "source": "research/acceptance/cases.json",
   "run": {
-    "passed": 66,
-    "total": 66,
-    "version": "751c00be-64e9-4100-bc9d-cf2b9f64a5a9",
+    "passed": 69,
+    "total": 69,
+    "version": "f4b69950-3a54-4541-b1b7-f01f0eb7819e",
     "date": "2026-11-15"
   },
   "cases": [
@@ -935,7 +935,8 @@
         "get_receipt",
         "audit_verify"
       ],
-      "checks": 19
+      "checks": 19,
+      "pass": true
     },
     {
       "id": "AC68",
@@ -953,7 +954,8 @@
         "get_order",
         "http_get"
       ],
-      "checks": 14
+      "checks": 14,
+      "pass": true
     },
     {
       "id": "AC69",
@@ -965,7 +967,8 @@
         "public_read",
         "mcp_list_tools"
       ],
-      "checks": 21
+      "checks": 21,
+      "pass": true
     }
   ]
 }

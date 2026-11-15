@@ -609,3 +609,25 @@ xmllint). Schematron Peppol chưa chạy được (máy không có XSLT 2.0).
 - Merge demo `3564108` (nút mic, link Peppol, Connect Claude hiện khi metadata OAuth có). `proof.json` và
   `acceptance.json` của trang đã cập nhật số đo. Ghi chú slide deck đổi 63 → 66; ảnh slide và PDF deck có thể vẫn ghi 63.
 - `/demo` vẫn ẩn tới 07:45Z. Đã reset chuẩn. Commit cuối `9ba78ea` trở về trước, **chưa push**.
+
+## C15 – Huỷ đơn có chữ ký trước cut-off, api-catalog, llms.txt, CORS (15.11, ~09:15 Helsinki)
+
+**1. Huỷ đơn trước cut-off của Valio.** `POST /v1/orders/{id}/cancel` (body tuỳ chọn `{reason}`, Idempotency-Key được nhận)
+và tool MCP `cancel_order` (MCP giờ có 10 tool). Agent huỷ đơn ACCEPTED hoặc HELD của chính mình khi đồng hồ door còn trước
+cut-off sớm nhất của các dòng (lưu vào cột `cutoff_at` lúc đặt). Một transaction Aiven dưới advisory lock ghi: đơn
+CANCELLED, dòng ledger hết tính vào tồn kho (agent khác mua được), tổng ngày không tính nữa, sự kiện `order.cancelled` vào
+chuỗi hash. Trả về bản ghi huỷ ký EdDSA (aud `lazydoor:cancellation`, kiểm bằng `/.well-known/jwks.json`): orderId,
+cancelledAt, by {role, keyId = k_ + 12 hex sha256 của key, không bao giờ là key}, lines, refunded net/gross, reason. Huỷ lại
+trả đúng bản ghi cũ. Sau cut-off: 409 `ORDER_CUTOFF_PASSED`, đơn giữ nguyên; REJECTED/EXPIRED: 409 `ORDER_NOT_CANCELLABLE`;
+đơn của buyer khác: 404. Link duyệt của đơn HELD đã rút trả 409 `ORDER_WITHDRAWN`, trang ghi "withdrawn". Ba mã mới có
+trong `/v1/reason-codes`; `/v1/rules` có mục `cancellation`; biên lai chữ có dòng "Cancelled … before Valio's cut-off".
+Try it không huỷ được (cần Bearer key).
+
+**2. Discovery.** `/.well-known/api-catalog` theo RFC 9727 (linkset `application/linkset+json`: openapi, agent-gateway.json,
+llms.txt, health; HEAD có `Link: rel="api-catalog"`), `/llms.txt` cho agent LLM, và `Access-Control-Allow-Origin: *` trên mọi
+GET công khai (không credentials). agent-gateway.json có `apiCatalog`, `llms`, `cancellation`.
+
+**Kiểm:** unit test **458/458**; acceptance live **69/69** trên door `f4b69950` (thêm AC67 huỷ giải phóng tồn kho + chữ ký,
+AC68 sau cut-off bị từ chối + đơn HELD đã rút không duyệt được, AC69 api-catalog/llms.txt/CORS/10 tool). `proof.json` có số
+đo và link video pitch https://youtu.be/etiVUAh1mYw. Commit `958fc30` (code) và commit proof. **Chưa push** (phiên tổng
+quan sẽ push sau deploy cuối).
