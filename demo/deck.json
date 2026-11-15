@@ -48,13 +48,13 @@
       "id": "proof",
       "src": "assets/deck/08.webp",
       "heading": "It works, and you can check it",
-      "notes": "This is not a mock-up. 63 acceptance cases and 11 scenarios pass on the deployed door. A real Gemini agent ordered milk: held, approved by the manager, accepted at 1,010 euros. And you don't have to trust us: /v1/audit/verify recomputes the hash chain and signs the result, and our verify script checks it from outside. Change one byte of a quote and the door refuses it."
+      "notes": "This is not a mock-up. 69 acceptance cases and 11 scenarios pass on the deployed door. A real Gemini agent ordered milk: held, approved by the manager, accepted at 1,010 euros. And you don't have to trust us: /v1/audit/verify recomputes the hash chain and signs the result, and our verify script checks it from outside. Change one byte of a quote and the door refuses it."
     },
     {
       "id": "next",
       "src": "assets/deck/09.webp",
       "heading": "Path to production",
-      "notes": "Ordering is simulated today because Valio's API has no order endpoint. Valio adds that endpoint and its allocation rule; the door, the rules and the agents stay as they are. Kitchens sign their limits once, and any agent can plug in. Lazy at the order, strict at the border. Thank you."
+      "notes": "Ordering is simulated today because Valio's API has no order endpoint. Valio adds that endpoint and its allocation rule; the door, the rules and the agents stay as they are. Kitchens sign their limits once, and any agent can plug in. Lazy at the order, strict at the border. Thank you. The pitch video: youtu.be/etiVUAh1mYw."
     }
   ]
 }
