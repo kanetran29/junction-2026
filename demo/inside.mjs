@@ -3,6 +3,7 @@
 
 export const DOOR_URL = "https://lazydoor.lazydoor.workers.dev";
 export const REPO_URL = "https://github.com/kanetran29/junction-2026";
+export const PITCH_VIDEO_URL = "https://youtu.be/etiVUAh1mYw";
 
 /** The hero: the punchline, one sentence of at most 20 words, and the still beside it. */
 export const HERO = {

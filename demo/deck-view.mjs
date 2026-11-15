@@ -2,6 +2,7 @@
 // PDF to download. Built from deck.json (written by deck/build.mjs --site from pitch.json) with DOM calls only. On a door
 // that supports the Claude connector, the demo slide's notes say how to connect it.
 import { CONNECT, connectReady } from "./connect.mjs";
+import { PITCH_VIDEO_URL } from "./inside.mjs";
 
 /** An element with a class and text. */
 function el(tag, cls = "", text = "") {
@@ -24,8 +25,12 @@ export async function mountDeck(root, url = "deck.json", base = location.origin)
   }
   const pdf = el("a", "btn btn-primary deck-pdf", "Download PDF");
   Object.assign(pdf, { href: deck.pdf, download: "lazydoor-deck.pdf" });
+  const video = el("a", "btn btn-ghost", "Watch on YouTube");
+  Object.assign(video, { href: PITCH_VIDEO_URL, target: "_blank", rel: "noopener" });
+  const actions = el("div", "deck-actions");
+  actions.append(video, pdf);
   const head = el("header", "deck-head");
-  head.append(el("h1", "", "Pitch deck"), pdf);
+  head.append(el("h1", "", "Pitch deck"), actions);
   const list = el("ol", "deck-slides");
   deck.slides.forEach((s, i) => {
     const img = el("img");

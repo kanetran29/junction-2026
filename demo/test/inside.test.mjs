@@ -89,7 +89,7 @@ test("inside page: renders every section, loads proof.json, shows each live chec
   assert.deepEqual([out.track, out.clusters, out.numerals], [7, 3, 3]);
   assert.deepEqual(out.tiles, ["audit:pending", "jwks:pending", "rules:pending", "discovery:pending"], "the dev server has none of the door's routes: each tile says it is coming");
   assert.equal(out.poster, "assets/proof/agent-run-poster.webp");
-  assert.equal(out.pitch, 0, "no pitch link until proof.json has its URL");
+  assert.equal(out.pitch, 1, "proof.json has the pitch video's URL");
   assert.deepEqual(out.marks, [["assets/logos/aiven-logo-white.svg"], ["cloudflare"], ["googlegemini"], ["assets/logos/gemma-mark-dark.svg"], ["cloudflare"], ["openapiinitiative", "modelcontextprotocol"]]);
   assert.ok(out.marksLoaded, "the official logos load");
   assert.ok(out.scroll <= out.client, `page is ${out.scroll} px wide in a ${out.client} px viewport`);
