@@ -11,14 +11,14 @@ import type { Env } from '../env';
 import { decisionRegister, reasonCodes } from '../domain/rules';
 import { logEvent, verifyChain } from '../events/log';
 import { InterpretError, confirmDraft, interpret } from '../interpret/gemini';
-import { OrderError, createBasket, getOrder, placeOrder } from '../orders/store';
+import { OrderError, cancelOrder, createBasket, getOrder, placeOrder } from '../orders/store';
 import { QuoteError, createQuote, getQuote, type QuoteInput } from '../quote/store';
 import { peppolFilename, peppolXml, visitorBuyer } from '../peppol/export';
 import { productName } from '../receipt/render';
 import { ValioRateLimited } from '../valio/client';
 import { uiRoutes, receiptText } from '../ui/approve';
 import { adminRoutes } from './admin';
-import { HttpError, authenticate, rateLimit, requireBuyer, sameSecret } from './auth';
+import { HttpError, authenticate, keyIdOf, rateLimit, requireBuyer, sameSecret } from './auth';
 import { getCookie } from 'hono/cookie';
 import { readEvents, streamEvents } from './events';
 import * as S from './schemas';
@@ -26,12 +26,15 @@ import { storeKind } from '../db';
 import { AUD, jwks, signJws } from '../sign/door';
 import { tryDecision, tryIt } from '../try/sandbox';
 import { VOICE_MAX_BYTES, VOICE_TYPES, audioType, transcribe } from '../try/voice';
-import { VERSION, discovery } from './discovery';
+import { VERSION, apiCatalog, discovery, llmsTxt } from './discovery';
 import { connectorOn, oauthRoutes } from '../oauth/server';
 
 export const INTERPRET_PER_MINUTE = 20;
 /** `/v1/audit/verify` recomputes the whole chain, so anonymous callers get at most this many a minute per client address. */
 export const AUDIT_PER_MINUTE = 30;
+
+/** The public reads a page on any origin may fetch (`Access-Control-Allow-Origin: *`, never with credentials). */
+const PUBLIC_READS = ['/.well-known/agent-gateway.json', '/.well-known/api-catalog', '/llms.txt', '/openapi.json', '/v1/rules', '/v1/reason-codes', '/.well-known/jwks.json', '/v1/audit/verify', '/health', '/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp', '/.well-known/oauth-authorization-server'];
 
 /** The only `/v1` routes that need no key: the published rules and reason codes, the audit check (it shows only hashes) and Try it, voice included (demo door only). */
 const PUBLIC_PATHS = ['/v1/rules', '/v1/reason-codes', '/v1/audit/verify', '/v1/try', '/v1/try/decision', '/v1/try/voice'];
@@ -75,6 +78,14 @@ const orderRoute = createRoute({
   request: { headers: S.IdempotencyHeader, ...body(S.OrderBody) },
   security: SECURITY,
   responses: ok(S.Order),
+});
+const cancelRoute = createRoute({
+  method: 'post',
+  path: '/v1/orders/{id}/cancel',
+  summary: "Cancel the buyer's own ACCEPTED or HELD order before Valio's cut-off: stock released, day total freed, a signed cancellation record (aud lazydoor:cancellation); idempotent (a repeat returns the same record)",
+  request: { params: S.IdParam, headers: S.IdempotencyHeader, body: { content: { 'application/json': { schema: S.CancelBody } }, required: false } },
+  security: SECURITY,
+  responses: ok(S.Cancellation),
 });
 const getOrderRoute = createRoute({ method: 'get', path: '/v1/orders/{id}', summary: "Read the buyer's own order", request: { params: S.IdParam }, security: SECURITY, responses: ok(S.Order) });
 const receiptRoute = createRoute({ method: 'get', path: '/v1/orders/{id}/receipt', summary: "The order's plain-text receipt", request: { params: S.IdParam }, security: SECURITY, responses: ok(S.Receipt) });
@@ -160,6 +171,8 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   const eventsCors = cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'], allowHeaders: ['Authorization', 'Last-Event-ID'] });
   app.use('/v1/events', eventsCors);
   app.use('/v1/events/stream', eventsCors);
+  const publicCors = cors({ origin: '*', allowMethods: ['GET', 'HEAD', 'OPTIONS'] });
+  for (const path of PUBLIC_READS) app.use(path, publicCors);
   /** Try it exists only on a demo door, and only while not switched off (`/admin/try`): else 404 before any validation. */
   const demoOnly: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
     if (c.env.DEMO_MODE !== '1' || (await getSetting(c.env, 'try_off')) === '1') throw new HttpError(404, 'NOT_FOUND', 'no such route');
@@ -269,6 +282,13 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
     return c.json(reply as never, 200);
   });
 
+  /** Cancels the caller's own order before Valio's cut-off; the reply is the signed cancellation record. */
+  app.openapi(cancelRoute, async (c) => {
+    const { buyerId, role } = await requireBuyer(c);
+    const by = { role: role as 'agent' | 'judge', keyId: await keyIdOf(c.req.header('Authorization')) };
+    return c.json((await cancelOrder(c.env, { buyerId, orderId: c.req.valid('param').id, by, reason: c.req.valid('json')?.reason })) as never, 200);
+  });
+
   /** Reads the caller's own order; another buyer's is 404. */
   app.openapi(getOrderRoute, async (c) => {
     const { buyerId } = await requireBuyer(c);
@@ -341,6 +361,16 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
 
   /** What any agent fetches first: where the API, MCP, rules, events, audit, keys and demo are. */
   app.get('/.well-known/agent-gateway.json', async (c) => c.json(discovery(new URL(c.req.url).origin, c.env.DEMO_MODE === '1', { voice: await featureOn(c.env, 'voice'), connector: await connectorOn(c.env), peppol: await featureOn(c.env, 'peppol') })));
+
+  /** RFC 9727 API catalog: the API as an RFC 9264 linkset; GET and HEAD carry `Link: rel="api-catalog"`. */
+  app.get('/.well-known/api-catalog', (c) => {
+    const origin = new URL(c.req.url).origin;
+    c.header('Link', `<${origin}/.well-known/api-catalog>; rel="api-catalog"`);
+    return c.body(JSON.stringify(apiCatalog(origin)), 200, { 'Content-Type': 'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"' });
+  });
+
+  /** The short markdown guide for LLM agents. */
+  app.get('/llms.txt', async (c) => c.body(llmsTxt(new URL(c.req.url).origin, await connectorOn(c.env)), 200, { 'Content-Type': 'text/markdown; charset=utf-8' }));
 
   app.doc('/openapi.json', (c) => {
     const discoveryUrl = `${new URL(c.req.url).origin}/.well-known/agent-gateway.json`;

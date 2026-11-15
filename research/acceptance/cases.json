@@ -596,7 +596,7 @@
           "input": {},
           "expect": [
             ["tools[*].name", "contains", "place_order"],
-            ["tools", "count=", 9],
+            ["tools", "count=", 10],
             ["tools[*].name", "contains", "quote_basket"],
             ["tools[*].name", "contains", "resolve_product"],
             ["tools[*].name", "contains", "list_families"]
@@ -1476,6 +1476,536 @@
         {"call": "connector_approve", "input": {"asConnector": true}, "expect": [["httpStatus", "=", 403], ["error", "=", "AGENT_CANNOT_APPROVE"]]},
         {"call": "connector_rest", "input": {}, "expect": [["httpStatus", "=", 401]]},
         {"call": "connector_approve", "input": {"asConnector": false}, "expect": [["httpStatus", "=", 200], ["state", "=", "ACCEPTED"]]}
+      ]
+    },
+    {
+      "id": "AC67",
+      "tier": 1,
+      "title": "An agent cancels its order before the cut-off: the stock goes back on sale for another agent, and the signed cancellation record verifies while a tampered copy does not",
+      "rubric": [
+        "controls 20",
+        "exceptions 15",
+        "e2e 30"
+      ],
+      "given": {
+        "draft": {
+          "referenceProduct": "470746",
+          "quantity": {
+            "value": 20,
+            "unit": "kg"
+          },
+          "deliverBy": "2026-11-16",
+          "allowSubstitutes": false
+        }
+      },
+      "steps": [
+        {
+          "call": "quote",
+          "as": "hotel-a",
+          "input": {},
+          "expect": [
+            [
+              "offers[0].filled",
+              "=",
+              20
+            ]
+          ]
+        },
+        {
+          "call": "quote_and_place",
+          "as": "hotel-b",
+          "input": {
+            "offer": 0
+          },
+          "expect": [
+            [
+              "state",
+              "=",
+              "ACCEPTED"
+            ]
+          ]
+        },
+        {
+          "call": "place_order",
+          "as": "hotel-a",
+          "input": {
+            "offer": 0
+          },
+          "expect": [
+            [
+              "state",
+              "=",
+              "REJECTED"
+            ],
+            [
+              "decision.reasons[*].code",
+              "contains",
+              "STOCK_TAKEN"
+            ]
+          ]
+        },
+        {
+          "call": "cancel_order",
+          "as": "hotel-b",
+          "input": {
+            "reason": "Menu changed."
+          },
+          "expect": [
+            [
+              "httpStatus",
+              "=",
+              200
+            ],
+            [
+              "state",
+              "=",
+              "CANCELLED"
+            ],
+            [
+              "cancellation.reason",
+              "=",
+              "Menu changed."
+            ],
+            [
+              "cancellation.by.role",
+              "=",
+              "agent"
+            ],
+            [
+              "verified",
+              "=",
+              true
+            ],
+            [
+              "tamperedVerifies",
+              "=",
+              false
+            ]
+          ]
+        },
+        {
+          "call": "get_order",
+          "as": "hotel-b",
+          "input": {},
+          "expect": [
+            [
+              "state",
+              "=",
+              "CANCELLED"
+            ]
+          ]
+        },
+        {
+          "call": "place_order",
+          "as": "hotel-a",
+          "input": {
+            "offer": 0
+          },
+          "expect": [
+            [
+              "state",
+              "=",
+              "ACCEPTED"
+            ]
+          ]
+        },
+        {
+          "call": "cancel_order",
+          "as": "hotel-b",
+          "input": {},
+          "expect": [
+            [
+              "httpStatus",
+              "=",
+              200
+            ],
+            [
+              "state",
+              "=",
+              "CANCELLED"
+            ],
+            [
+              "cancellation.reason",
+              "=",
+              "Menu changed."
+            ],
+            [
+              "verified",
+              "=",
+              true
+            ]
+          ]
+        },
+        {
+          "call": "get_receipt",
+          "as": "hotel-b",
+          "input": {},
+          "expect": [
+            [
+              "text",
+              "contains",
+              "before Valio's cut-off"
+            ]
+          ]
+        },
+        {
+          "call": "audit_verify",
+          "input": {},
+          "expect": [
+            [
+              "valid",
+              "=",
+              true
+            ],
+            [
+              "signatureVerified",
+              "=",
+              true
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "AC68",
+      "tier": 1,
+      "title": "After Valio's cut-off a cancel is refused with ORDER_CUTOFF_PASSED and the order stands; a held order the agent withdrew cannot be approved",
+      "rubric": [
+        "controls 20",
+        "exceptions 15"
+      ],
+      "steps": [
+        {
+          "call": "quote",
+          "input": {
+            "draft": {
+              "category": "10400",
+              "claims": [
+                "FREE_FROM_LACTOSE"
+              ],
+              "quantity": {
+                "value": 1000,
+                "unit": "l"
+              },
+              "deliverBy": "2026-11-16"
+            }
+          },
+          "expect": [
+            [
+              "offers[0].lines[0].productId",
+              "=",
+              "464306"
+            ]
+          ]
+        },
+        {
+          "call": "place_order",
+          "input": {
+            "offer": 0
+          },
+          "expect": [
+            [
+              "state",
+              "=",
+              "HELD"
+            ]
+          ]
+        },
+        {
+          "call": "cancel_order",
+          "input": {},
+          "expect": [
+            [
+              "httpStatus",
+              "=",
+              200
+            ],
+            [
+              "state",
+              "=",
+              "CANCELLED"
+            ],
+            [
+              "verified",
+              "=",
+              true
+            ]
+          ]
+        },
+        {
+          "call": "approve",
+          "input": {},
+          "expect": [
+            [
+              "httpStatus",
+              "=",
+              409
+            ],
+            [
+              "error",
+              "=",
+              "ORDER_WITHDRAWN"
+            ]
+          ]
+        },
+        {
+          "call": "quote",
+          "input": {
+            "draft": {
+              "category": "10400",
+              "claims": [
+                "FREE_FROM_LACTOSE"
+              ],
+              "quantity": {
+                "value": 20,
+                "unit": "l"
+              },
+              "deliverBy": "2026-11-16"
+            }
+          },
+          "expect": [
+            [
+              "offers[0].lines[0].productId",
+              "=",
+              "464306"
+            ]
+          ]
+        },
+        {
+          "call": "place_order",
+          "input": {
+            "offer": 0
+          },
+          "expect": [
+            [
+              "state",
+              "=",
+              "ACCEPTED"
+            ]
+          ]
+        },
+        {
+          "call": "set_clock",
+          "input": {
+            "clock": "2026-11-15T17:05:00+02:00"
+          },
+          "expect": []
+        },
+        {
+          "call": "cancel_order",
+          "input": {},
+          "expect": [
+            [
+              "httpStatus",
+              "=",
+              409
+            ],
+            [
+              "error",
+              "=",
+              "ORDER_CUTOFF_PASSED"
+            ]
+          ]
+        },
+        {
+          "call": "get_order",
+          "input": {},
+          "expect": [
+            [
+              "state",
+              "=",
+              "ACCEPTED"
+            ]
+          ]
+        },
+        {
+          "call": "http_get",
+          "input": {
+            "path": "/v1/reason-codes"
+          },
+          "expect": [
+            [
+              "codes[*].code",
+              "contains",
+              "ORDER_CUTOFF_PASSED"
+            ],
+            [
+              "codes[*].code",
+              "contains",
+              "ORDER_WITHDRAWN"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "AC69",
+      "tier": 1,
+      "title": "Any agent finds the door: an RFC 9727 API catalog, /llms.txt, and every public read open to a page on another origin",
+      "rubric": [
+        "openness 15"
+      ],
+      "steps": [
+        {
+          "call": "public_read",
+          "input": {
+            "path": "/.well-known/api-catalog"
+          },
+          "expect": [
+            [
+              "httpStatus",
+              "=",
+              200
+            ],
+            [
+              "contentType",
+              "matches",
+              "^application/linkset\\+json"
+            ],
+            [
+              "allowOrigin",
+              "=",
+              "*"
+            ],
+            [
+              "text",
+              "contains",
+              "service-desc"
+            ],
+            [
+              "text",
+              "contains",
+              "/openapi.json"
+            ]
+          ]
+        },
+        {
+          "call": "public_read",
+          "input": {
+            "path": "/.well-known/api-catalog",
+            "method": "HEAD"
+          },
+          "expect": [
+            [
+              "httpStatus",
+              "=",
+              200
+            ],
+            [
+              "link",
+              "contains",
+              "rel=\"api-catalog\""
+            ]
+          ]
+        },
+        {
+          "call": "public_read",
+          "input": {
+            "path": "/llms.txt"
+          },
+          "expect": [
+            [
+              "httpStatus",
+              "=",
+              200
+            ],
+            [
+              "contentType",
+              "matches",
+              "^text/markdown"
+            ],
+            [
+              "allowOrigin",
+              "=",
+              "*"
+            ],
+            [
+              "text",
+              "contains",
+              "/mcp"
+            ],
+            [
+              "text",
+              "contains",
+              "cannot approve"
+            ]
+          ]
+        },
+        {
+          "call": "public_read",
+          "input": {
+            "path": "/.well-known/agent-gateway.json"
+          },
+          "expect": [
+            [
+              "allowOrigin",
+              "=",
+              "*"
+            ],
+            [
+              "allowCredentials",
+              "=",
+              null
+            ],
+            [
+              "text",
+              "contains",
+              "/.well-known/api-catalog"
+            ]
+          ]
+        },
+        {
+          "call": "public_read",
+          "input": {
+            "path": "/openapi.json"
+          },
+          "expect": [
+            [
+              "allowOrigin",
+              "=",
+              "*"
+            ],
+            [
+              "text",
+              "contains",
+              "/v1/orders/{id}/cancel"
+            ]
+          ]
+        },
+        {
+          "call": "public_read",
+          "input": {
+            "path": "/v1/rules"
+          },
+          "expect": [
+            [
+              "allowOrigin",
+              "=",
+              "*"
+            ],
+            [
+              "text",
+              "contains",
+              "cancellation"
+            ]
+          ]
+        },
+        {
+          "call": "mcp_list_tools",
+          "input": {},
+          "expect": [
+            [
+              "tools[*].name",
+              "contains",
+              "cancel_order"
+            ],
+            [
+              "tools",
+              "count=",
+              10
+            ]
+          ]
+        }
       ]
     }
   ],

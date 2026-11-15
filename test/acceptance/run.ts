@@ -123,11 +123,11 @@ async function verifyDoorJws(jws: string | undefined): Promise<Json | null> {
   return (await webcrypto.subtle.verify('Ed25519', key, Buffer.from(s, 'base64url'), Buffer.from(`${h}.${p}`))) ? JSON.parse(Buffer.from(p, 'base64url').toString('utf8')) : null;
 }
 
-/** A copy of a JWS whose claims were edited (the first line's price and the net doubled), keeping the door's header and signature. */
-function tamperedPrice(jws: string): string {
+/** A copy of a JWS whose claims were edited (`field`, the net by default, halved), keeping the door's header and signature. */
+function tamperedPrice(jws: string, field = 'netCents'): string {
   const [h, p, s] = jws.split('.');
   const claims = JSON.parse(Buffer.from(p, 'base64url').toString('utf8'));
-  claims.netCents = Math.floor(claims.netCents / 2);
+  claims[field] = Math.floor(claims[field] / 2);
   return `${h}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.${s}`;
 }
 
@@ -367,6 +367,16 @@ const handlers: Record<string, Handler> = {
   },
   connector_approve: (ctx, step) => http(ctx.connectorApproval ?? '/approve/none', { method: 'POST', headers: { Accept: 'application/json', ...(step.input.asConnector ? bearer(ctx.oauthToken) : {}) } }),
   connector_rest: (ctx) => http(`/v1/orders/${ctx.connectorOrder}`, { key: ctx.oauthToken }),
+  cancel_order: async (ctx, step, buyer) => {
+    const r = await agent(ctx, buyer, `/v1/orders/${ctx.lastOrderId[buyer]}/cancel`, step.input.reason ? { reason: step.input.reason } : {}, { 'Idempotency-Key': randomUUID() });
+    const claims = await verifyDoorJws(r.jws);
+    const verified = claims !== null && claims.aud === 'lazydoor:cancellation' && claims.orderId === r.orderId && claims.refundedNetCents === r.cancellation?.refundedNetCents;
+    return { ...r, verified, tamperedVerifies: typeof r.jws === 'string' && (await verifyDoorJws(tamperedPrice(r.jws, 'refundedNetCents'))) !== null };
+  },
+  public_read: async (_ctx, step) => {
+    const res = await fetch(`${GATEWAY}${step.input.path}`, { method: step.input.method ?? 'GET', headers: { Origin: 'http://localhost:8790' } });
+    return { httpStatus: res.status, contentType: res.headers.get('Content-Type'), allowOrigin: res.headers.get('Access-Control-Allow-Origin'), allowCredentials: res.headers.get('Access-Control-Allow-Credentials'), link: res.headers.get('Link'), text: await res.text() };
+  },
 };
 
 /** The reset body for a case: `defaults` plus the case `given`, only the fields `/admin/reset` reads. */

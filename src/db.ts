@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS events (
 );
 ALTER TABLE events ADD COLUMN IF NOT EXISTS prev_hash TEXT, ADD COLUMN IF NOT EXISTS hash TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS decided_at TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS cutoff_at TEXT, ADD COLUMN IF NOT EXISTS cancelled_at TEXT, ADD COLUMN IF NOT EXISTS cancelled_by TEXT, ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
 CREATE INDEX IF NOT EXISTS idx_events_order ON events(order_id);
 CREATE INDEX IF NOT EXISTS idx_events_buyer ON events(buyer_id, id);
 CREATE TABLE IF NOT EXISTS rate_limits (key_hash TEXT NOT NULL, minute INTEGER NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (key_hash, minute));
@@ -75,7 +76,7 @@ ALTER TABLE oauth_codes ADD COLUMN IF NOT EXISTS used BOOLEAN NOT NULL DEFAULT F
 export const TABLES = ['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'oauth_tokens', 'oauth_codes', 'oauth_requests', 'oauth_clients', 'try_visitors', 'mandates', 'buyer_keys', 'api_keys', 'settings'];
 
 /** The advisory lock every batch takes: writes that must not interleave (the stock ledger above all) run one at a time. */
-const WRITE_LOCK = 1;
+export const WRITE_LOCK = 1;
 
 const clients = new WeakMap<object, postgres.Sql>();
 

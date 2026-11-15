@@ -6,10 +6,10 @@ import { z } from 'zod';
 import { listFamilies, resolve } from '../catalog/open';
 import type { Env } from '../env';
 import { confirmDraft, interpret } from '../interpret/gemini';
-import { createBasket, getOrder, placeOrder } from '../orders/store';
+import { cancelOrder, createBasket, getOrder, placeOrder } from '../orders/store';
 import { createQuote, type QuoteInput } from '../quote/store';
 import { SANDBOX_BUYER_PREFIX } from '../domain/constants';
-import { HttpError, countUse, identify, rateLimit } from '../http/auth';
+import { HttpError, countUse, identify, keyIdOf, rateLimit } from '../http/auth';
 import { CONNECTOR_ALL_PER_MINUTE, MCP_PER_TOKEN_PER_MINUTE, challenge, connectorOn, oauthCaller } from '../oauth/server';
 import { limit, limitFreeText } from '../try/sandbox';
 import { INTERPRET_PER_MINUTE, errorBody, searchReply } from '../http/routes';
@@ -81,6 +81,14 @@ const tools: Tool[] = [
     input: S.IdParam,
     output: S.Order,
     run: async (a, { env, buyerId }) => (await getOrder(env, buyerId, a.id)) ?? Promise.reject(new HttpError(404, 'ORDER_NOT_FOUND', 'no such order')),
+  },
+  {
+    name: 'cancel_order',
+    description: "Cancel the buyer's own ACCEPTED or HELD order before Valio's cut-off: the stock goes back on sale, the day total no longer counts it, and the reply is the door's signed cancellation record (jws, aud lazydoor:cancellation; verify with /.well-known/jwks.json). Idempotent; after the cut-off it is ORDER_CUTOFF_PASSED.",
+    input: S.IdParam.extend({ reason: S.CancelBody.shape.reason }),
+    output: S.Cancellation,
+    run: async (a, { env, buyerId, auth }) =>
+      cancelOrder(env, { buyerId, orderId: a.id, reason: a.reason, by: { role: buyerId.startsWith(SANDBOX_BUYER_PREFIX) ? 'connector' : 'agent', keyId: await keyIdOf(auth) } }),
   },
   {
     name: 'resolve_product',

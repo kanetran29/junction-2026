@@ -31,6 +31,11 @@ export function bearerOf(header: string | undefined): string | null {
 }
 
 /** Compares two secrets in constant time by comparing their fixed-length sha256 digests. */
+/** A short public fingerprint of the caller's bearer key: `k_` and the first 12 hex characters of its sha256, never the key. */
+export async function keyIdOf(header: string | undefined): Promise<string> {
+  return `k_${(await sha256Hex(bearerOf(header) ?? '')).slice(0, 12)}`;
+}
+
 export async function sameSecret(a: string, b: string): Promise<boolean> {
   const enc = new TextEncoder();
   const [da, db] = await Promise.all([crypto.subtle.digest('SHA-256', enc.encode(a)), crypto.subtle.digest('SHA-256', enc.encode(b))]);

@@ -4,7 +4,7 @@ import { MANDATE_AUD, sameWorld, type Mandate } from '../domain/constants';
 import { grossCents, halfUp, lineNet } from '../domain/money';
 import type { ReasonCode } from '../domain/reasons';
 import type { Env } from '../env';
-import { logEvent, type NewEvent } from '../events/log';
+import { appendEvent, logEvent, staleTail, type NewEvent } from '../events/log';
 import { MandateError, loadMandate } from '../mandate/jws';
 import { orderable } from '../offers/orderable';
 import { decide, type Decision, type Reason, type Unmet } from '../policy/decide';
@@ -13,9 +13,9 @@ import { createQuote, getQuote, offerClaims } from '../quote/store';
 import { AUD, doorKey, signJws, verifyJws } from '../sign/door';
 import { canonicalJson, newId, sha256Hex } from '../util';
 import { ValioError, fetchOffers, type Offers } from '../valio/client';
-import { db } from '../db';
+import { WRITE_LOCK, db, transaction } from '../db';
 
-export type OrderState = 'PLACING' | 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED';
+export type OrderState = 'PLACING' | 'ACCEPTED' | 'HELD' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
 
 /** What an order holds besides its money: the lines the buyer gets and the needs no offer covered. */
 export interface Order {
@@ -89,6 +89,10 @@ interface Row {
   lines_hash: string | null;
   reply: string | null;
   decided_at: string | null;
+  cutoff_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
 }
 
 /** One product on one delivery day: how many sales units the order needs and Valio's limit read at commit (null = Valio's stock is unknown). */
@@ -462,7 +466,7 @@ async function commitOrder(env: Env, id: string, req: PlaceRequest, at: Date, fe
                       ELSE 'ACCEPTED' END,
          reason = CASE WHEN ?3 = 'REJECT' THEN ?7 WHEN (SELECT total FROM day) + ?4 > ?5 THEN 'OVER_DAY_HARD' END,
          net_cents = ?4, gross_cents = ?8, delivery_date = ?2, decision = ?9, body = ?10, agent_reason = ?11,
-         mandate_version = ?12, approver = ?13, lines_hash = ?14, approval_token = ?15, expires_at = ?16
+         mandate_version = ?12, approver = ?13, lines_hash = ?14, approval_token = ?15, expires_at = ?16, cutoff_at = ?16
        WHERE id = ?17 AND state = 'PLACING'`,
     ).bind(
       req.buyerId, deliveryDate, decision.outcome, net, hardDay, autoDay, firstReject, gross, JSON.stringify(decision), JSON.stringify({ lines, unmet, checks }),
@@ -481,6 +485,78 @@ async function commitOrder(env: Env, id: string, req: PlaceRequest, at: Date, fe
   if (row.state === 'ACCEPTED') await logEvent(env, { ...ref, type: 'order.accepted', data: { lines, netCents: net } });
   for (const s of shorts) await logEvent(env, { ...ref, type: 'stock.denied', data: { productId: s.productId, remaining: s.remaining } });
   return reply;
+}
+
+/** The refusal of an approval link whose held order the agent cancelled. */
+const withdrawn = () => new OrderError(409, 'ORDER_WITHDRAWN', "the agent withdrew this order before Valio's cut-off; there is nothing to approve");
+
+/** Who cancelled an order: the caller's role and a short fingerprint of its key (never the key). */
+export interface CancelledBy {
+  role: 'agent' | 'judge' | 'connector';
+  keyId: string;
+}
+
+/**
+ * What a cancellation JWS binds (audience "lazydoor:cancellation"): the order and buyer, state CANCELLED, when (door time)
+ * and by whom, every line as the receipt lists it, the refunded net and gross (the order's own totals), the currency and
+ * the reason given (null when none).
+ */
+function cancellationClaims(r: Row) {
+  const { lines } = JSON.parse(r.body) as { lines: OfferLine[] };
+  return {
+    orderId: r.id,
+    buyerId: r.buyer_id,
+    state: 'CANCELLED' as const,
+    cancelledAt: r.cancelled_at!,
+    by: JSON.parse(r.cancelled_by!) as CancelledBy,
+    lines: lines.map((l) => ({ productId: l.productId, salesUnits: l.salesUnits, unitPriceCents: l.netCentsPerSalesUnit, netCents: lineNet(l), deliveryDate: l.deliveryDate })),
+    refundedNetCents: r.net_cents,
+    refundedGrossCents: r.gross_cents,
+    currency: 'EUR' as const,
+    reason: r.cancel_reason,
+  };
+}
+
+export type CancelReply = { orderId: string; state: 'CANCELLED'; cancellation: ReturnType<typeof cancellationClaims>; jws: string };
+
+/** The reply for a cancelled row: the record and the door's EdDSA JWS over it. Ed25519 is deterministic, so a repeat gets the same JWS. */
+async function cancelReply(env: Env, r: Row): Promise<CancelReply> {
+  const cancellation = cancellationClaims(r);
+  return { orderId: r.id, state: 'CANCELLED', cancellation, jws: await signJws(env, { ...cancellation, aud: AUD.cancellation }) };
+}
+
+/**
+ * Cancels the buyer's own ACCEPTED or HELD order while the door clock is before Valio's cut-off of every line (the earliest
+ * closing time, kept at commit). In ONE transaction under the write lock: the order becomes CANCELLED, its ledger lines stop
+ * counting against stock (so another buyer can take it), the day totals no longer count it (they read ACCEPTED and HELD only)
+ * and an `order.cancelled` event joins the hash chain. A held order's approval link then answers ORDER_WITHDRAWN. Idempotent:
+ * an order already cancelled returns the same signed record. Unknown or another buyer's is 404; REJECTED or EXPIRED is 409
+ * ORDER_NOT_CANCELLABLE; past the cut-off (or with none recorded) 409 ORDER_CUTOFF_PASSED.
+ */
+export async function cancelOrder(env: Env, req: { buyerId: string; orderId: string; by: CancelledBy; reason?: string }): Promise<CancelReply> {
+  await doorKey(env);
+  const find = () => db(env).prepare("SELECT * FROM orders WHERE id = ? AND buyer_id = ? AND state <> 'PLACING'").bind(req.orderId, req.buyerId).first<Row>();
+  const row = await find();
+  if (!row) throw new OrderError(404, 'ORDER_NOT_FOUND', 'no such order');
+  if (row.state === 'CANCELLED') return cancelReply(env, row);
+  const notCancellable = (state: string) => new OrderError(409, 'ORDER_NOT_CANCELLABLE', `a ${state} order cannot be cancelled`);
+  if (row.state !== 'ACCEPTED' && row.state !== 'HELD') throw notCancellable(row.state);
+  const at = await now(env);
+  const cutoff = row.cutoff_at ?? row.expires_at;
+  if (!cutoff || at.getTime() >= Date.parse(cutoff)) throw new OrderError(409, 'ORDER_CUTOFF_PASSED', `Valio's cut-off was ${cutoff ?? 'not recorded'}; the order can no longer be cancelled`);
+
+  const ts = helsinkiIso(at);
+  const by = JSON.stringify(req.by);
+  await transaction(env, async (s) => {
+    await s.prepare(`SELECT pg_advisory_xact_lock(${WRITE_LOCK})`).run();
+    const res = await s.prepare("UPDATE orders SET state = 'CANCELLED', cancelled_at = ?, cancelled_by = ?, cancel_reason = ? WHERE id = ? AND state IN ('ACCEPTED','HELD')").bind(ts, by, req.reason ?? null, row.id).run();
+    if (!res.meta.changes) return;
+    const released = await s.prepare("UPDATE order_lines SET state = 'CANCELLED' WHERE order_id = ? AND state = 'ACCEPTED'").bind(row.id).run();
+    await appendEvent(s, { buyerId: row.buyer_id, orderId: row.id, ...(row.quote_id ? { quoteId: row.quote_id } : {}), type: 'order.cancelled', data: { from: row.state, by: req.by, reason: req.reason ?? null, releasedLines: released.meta.changes, netCents: row.net_cents } }, ts);
+  }).finally(staleTail);
+  const after = (await find())!;
+  if (after.state !== 'CANCELLED') throw notCancellable(after.state);
+  return cancelReply(env, after);
 }
 
 /** Loads a stored order by approval token; unknown is 404. The token never appears outside the approver inbox. */
@@ -507,6 +583,7 @@ async function expireOrder(env: Env, row: Row, at: Date, reason: ReasonCode, ext
 export async function approve(env: Env, token: string, opts: { callerRole: 'approver' | 'agent' }, fetchFn: typeof fetch = fetch): Promise<ApproveReply> {
   if (opts?.callerRole !== 'approver') throw new OrderError(403, 'AGENT_CANNOT_APPROVE', 'only the approver can approve an order');
   const row = await byToken(env, token);
+  if (row.state === 'CANCELLED') throw withdrawn();
   if (row.state !== 'HELD') throw new OrderError(409, 'TOKEN_USED', 'this approval was already resolved');
   const at = await now(env);
   const { lines } = JSON.parse(row.body) as { lines: OfferLine[] };
@@ -553,6 +630,7 @@ export async function approve(env: Env, token: string, opts: { callerRole: 'appr
 export async function reject(env: Env, token: string, opts: { callerRole: 'approver' | 'agent' }): Promise<ApproveReply> {
   if (opts?.callerRole !== 'approver') throw new OrderError(403, 'AGENT_CANNOT_APPROVE', 'only the approver can reject an order');
   const row = await byToken(env, token);
+  if (row.state === 'CANCELLED') throw withdrawn();
   const res = await db(env).prepare("UPDATE orders SET state = 'REJECTED', decided_at = ? WHERE id = ? AND state = 'HELD'").bind(helsinkiIso(await now(env)), row.id).run();
   if (!res.meta.changes) throw new OrderError(409, 'TOKEN_USED', 'this approval was already resolved');
   await logEvent(env, { buyerId: row.buyer_id, orderId: row.id, ...(row.quote_id ? { quoteId: row.quote_id } : {}), type: 'approval.rejected', data: {} });

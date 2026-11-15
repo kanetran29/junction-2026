@@ -2,7 +2,7 @@ import type { Env } from '../env';
 import { b64u, canonicalJson, fromB64u } from '../util';
 
 /** The audience of each kind of statement the door signs, so a signature over one kind is never accepted as another. */
-export const AUD = { quote: 'lazydoor:quote', receipt: 'lazydoor:receipt', audit: 'lazydoor:audit' } as const;
+export const AUD = { quote: 'lazydoor:quote', receipt: 'lazydoor:receipt', audit: 'lazydoor:audit', cancellation: 'lazydoor:cancellation' } as const;
 
 /** The door's signing key: its RFC 7638 thumbprint (`kid`), the public JWK it publishes, and the imported key pair. */
 export interface DoorKey {

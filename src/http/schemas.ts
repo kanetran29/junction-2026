@@ -52,7 +52,7 @@ export const OrderBody = z.union([
 ]).openapi('OrderBody');
 export const Order = z.looseObject({
   orderId: z.string(),
-  state: z.enum(['ACCEPTED', 'HELD', 'REJECTED', 'EXPIRED']),
+  state: z.enum(['ACCEPTED', 'HELD', 'REJECTED', 'EXPIRED', 'CANCELLED']),
   reason: z.string().optional(),
   decision: z.looseObject({ outcome: z.string(), reasons: z.array(z.looseObject({ code: z.string() })) }),
   approval: z.object({ status: z.enum(['pending', 'none']), approver: z.string() }),
@@ -62,6 +62,27 @@ export const Order = z.looseObject({
   resolution: z.string().optional(),
   jws: z.string().optional().openapi({ description: 'Once the order is final: the door\'s compact EdDSA JWS over orderId, buyerId, state, lines, netCents, grossCents, currency, approvedBy, decidedAt and aud "lazydoor:receipt"' }),
 }).openapi('Order');
+
+export const CancelBody = z.object({ reason: z.string().max(500).optional().openapi({ description: 'Why the order is cancelled; kept in the signed record' }) }).openapi('CancelBody');
+export const Cancellation = z
+  .object({
+    orderId: z.string(),
+    state: z.literal('CANCELLED'),
+    cancellation: z.object({
+      orderId: z.string(),
+      buyerId: z.string(),
+      state: z.literal('CANCELLED'),
+      cancelledAt: z.string(),
+      by: z.object({ role: z.enum(['agent', 'judge', 'connector']), keyId: z.string().openapi({ description: "k_ and 12 hex characters of the sha256 of the caller's key; never the key" }) }),
+      lines: z.array(z.object({ productId: z.string(), salesUnits: z.number(), unitPriceCents: z.number(), netCents: z.number(), deliveryDate: z.string() })),
+      refundedNetCents: z.number(),
+      refundedGrossCents: z.number(),
+      currency: z.literal('EUR'),
+      reason: z.string().nullable(),
+    }),
+    jws: z.string().openapi({ description: 'The door\'s compact EdDSA JWS over the cancellation record with aud "lazydoor:cancellation"; verify with /.well-known/jwks.json' }),
+  })
+  .openapi('Cancellation');
 
 export const Receipt = z.object({ text: z.string(), jws: z.string().optional().openapi({ description: 'The same signed receipt as the order reply carries, once the order is final' }) }).openapi('Receipt');
 export const Health = z

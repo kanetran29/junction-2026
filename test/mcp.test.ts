@@ -16,7 +16,7 @@ const valio = fakeValio({ P1: { price: 3, stock: 250 } }).fn;
 const app = createApp(valio);
 app.route('/', mcpRoutes(valio));
 const need = { category: '10400', claims: ['FREE_FROM_LACTOSE'], quantity: { value: 20, unit: 'l' }, deliverBy: '2026-11-16' };
-const names = ['interpret_request', 'confirm_draft', 'search_products', 'get_quote', 'quote_basket', 'place_order', 'get_order', 'resolve_product', 'list_families'];
+const names = ['interpret_request', 'confirm_draft', 'search_products', 'get_quote', 'quote_basket', 'place_order', 'get_order', 'cancel_order', 'resolve_product', 'list_families'];
 
 const post = (path: string, key: string | undefined, body: unknown, headers: Record<string, string> = {}) =>
   app.request(path, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...(key ? { Authorization: `Bearer ${key}` } : {}), ...headers }, body: JSON.stringify(body) }, e);
@@ -38,7 +38,7 @@ describe('mcp', () => {
     expect((await post('/mcp', 'adm', { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status).toBe(403);
   });
 
-  it('initializes as lazydoor and lists 9 tools whose schemas are the HTTP ones', async () => {
+  it('initializes as lazydoor and lists 10 tools whose schemas are the HTTP ones', async () => {
     const keys = await reset();
     const key = keys.agentKeys['hotel-a'];
     const init = await rpc(key, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '0' } });
@@ -121,7 +121,7 @@ describe('mcp', () => {
       requestInit: { headers: { Authorization: `Bearer ${keys.agentKeys['hotel-a']}` } },
       fetch: ((u: any, i: any) => app.request(new Request(u, i), undefined, e)) as typeof fetch,
     }));
-    expect((await client.listTools()).tools).toHaveLength(9);
+    expect((await client.listTools()).tools).toHaveLength(10);
     const r = await client.callTool({ name: 'get_order', arguments: { id: 'nope' } });
     expect(r.isError).toBe(true);
     expect(JSON.stringify(r.content)).toContain('ORDER_NOT_FOUND');

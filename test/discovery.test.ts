@@ -55,3 +55,44 @@ describe('/.well-known/agent-gateway.json', () => {
     expect(doc.externalDocs?.url).toBe(`${ORIGIN}/.well-known/agent-gateway.json`);
   });
 });
+
+describe('/.well-known/api-catalog (RFC 9727) and /llms.txt', () => {
+  it('lists the API as an RFC 9264 linkset, linked from HEAD and from agent-gateway.json', async () => {
+    const r = await get('/.well-known/api-catalog');
+    expect(r.status).toBe(200);
+    expect(r.headers.get('Content-Type')).toContain('application/linkset+json');
+    expect(await r.json()).toEqual({
+      linkset: [
+        {
+          anchor: `${ORIGIN}/`,
+          'service-desc': [{ href: `${ORIGIN}/openapi.json`, type: 'application/vnd.oai.openapi+json' }],
+          'service-meta': [{ href: `${ORIGIN}/.well-known/agent-gateway.json`, type: 'application/json' }],
+          'service-doc': [{ href: `${ORIGIN}/llms.txt`, type: 'text/markdown' }],
+          status: [{ href: `${ORIGIN}/health`, type: 'application/json' }],
+        },
+      ],
+    });
+    const head = await app.request(`${ORIGIN}/.well-known/api-catalog`, { method: 'HEAD' }, e);
+    expect(head.status).toBe(200);
+    expect(head.headers.get('Link')).toBe(`<${ORIGIN}/.well-known/api-catalog>; rel="api-catalog"`);
+    expect(await (await get('/.well-known/agent-gateway.json')).json()).toMatchObject({ apiCatalog: `${ORIGIN}/.well-known/api-catalog`, llms: `${ORIGIN}/llms.txt` });
+  });
+
+  it('serves /llms.txt as markdown for agents: what the door is, the rules, how to connect and where to check', async () => {
+    const r = await get('/llms.txt');
+    expect(r.status).toBe(200);
+    expect(r.headers.get('Content-Type')).toContain('text/markdown');
+    const text = await r.text();
+    expect(text).toMatch(/^# Lazydoor/);
+    for (const s of ['/openapi.json', '/v1/rules', '/v1/reason-codes', '/.well-known/jwks.json', '/v1/audit/verify', '/mcp', 'query string', 'cannot approve']) expect(text, s).toContain(s);
+  });
+
+  it('lets a page on another origin read every public GET (Access-Control-Allow-Origin: *, no credentials)', async () => {
+    for (const path of ['/.well-known/agent-gateway.json', '/.well-known/api-catalog', '/llms.txt', '/openapi.json', '/v1/rules', '/v1/reason-codes', '/.well-known/jwks.json', '/v1/audit/verify', '/health']) {
+      const r = await app.request(`${ORIGIN}${path}`, { headers: { Origin: 'http://localhost:8790' } }, e);
+      expect([path, r.status, r.headers.get('Access-Control-Allow-Origin')]).toEqual([path, 200, '*']);
+      expect(r.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+      await r.body?.cancel();
+    }
+  });
+});

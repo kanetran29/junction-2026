@@ -24,10 +24,10 @@ export function productName(products: CatalogProduct[], id: string): string {
 /**
  * The plain-text receipt of an order, built only from templates (no model): one block per line (product, sales units times
  * content, fixed price per litre or kilo, line net), the net and gross totals, the decision's reasons in their human text,
- * the state, why it ended when it did not end accepted (`reason`) and who approved or rejected. Only an ACCEPTED order is called binding. `products` supply the names; `approver` is the
+ * the state, why it ended when it did not end accepted (`reason`), who approved or rejected, and for a cancelled order when and why (`cancelled`). Only an ACCEPTED order is called binding. `products` supply the names; `approver` is the
  * mandate approver's name.
  */
-export function renderReceipt(order: Order, drafts: Draft[], decision: Decision, opts: { products: CatalogProduct[]; approver: string; reason?: string }): string {
+export function renderReceipt(order: Order, drafts: Draft[], decision: Decision, opts: { products: CatalogProduct[]; approver: string; reason?: string; cancelled?: { at: string; reason: string | null } }): string {
   const wantedPack = drafts.find((d) => d.packLitres)?.packLitres;
   const packChanged = decision.reasons.some((r) => r.code === 'PACK_SIZE_CHANGED');
   const out = [`Lazydoor receipt ${order.id}`, `State: ${order.state}`];
@@ -44,6 +44,9 @@ export function renderReceipt(order: Order, drafts: Draft[], decision: Decision,
   if (order.state === 'ACCEPTED') {
     out.push(decision.outcome === 'NEEDS_APPROVAL' ? `Approved by ${opts.approver}` : 'Order accepted within the mandate', 'Accepted = binding order, invoiced on delivery (simulated)');
   } else if (order.state === 'HELD') out.push(`Waiting for approval by ${opts.approver}`);
+  else if (order.state === 'CANCELLED') {
+    out.push(`Cancelled ${opts.cancelled?.at ?? ''} by the agent, before Valio's cut-off${opts.cancelled?.reason ? `: ${opts.cancelled.reason}` : ''}`, 'Nothing is delivered or invoiced; the stock went back on sale');
+  }
   else {
     const why = opts.reason && opts.reason in REASONS ? REASONS[opts.reason as ReasonCode].text : null;
     if (why) out.push(`Ended: ${why}`);

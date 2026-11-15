@@ -15,6 +15,7 @@ export type EventType =
   | 'approval.rejected'
   | 'approval.expired'
   | 'order.accepted'
+  | 'order.cancelled'
   | 'stock.denied'
   | 'clock.set';
 
@@ -71,23 +72,32 @@ function covered(e: NewEvent & { seq: number; ts: string }): ChainedFields {
  */
 export async function logEvent(env: Env, e: NewEvent): Promise<number> {
   const ts = helsinkiIso(await now(env));
-  return transaction(env, async (s) => {
-    await s.prepare(`SELECT pg_advisory_xact_lock(${EVENT_LOCK})`).run();
-    const next = (await s
-      .prepare("SELECT nextval(pg_get_serial_sequence('events', 'id')) AS seq, (SELECT hash FROM events ORDER BY id DESC LIMIT 1) AS prev")
-      .first<{ seq: number; prev: string | null }>())!;
-    const event = covered({ ...e, seq: next.seq, ts });
-    const prevHash = next.prev ?? GENESIS;
-    await s
-      .prepare(
-        'INSERT INTO events(id, order_id, buyer_id, draft_id, quote_id, kind, body, at, prev_hash, hash) OVERRIDING SYSTEM VALUE VALUES (?::bigint, ?::text, ?::text, ?::text, ?::text, ?::text, ?::text, ?::text, ?::text, ?::text)',
-      )
-      .bind(event.seq, event.orderId ?? null, event.buyerId, event.draftId ?? null, event.quoteId ?? null, event.type, JSON.stringify(event.data), ts, prevHash, await chainHash(prevHash, event))
-      .run();
-    return event.seq;
-  }).finally(() => {
-    tail.at = 0;
-  });
+  return transaction(env, (s) => appendEvent(s, e, ts)).finally(staleTail);
+}
+
+/** Makes the next read of the shared tail go to the database, so an event just committed is served at once. */
+export function staleTail(): void {
+  tail.at = 0;
+}
+
+/**
+ * Appends one event stamped `ts` inside the caller's transaction `s` (see `logEvent`): takes the event lock, draws the next
+ * seq, reads the previous hash and inserts the event hashed onto it. Lets a caller commit its own writes and their event at once.
+ */
+export async function appendEvent(s: Pick<Db, 'prepare'>, e: NewEvent, ts: string): Promise<number> {
+  await s.prepare(`SELECT pg_advisory_xact_lock(${EVENT_LOCK})`).run();
+  const next = (await s
+    .prepare("SELECT nextval(pg_get_serial_sequence('events', 'id')) AS seq, (SELECT hash FROM events ORDER BY id DESC LIMIT 1) AS prev")
+    .first<{ seq: number; prev: string | null }>())!;
+  const event = covered({ ...e, seq: next.seq, ts });
+  const prevHash = next.prev ?? GENESIS;
+  await s
+    .prepare(
+      'INSERT INTO events(id, order_id, buyer_id, draft_id, quote_id, kind, body, at, prev_hash, hash) OVERRIDING SYSTEM VALUE VALUES (?::bigint, ?::text, ?::text, ?::text, ?::text, ?::text, ?::text, ?::text, ?::text, ?::text)',
+    )
+    .bind(event.seq, event.orderId ?? null, event.buyerId, event.draftId ?? null, event.quoteId ?? null, event.type, JSON.stringify(event.data), ts, prevHash, await chainHash(prevHash, event))
+    .run();
+  return event.seq;
 }
 
 /** How long the shared tail answers reads before the next read refreshes it. */

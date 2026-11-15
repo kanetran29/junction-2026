@@ -52,6 +52,9 @@ export const REASONS = {
   TRY_RATE_LIMITED: r('Try it is limited per visitor, per address and for everyone (free text most, since it uses the shared models); wait retryAfter seconds.', 'recoverable', true),
   MODELS_BUSY: r('Gemini is over its request quota right now; retry after retryAfter seconds (in Try it, the example sentences need no model call).', 'recoverable', true),
   TRANSCRIPT_EMPTY: r('The spoken clip held no clear speech, so nothing was transcribed; record it again or type the request.', 'requires_buyer_input'),
+  ORDER_CUTOFF_PASSED: r("Valio's order cut-off for a line of this order has passed, so it can no longer be cancelled; contact the supplier.", 'requires_buyer_input'),
+  ORDER_NOT_CANCELLABLE: r('Only an accepted or held order can be cancelled; a rejected or expired order never booked anything.', 'requires_buyer_input'),
+  ORDER_WITHDRAWN: r("The agent withdrew this held order before Valio's cut-off, so there is nothing left to approve.", 'requires_buyer_input'),
   QUOTE_SIGNATURE_INVALID: r("The quote signature sent with the order does not verify against the door's key or does not match the offer as quoted.", 'requires_buyer_input'),
 } as const satisfies Record<string, ReasonInfo>;
 

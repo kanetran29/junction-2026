@@ -37,6 +37,8 @@ export function page(title: string, body: string): string {
 /** The stored order columns the pages need beyond the order view. */
 interface Meta {
   buyer_id: string;
+  cancelled_at?: string | null;
+  cancel_reason?: string | null;
   quote_id: string | null;
   basket_id: string | null;
   agent_reason: string | null;
@@ -101,7 +103,7 @@ export async function renderApprovePage(env: Env, token: string, fetchFn: typeof
 <form method="post" action="/approve/${escapeHtml(token)}"><button>Approve</button></form><form method="post" action="/reject/${escapeHtml(token)}"><button class="no">Reject</button></form>
 <script>var el=document.getElementById('left'),t=Date.now()+el.dataset.left*1000;function tick(){var s=Math.max(0,Math.floor((t-Date.now())/1000));el.textContent=Math.floor(s/3600)+'h '+Math.floor(s%3600/60)+'m '+s%60+'s'}tick();setInterval(tick,1000)</script>`;
   } else {
-    const label = order.state === 'HELD' || order.state === 'EXPIRED' ? 'expired' : order.state;
+    const label = order.state === 'CANCELLED' ? "withdrawn by the agent before Valio's cut-off" : order.state === 'HELD' || order.state === 'EXPIRED' ? 'expired' : order.state;
     action = `<p class="state">This approval is ${escapeHtml(label)}${view.reason ? ` (${escapeHtml(view.reason)})` : ''}.</p>`;
   }
   const body = `<h1>Approve order</h1><p class="muted">Order ${escapeHtml(order.id)} · delivery ${escapeHtml(order.deliveryDate ?? '')}</p>
@@ -137,11 +139,11 @@ function resultPage(r: ApproveReply): string {
  * given) belongs to another buyer. Without `buyerId` the order id itself is the capability (the public receipt page).
  */
 export async function receiptText(env: Env, orderId: string, buyerId?: string): Promise<string | null> {
-  const m = await db(env).prepare("SELECT buyer_id, quote_id, basket_id, agent_reason, expires_at FROM orders WHERE id = ?1 AND state <> 'PLACING' AND (?2::text IS NULL OR buyer_id = ?2)").bind(orderId, buyerId ?? null).first<Meta>();
+  const m = await db(env).prepare("SELECT buyer_id, quote_id, basket_id, agent_reason, expires_at, cancelled_at, cancel_reason FROM orders WHERE id = ?1 AND state <> 'PLACING' AND (?2::text IS NULL OR buyer_id = ?2)").bind(orderId, buyerId ?? null).first<Meta>();
   const view: OrderView | null = m && (await getOrder(env, m.buyer_id, orderId));
   if (!m || !view) return null;
   const products = await getProducts(env, view.order.lines.map((l) => l.productId));
-  return renderReceipt(view.order, await draftsOf(env, m), view.decision, { products, approver: view.approval.approver, reason: view.reason });
+  return renderReceipt(view.order, await draftsOf(env, m), view.decision, { products, approver: view.approval.approver, reason: view.reason, ...(m.cancelled_at ? { cancelled: { at: m.cancelled_at, reason: m.cancel_reason ?? null } } : {}) });
 }
 
 /**
