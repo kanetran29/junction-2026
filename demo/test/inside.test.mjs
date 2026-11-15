@@ -132,7 +132,7 @@ test("models page: the section, the grid and the Proof line show from models.jso
     assert.deepEqual(out.rows[1], ["Gemma 4 31BSecond reader", "2/316/18 fields", "n/a", "n/a", "2,310 ms"]);
     assert.equal(out.door, "gemini-3.8-flash");
     assert.deepEqual(out.grid, [["✓", "✓", "✓"], ["✓", "deliveryDate", "deliveryDate, unit"], ["qty", "✓", "error"]]);
-    assert.match(out.proof, /^Same sentence, 3 models: Fixture only/);
+    assert.equal(out.proof, "3 models read the same 3 sentences: the door's reader read 2 exactly, asked the kitchen on 1 and let 0 wrong readings through.");
     assert.ok(out.scroll <= out.client, `page is ${out.scroll} px wide in a ${out.client} px viewport`);
     if (width === 375) await page.locator(".is-models").screenshot({ path: fileURLToPath(new URL("../shots/models-375.png", import.meta.url)) });
     else await page.locator(".is-models").screenshot({ path: fileURLToPath(new URL("../shots/models-desktop.png", import.meta.url)) });

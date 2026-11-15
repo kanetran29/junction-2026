@@ -50,9 +50,10 @@ function scoreboard(data) {
     const tr = el("tr");
     tr.dataset.model = m.model;
     if (m.isDoorReader) tr.dataset.door = "";
-    const name = cell("th", m.label ?? m.model);
+    const label = m.label ?? m.model;
+    const name = cell("th", label);
     name.scope = "row";
-    if (s.role) name.append(el("span", "models-role", s.role));
+    if (s.role && !/reader/i.test(label)) name.append(el("span", "models-role", s.role));
     const exact = el("td");
     exact.append(el("b", "", s.exact), el("span", "models-sub", s.fields));
     tr.append(name, exact, cell("td", s.asked), cell("td", s.unflagged, s.risky ? "models-risky" : ""), cell("td", s.ms, "models-ms"));
@@ -117,6 +118,15 @@ export function modelsNodes(data) {
   if (data.summary) parts.push(el("p", "models-summary", data.summary));
   parts.push(el("p", "models-meta", meta));
   return parts;
+}
+
+/** Proof's one line: how the door's reader did on the same sentences as the other models; null without a door reader. */
+export function proofModelsLine(data) {
+  const m = data.models.find((x) => x.isDoorReader);
+  if (!m) return null;
+  const n = data.sentences ?? data.rows.length;
+  const u = m.wrongUnflagged;
+  return `${data.models.length} models read the same ${n} sentences: the door's reader read ${m.sentencesExact} exactly, asked the kitchen on ${m.asked} and let ${u} wrong ${u === 1 ? "reading" : "readings"} through.`;
 }
 
 /** Loads models.json into `slot` and shows it; resolves to the data, or null (slot stays hidden) when it is missing. */

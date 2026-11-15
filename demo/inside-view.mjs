@@ -5,7 +5,7 @@ import { HERO, FLOW, FLOW_NOTE, FLOW_STILL, GUARDRAILS, GUARD_STILL, BUILT_WITH,
 import { ICONS } from "./icons.mjs";
 import { AC_ID, acChip, acNote, labelAcChips, fillAcceptance, openCase } from "./acceptance-view.mjs";
 import { mountWays } from "./ways.mjs";
-import { mountModels } from "./models-view.mjs";
+import { mountModels, proofModelsLine } from "./models-view.mjs";
 
 /** An element with a class and text. */
 function el(tag, cls = "", text = "") {
@@ -284,7 +284,8 @@ export async function mountInside(root, base, go, proofUrl = "proof.json", model
     .then((data) => proofSlot.replaceWith(proof(data)))
     .catch(() => proofSlot.replaceChildren(el("h2", "", "Proof"), el("p", "muted", "The proof numbers could not be loaded.")));
   const modelsLine = Promise.all([modelsLoad, proofLoad]).then(([data]) => {
-    if (data?.summary) root.querySelector('[data-section="proof"] .numerals')?.after(el("p", "proof-models", `Same sentence, ${data.models.length} models: ${data.summary}`));
+    const line = data && proofModelsLine(data);
+    if (line) root.querySelector('[data-section="proof"] .numerals')?.after(el("p", "proof-models", line));
   });
   await Promise.all([proofLoad, live.run(), acLoad, modelsLine]);
 }
