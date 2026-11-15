@@ -1,7 +1,7 @@
 // Builds the Inside tab from inside.mjs and proof.json with DOM calls only (text, never markup), then fills its four live
 // tiles from the door. Called once when the tab first opens. Each section uses its own layout: a split hero, a flow track,
 // three guardrail clusters, a bento of live tiles, display numerals with the agent-run video, logo groups, a closing split.
-import { HERO, FLOW, FLOW_NOTE, FLOW_STILL, GUARDRAILS, GUARD_STILL, BUILT_WITH, PRODUCTION, CHECKS, COMMANDS, DOOR_URL, REPO_URL, runCheck } from "./inside.mjs";
+import { HERO, FLOW, FLOW_NOTE, FLOW_STILL, GUARDRAILS, GUARD_STILL, BUILT_WITH, PRODUCTION, CHECKS, COMMANDS, DOOR_URL, REPO_URL, PITCH_VIDEO_URL, runCheck } from "./inside.mjs";
 import { ICONS } from "./icons.mjs";
 import { AC_ID, acChip, acNote, labelAcChips, fillAcceptance, openCase } from "./acceptance-view.mjs";
 import { mountWays } from "./ways.mjs";
@@ -179,7 +179,7 @@ const OPTIONAL_LINKS = [
   { path: "/llms.txt", label: "llms.txt" },
 ];
 
-/** Proof: display numerals from proof.json, the agent-run video with its poster, and the pitch link when there is one. */
+/** Proof: display numerals from proof.json, the agent-run video with its poster, and the pitch video on YouTube. */
 function proof(data) {
   const numbers = el("dl", "numerals");
   for (const key of ["acceptance", "scenarios", "tests"]) {
@@ -198,11 +198,9 @@ function proof(data) {
   const figure = el("figure", "agent-figure");
   figure.append(video, el("figcaption", "", data.agentRun.caption));
   const parts = [numbers, figure];
-  if (data.pitchVideo?.url) {
-    const p = el("p", "pitch-link");
-    p.append(link(data.pitchVideo.url, data.pitchVideo.label));
-    parts.push(p);
-  }
+  const p = el("p", "pitch-link");
+  p.append(link(PITCH_VIDEO_URL, "Watch the pitch video on YouTube"));
+  parts.push(p);
   const s = section("proof", "Proof", ...parts);
   s.dataset.loaded = "";
   return s;
