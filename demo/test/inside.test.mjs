@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { HERO, FLOW, GUARDRAILS, BUILT_WITH, CHECKS, COMMANDS, summarize, runCheck } from "../inside.mjs";
@@ -80,7 +80,7 @@ test("inside page: renders every section, loads proof.json, shows each live chec
     optional: [...document.querySelectorAll(".check-links a")].map((a) => a.textContent),
     cors: document.querySelectorAll(".check-cors").length,
   }));
-  assert.equal(out.modelsHidden, true, "no models.json: the models section stays hidden");
+  assert.equal(out.modelsHidden, !existsSync(new URL("../models.json", import.meta.url)), "the models section shows exactly when models.json is there");
   assert.deepEqual([out.optional, out.cors], [["OpenAPI document", "Discovery document"], 0], "api-catalog, llms.txt and CORS show only once the door answers them");
   assert.deepEqual(out.sections, ["hero", "flow", "models", "guardrails", "ways", "checks", "proof", "acceptance", "stack", "production"]);
   assert.equal(out.h1, "Lazy at the order, strict at the border.");

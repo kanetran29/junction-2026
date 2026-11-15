@@ -917,6 +917,55 @@
       ],
       "checks": 26,
       "pass": true
+    },
+    {
+      "id": "AC67",
+      "title": "An agent cancels its order before the cut-off: the stock goes back on sale for another agent, and the signed cancellation record verifies while a tampered copy does not",
+      "rubric": [
+        "controls",
+        "exceptions",
+        "e2e"
+      ],
+      "calls": [
+        "quote",
+        "quote_and_place",
+        "place_order",
+        "cancel_order",
+        "get_order",
+        "get_receipt",
+        "audit_verify"
+      ],
+      "checks": 19
+    },
+    {
+      "id": "AC68",
+      "title": "After Valio's cut-off a cancel is refused with ORDER_CUTOFF_PASSED and the order stands; a held order the agent withdrew cannot be approved",
+      "rubric": [
+        "controls",
+        "exceptions"
+      ],
+      "calls": [
+        "quote",
+        "place_order",
+        "cancel_order",
+        "approve",
+        "set_clock",
+        "get_order",
+        "http_get"
+      ],
+      "checks": 14
+    },
+    {
+      "id": "AC69",
+      "title": "Any agent finds the door: an RFC 9727 API catalog, /llms.txt, and every public read open to a page on another origin",
+      "rubric": [
+        "openness"
+      ],
+      "calls": [
+        "public_read",
+        "mcp_list_tools"
+      ],
+      "checks": 21
     }
   ]
 }

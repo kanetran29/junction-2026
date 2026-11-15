@@ -645,6 +645,7 @@ body.kiosk .connect-panel { display: none; }
 .is-ways .way + .way { margin-top: 40px; }
 .way { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 32px; align-items: start; }
 .way-plain { grid-template-columns: minmax(0, 1fr); }
+.way-code { font: 500 13px/1.5 var(--anatomy-mono); color: var(--ink-dim); overflow-wrap: anywhere; }
 .way-text { display: grid; gap: 12px; justify-items: start; }
 .way-text p { margin: 0; max-width: 52ch; color: var(--ink); }
 .deck-notes p.deck-connect { color: var(--brand-soft); }

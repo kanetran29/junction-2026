@@ -336,6 +336,7 @@ Vấn đề tìm thấy:
 - Proof: thêm một dòng dưới các con số khi `models.json` có, ví dụ với dữ liệu eval thật: "5 models read the same 14 sentences: the door's reader read 12 exactly, asked the kitchen on 3 and let 0 wrong readings through." Đã render thử `models.json` thật (5 model × 14 câu) ở 375 và 1280 px: không cuộn ngang.
 - Compare: không thêm dòng; dòng "Meaning" (hai model đọc, lệch thì hỏi) đã nói ý này.
 - Check it yourself: link "API catalog (RFC 9727)" và "llms.txt" chỉ hiện khi door trả 200; dòng CORS chỉ hiện khi `/.well-known/jwks.json` trả 200 kèm `Access-Control-Allow-Origin`. Lúc 06:55Z cả hai route còn 404.
+- Huỷ đơn có ký (958fc30 của build session): `features.mjs` thêm `cancel` = discovery có `cancellation`. Khi bật: Inside "Use it your way" thêm "Change your mind" (huỷ trước cut-off, stock về lại, door ký bản huỷ; route và tool MCP), Compare thêm dòng "Changing your mind" (AC67, AC68). Try it không có nút huỷ: route cần Bearer key, không nhận `X-Visitor-Token`. `acceptance.json` tạo lại: 69 case, lần chạy 66/66, AC67 đến AC69 ghi "not in that run yet".
 - Test: fixture `demo/test/models.fixture.json` (cùng shape với eval, ghi rõ "Fixture only"); test đơn vị và Playwright ở 375 px và 1280 px.
 
 ## Còn lại / cần làm sau
