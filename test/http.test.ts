@@ -316,3 +316,19 @@ describe('/openapi.json', () => {
     expect(doc.paths['/v1/quotes'].post.requestBody.content['application/json'].schema).toBeDefined();
   });
 });
+
+describe('feature flags', () => {
+  it('default off, switch with the admin key, and stay across a reset', async () => {
+    const { featureOn } = await import('../src/clock');
+    await db(e).prepare("DELETE FROM settings WHERE key LIKE 'feature_%'").run();
+    expect(await featureOn(e, 'peppol')).toBe(false);
+    expect((await call('/admin/feature', { body: { name: 'peppol', enabled: true } })).status).toBe(401);
+    expect(await json(await call('/admin/feature', { key: 'adm', body: { name: 'peppol', enabled: true } }))).toEqual({ peppol: true });
+    expect(await featureOn(e, 'peppol')).toBe(true);
+    await reset();
+    expect(await featureOn(e, 'peppol')).toBe(true);
+    expect((await call('/admin/feature', { key: 'adm', body: { name: 'nope', enabled: true } })).status).toBe(400);
+    await call('/admin/feature', { key: 'adm', body: { name: 'peppol', enabled: false } });
+    expect(await featureOn(e, 'peppol')).toBe(false);
+  });
+});

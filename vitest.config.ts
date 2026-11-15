@@ -15,7 +15,8 @@ export default defineConfig(async () => {
     plugins: [
       cloudflareTest({
         wrangler: { configPath: './wrangler.jsonc' },
-        miniflare: { bindings: { TEST_MIGRATIONS: migrations, DOOR_SIGNING_JWK: doorKey } },
+        // TEST_PG_URL points a worktree's tests at its own database, so parallel runs never wipe each other's tables
+        miniflare: { bindings: { TEST_MIGRATIONS: migrations, DOOR_SIGNING_JWK: doorKey }, ...(process.env.TEST_PG_URL ? { hyperdrives: { HYPERDRIVE: process.env.TEST_PG_URL } } : {}) },
       }),
     ],
     test: {

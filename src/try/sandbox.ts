@@ -3,7 +3,7 @@ import { db } from '../db';
 import { DEFAULT_MANDATE_EXP, SANDBOX_BUYER_PREFIX } from '../domain/constants';
 import { REASONS, type ReasonCode } from '../domain/reasons';
 import type { Env } from '../env';
-import { HttpError, countUse, identify } from '../http/auth';
+import { HttpError, countUse, isAgentCaller } from '../http/auth';
 import { InterpretError, confirmDraft, interpret, type InterpretedDraft, type Readings } from '../interpret/gemini';
 import { seedMandate } from '../mandate/jws';
 import { approve, getOrder, placeOrder, reject, type OrderView } from '../orders/store';
@@ -32,7 +32,7 @@ export const TRY_APPROVER = 'You (kitchen manager)';
 export const TRY_AGENT_REASON = 'Try it: cheapest covering offer';
 
 /** A sandbox kitchen's signed rules: the demo kitchen's limits (500 € an order and 1,500 € a day automatically), the visitor as approver. */
-const SANDBOX_MANDATE = { perOrder: { autoCents: 50_000, hardCents: 500_000 }, perDay: { autoCents: 150_000, hardCents: 1_000_000 }, approver: { name: TRY_APPROVER }, exp: DEFAULT_MANDATE_EXP };
+export const SANDBOX_MANDATE = { perOrder: { autoCents: 50_000, hardCents: 500_000 }, perDay: { autoCents: 150_000, hardCents: 1_000_000 }, approver: { name: TRY_APPROVER }, exp: DEFAULT_MANDATE_EXP };
 
 /** A new request (`text`), or the answer to a question about a stored draft (`visitor`, `draftId`, `answer`). */
 export interface TryRequest {
@@ -91,17 +91,19 @@ export function addressBucket(ip: string): string {
 }
 
 /** Counts one call in a rate bucket and refuses it with 429 TRY_RATE_LIMITED (and the seconds to the next minute) past `max`. */
-async function limit(env: Env, bucket: string, max: number, detail: string): Promise<void> {
+export async function limit(env: Env, bucket: string, max: number, detail: string): Promise<void> {
   if ((await countUse(env, bucket)) > max) throw new HttpError(429, 'TRY_RATE_LIMITED', detail, untilNextMinute());
 }
 
 /** The flood guard for a client address: 60 calls a minute. */
-const limitAddress = (env: Env, address: string) => limit(env, `try-address:${addressBucket(address)}`, TRY_PER_ADDRESS_PER_MINUTE, `at most ${TRY_PER_ADDRESS_PER_MINUTE} Try it calls a minute from one address`);
+export const limitAddress = (env: Env, address: string) => limit(env, `try-address:${addressBucket(address)}`, TRY_PER_ADDRESS_PER_MINUTE, `at most ${TRY_PER_ADDRESS_PER_MINUTE} Try it calls a minute from one address`);
 /** The per-person limit, keyed on the visitor token: 3 calls a minute. */
-const limitVisitor = (env: Env, visitor: string) => limit(env, `try-visitor:${visitor}`, TRY_PER_VISITOR_PER_MINUTE, `at most ${TRY_PER_VISITOR_PER_MINUTE} Try it calls a minute for this visitor`);
+export const limitVisitor = (env: Env, visitor: string) => limit(env, `try-visitor:${visitor}`, TRY_PER_VISITOR_PER_MINUTE, `at most ${TRY_PER_VISITOR_PER_MINUTE} Try it calls a minute for this visitor`);
+/** The shared model budget (Try it free text, voice clips and connector sandboxes' interpret calls): 6 a minute for everyone. */
+export const limitFreeText = (env: Env) => limit(env, 'try-free-text', TRY_FREE_TEXT_PER_MINUTE, `the models are shared: at most ${TRY_FREE_TEXT_PER_MINUTE} free-text tries a minute for everyone; pick one of the example sentences, they need no model call`);
 
-/** The tables a sandbox's buyer id appears in, children first (events stay: removing them would break the hash chain). */
-const SANDBOX_TABLES = ['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'mandates', 'buyer_keys', 'try_visitors'];
+/** The tables a sandbox's buyer id appears in, children first, connector keys and tokens included (events stay: removing them would break the hash chain). */
+const SANDBOX_TABLES = ['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'mandates', 'buyer_keys', 'approver_keys', 'oauth_codes', 'oauth_tokens', 'try_visitors'];
 
 /** Removes a sandbox kitchen and everything it ordered, quoted and drafted (its events stay in the chain). */
 async function closeSandbox(env: Env, buyerId: string): Promise<void> {
@@ -115,7 +117,7 @@ async function closeSandbox(env: Env, buyerId: string): Promise<void> {
  * batch under the write lock it first makes room, removing with all their rows the sandboxes idle for 20 minutes, then the
  * least recently used ones past 500 in all or past 200 for this address, so a new visitor is never turned away.
  */
-async function openSandbox(env: Env, address: string): Promise<{ visitor: string; buyerId: string }> {
+export async function openSandbox(env: Env, address: string): Promise<{ visitor: string; buyerId: string }> {
   const visitor = b64u(crypto.getRandomValues(new Uint8Array(24)));
   const buyerId = `${SANDBOX_BUYER_PREFIX}${[...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
   const addressHash = await sha256Hex(`try-address:${addressBucket(address)}`);
@@ -132,7 +134,7 @@ async function openSandbox(env: Env, address: string): Promise<{ visitor: string
 }
 
 /** The sandbox buyer of a visitor token (and marks it used now); an unknown one (a reset, 20 idle minutes, or recycled) is 404 VISITOR_UNKNOWN. */
-async function sandboxOf(env: Env, visitor: string): Promise<string> {
+export async function sandboxOf(env: Env, visitor: string): Promise<string> {
   const row = await db(env).prepare('UPDATE try_visitors SET last_used = ?2::bigint WHERE token_hash = ?1 RETURNING buyer_id').bind(await sha256Hex(visitor), Date.now()).first<{ buyer_id: string }>();
   if (!row) throw new HttpError(404, 'VISITOR_UNKNOWN', 'no such visitor: sandboxes end at a demo reset, after 20 idle minutes or when recycled, so start again without one');
   return row.buyer_id;
@@ -183,7 +185,7 @@ export async function tryIt(env: Env, req: TryRequest, address: string, fetchFn:
   const words = req.answer && 'text' in req.answer;
   const recorded = req.draftId ? undefined : RECORDED[req.text!];
   if ((!req.draftId && !recorded) || words) {
-    await limit(env, 'try-free-text', TRY_FREE_TEXT_PER_MINUTE, `the models are shared: at most ${TRY_FREE_TEXT_PER_MINUTE} free-text tries a minute for everyone; pick one of the example sentences, they need no model call`);
+    await limitFreeText(env);
   }
   const { visitor, buyerId } = req.visitor && known ? { visitor: req.visitor, buyerId: known } : await openSandbox(env, address);
   try {
@@ -222,7 +224,7 @@ async function step(env: Env, req: TryRequest, visitor: string, buyerId: string,
 
 /**
  * The visitor decides a HELD order of their own sandbox through the normal approval path (re-check included: the cut-off,
- * Valio's stock and price, the token's lines binding). An agent or judge key is 403 AGENT_CANNOT_APPROVE; a token that is not
+ * Valio's stock and price, the token's lines binding). An agent or judge key, or a connector token, is 403 AGENT_CANNOT_APPROVE; a token that is not
  * on one of this sandbox's orders is 404 TOKEN_UNKNOWN, whoever's order it is.
  */
 export async function tryDecision(
@@ -231,8 +233,7 @@ export async function tryDecision(
   ctx: { address: string; authorization: string | undefined },
   fetchFn: typeof fetch,
 ): Promise<{ order: { orderId: string; state: string; reasons: ShownReason[] } }> {
-  const who = await identify(env, ctx.authorization);
-  if (who?.role === 'agent' || who?.role === 'judge') throw new HttpError(403, 'AGENT_CANNOT_APPROVE', 'an agent key can never approve or reject an order');
+  if (await isAgentCaller(env, ctx.authorization)) throw new HttpError(403, 'AGENT_CANNOT_APPROVE', 'an agent key can never approve or reject an order');
   await limitAddress(env, ctx.address);
   await limitVisitor(env, req.visitor);
   const buyerId = await sandboxOf(env, req.visitor);

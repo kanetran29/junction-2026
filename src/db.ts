@@ -63,10 +63,15 @@ CREATE INDEX IF NOT EXISTS idx_events_buyer ON events(buyer_id, id);
 CREATE TABLE IF NOT EXISTS rate_limits (key_hash TEXT NOT NULL, minute INTEGER NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (key_hash, minute));
 CREATE TABLE IF NOT EXISTS try_visitors (token_hash TEXT PRIMARY KEY, buyer_id TEXT NOT NULL UNIQUE, address_hash TEXT, created_at TEXT NOT NULL, last_used BIGINT);
 ALTER TABLE try_visitors ADD COLUMN IF NOT EXISTS address_hash TEXT, ADD COLUMN IF NOT EXISTS last_used BIGINT;
+CREATE TABLE IF NOT EXISTS oauth_clients (client_id TEXT PRIMARY KEY, client_name TEXT NOT NULL, redirect_uris TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS oauth_requests (id_hash TEXT PRIMARY KEY, csrf_hash TEXT NOT NULL, client_id TEXT NOT NULL, client_name TEXT NOT NULL, redirect_uri TEXT NOT NULL, code_challenge TEXT NOT NULL, state TEXT, expires_ms BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS oauth_codes (code_hash TEXT PRIMARY KEY, client_id TEXT NOT NULL, redirect_uri TEXT NOT NULL, code_challenge TEXT NOT NULL, buyer_id TEXT NOT NULL, expires_ms BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS oauth_tokens (token_hash TEXT PRIMARY KEY, kind TEXT NOT NULL, client_id TEXT NOT NULL, buyer_id TEXT NOT NULL, expires_ms BIGINT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_buyer ON oauth_tokens(buyer_id);
 `;
 
 /** Every table in SCHEMA, in an order that deletes children first. */
-export const TABLES = ['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'try_visitors', 'mandates', 'buyer_keys', 'api_keys', 'settings'];
+export const TABLES = ['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'oauth_tokens', 'oauth_codes', 'oauth_requests', 'oauth_clients', 'try_visitors', 'mandates', 'buyer_keys', 'api_keys', 'settings'];
 
 /** The advisory lock every batch takes: writes that must not interleave (the stock ledger above all) run one at a time. */
 const WRITE_LOCK = 1;

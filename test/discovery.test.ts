@@ -4,7 +4,7 @@ import type { Env } from '../src/env';
 import { createApp } from '../src/http/routes';
 import { mcpRoutes } from '../src/mcp/tools';
 
-const e = { ...(env as unknown as Env), DEMO_MODE: '1', ADMIN_KEY: 'adm' };
+const e = { ...(env as unknown as Env), DEMO_MODE: '1', ADMIN_KEY: 'adm', DEMO_OPENS_AT: '2000-01-01T00:00:00Z' };
 const app = createApp(async () => {
   throw new Error('discovery makes no outside call');
 });
@@ -42,7 +42,7 @@ describe('/.well-known/agent-gateway.json', () => {
     const urls = ownUrls(await (await get('/.well-known/agent-gateway.json')).json());
     expect(urls.length).toBeGreaterThanOrEqual(9);
     for (const url of urls) {
-      const post = /\/v1\/try(\/decision)?$/.test(url);
+      const post = /\/v1\/try(\/decision|\/voice)?$/.test(url);
       const r = await app.request(url, post ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' } : {}, e);
       expect([url, r.status === 404]).toEqual([url, false]);
       await r.body?.cancel();

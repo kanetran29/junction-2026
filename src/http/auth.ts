@@ -31,7 +31,7 @@ export function bearerOf(header: string | undefined): string | null {
 }
 
 /** Compares two secrets in constant time by comparing their fixed-length sha256 digests. */
-async function sameSecret(a: string, b: string): Promise<boolean> {
+export async function sameSecret(a: string, b: string): Promise<boolean> {
   const enc = new TextEncoder();
   const [da, db] = await Promise.all([crypto.subtle.digest('SHA-256', enc.encode(a)), crypto.subtle.digest('SHA-256', enc.encode(b))]);
   return crypto.subtle.timingSafeEqual(da, db);
@@ -49,6 +49,17 @@ export async function identify(env: Env, header: string | undefined): Promise<Ca
   return row ? { role: row.role, buyerId: row.buyer_id } : null;
 }
 
+/**
+ * True when the Authorization header carries an agent or judge key, or any connector (OAuth) token, live or not: such a caller
+ * orders but can never approve or reject.
+ */
+export async function isAgentCaller(env: Env, header: string | undefined): Promise<boolean> {
+  const who = await identify(env, header);
+  if (who) return who.role === 'agent' || who.role === 'judge';
+  const token = bearerOf(header);
+  return Boolean(token && (await db(env).prepare('SELECT 1 AS one FROM oauth_tokens WHERE token_hash = ?').bind(await sha256Hex(token)).first()));
+}
+
 /** The context key under which `authenticate` stores the resolved caller. */
 const CALLER = 'caller';
 
@@ -63,11 +74,14 @@ export function keylessDemo(env: Env, header: string | undefined): boolean {
 /**
  * Structural auth for `/v1/*`: resolves the caller from the bearer key before any validation (no key or an unknown one is
  * 401) and keeps it in the request context for `requireBuyer`; the public `exempt` paths skip it, and the `demoOpen` paths
- * skip it for a keyless request on a demo door (their handler then reads every buyer, read-only).
+ * skip it for a keyless request on a demo door (their handler then reads every buyer, read-only). A path matching
+ * `visitorPath` also skips it, but only for a request that sends `X-Visitor-Token` and no Authorization header; its handler
+ * then resolves the visitor's own sandbox and nothing else.
  */
-export function authenticate(exempt: string[], demoOpen: string[]): MiddlewareHandler<{ Bindings: Env }> {
+export function authenticate(exempt: string[], demoOpen: string[], visitorPath?: RegExp): MiddlewareHandler<{ Bindings: Env }> {
   return async (c, next) => {
-    const open = exempt.includes(c.req.path) || (demoOpen.includes(c.req.path) && keylessDemo(c.env, c.req.header('Authorization')));
+    const visitor = visitorPath?.test(c.req.path) === true && c.req.header('X-Visitor-Token') !== undefined && c.req.header('Authorization') === undefined;
+    const open = exempt.includes(c.req.path) || visitor || (demoOpen.includes(c.req.path) && keylessDemo(c.env, c.req.header('Authorization')));
     if (!open) {
       const who = await identify(c.env, c.req.header('Authorization'));
       if (!who) throw new HttpError(401, 'UNAUTHORIZED', 'a valid Bearer API key is required');

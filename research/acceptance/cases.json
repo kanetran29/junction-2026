@@ -1438,6 +1438,45 @@
         {"call": "try", "input": {"text": "20 litres of lactose-free milk"}, "expect": [["step", "=", "needs_input"], ["question.field", "=", "deliverBy"], ["question.text", "=", "When should it arrive?"]]},
         {"call": "try", "input": {"answer": {"text": "by Tuesday"}}, "expect": [["draft.deliverBy", "=", "2026-11-17"], ["draft.quantity.value", "=", 20], ["step", "=", "decided"], ["order.state", "=", "ACCEPTED"]]}
       ]
+    },
+    {
+      "id": "AC64",
+      "tier": 1,
+      "title": "Peppol BIS Order 3.0 export of an accepted order; a held one is refused",
+      "rubric": ["trust 20", "e2e 30"],
+      "steps": [
+        {"call": "quote", "input": {"draft": {"category": "10400", "claims": ["FREE_FROM_LACTOSE"], "quantity": {"value": 20, "unit": "l"}, "deliverBy": "2026-11-16"}}, "expect": [["offers[0].lines[0].productId", "=", "464306"]]},
+        {"call": "place_order", "input": {"offer": 0, "agentReason": "Cheapest lactose-free milk by Monday."}, "expect": [["state", "=", "ACCEPTED"]]},
+        {"call": "peppol_export", "input": {}, "expect": [["httpStatus", "=", 200], ["contentType", "matches", "^application/xml"], ["text", "contains", "<cbc:CustomizationID>urn:fdc:peppol.eu:poacc:trns:order:3</cbc:CustomizationID>"], ["text", "contains", "<cbc:ProfileID>urn:fdc:peppol.eu:poacc:bis:ordering:3</cbc:ProfileID>"], ["text", "contains", "464306"]]},
+        {"call": "quote", "input": {"draft": {"category": "10400", "claims": ["FREE_FROM_LACTOSE"], "quantity": {"value": 1000, "unit": "l"}, "deliverBy": "2026-11-16"}}, "expect": [["offers[0].lines[0].salesUnits", "=", 1000]]},
+        {"call": "place_order", "input": {"offer": 0, "agentReason": "Cheapest lactose-free milk by Monday."}, "expect": [["state", "=", "HELD"]]},
+        {"call": "peppol_export", "input": {}, "expect": [["httpStatus", "=", 409], ["error", "=", "ORDER_NOT_ACCEPTED"]]}
+      ]
+    },
+    {
+      "id": "AC65",
+      "tier": 1,
+      "title": "Voice in Try it: a spoken request comes back as text only; a non-audio body is refused",
+      "rubric": ["need 20", "e2e 30"],
+      "steps": [
+        {"call": "try_voice", "input": {"clip": "fixtures/voice-order.wav", "type": "audio/wav"}, "expect": [["httpStatus", "=", 200], ["transcript", "matches", "[Ll]actose"], ["transcript", "matches", "[Mm]ilk"]]},
+        {"call": "try_voice", "input": {"text": "not audio", "type": "text/plain"}, "expect": [["httpStatus", "=", 415], ["error", "=", "UNSUPPORTED_MEDIA_TYPE"]]}
+      ]
+    },
+    {
+      "id": "AC66",
+      "tier": 1,
+      "title": "Claude connector: OAuth 2.1 with PKCE opens a sandbox kitchen; the agent orders over /mcp and can never approve",
+      "rubric": ["trust 20", "e2e 30"],
+      "steps": [
+        {"call": "connector_connect", "input": {}, "expect": [["registered", "=", 201], ["consentPage", "=", 200], ["consentShowsLimit", "=", true], ["consentNotFramable", "=", true], ["allowed", "=", 200], ["kitchenLink", "=", true], ["backState", "=", "acc"], ["backIssIsDoor", "=", true], ["tokenStatus", "=", 200], ["tokenType", "=", "Bearer"], ["expiresIn", "=", 3600], ["scope", "=", "agent"], ["refresh", "=", true]]},
+        {"call": "connector_tools", "input": {}, "expect": [["httpStatus", "=", 200], ["tools[*].name", "contains", "place_order"]]},
+        {"call": "connector_order", "input": {"draft": {"category": "10400", "claims": ["FREE_FROM_LACTOSE"], "quantity": {"value": 1000, "unit": "l"}, "deliverBy": "2026-11-16"}, "agentReason": "Connector: cheapest lactose-free milk by Monday."}, "expect": [["state", "=", "HELD"], ["approval.approver", "=", "You (kitchen manager)"], ["carriesApprovalLink", "=", false]]},
+        {"call": "connector_kitchen", "input": {}, "expect": [["httpStatus", "=", 200], ["approver", "=", "You (kitchen manager)"], ["listsTheOrder", "=", true]]},
+        {"call": "connector_approve", "input": {"asConnector": true}, "expect": [["httpStatus", "=", 403], ["error", "=", "AGENT_CANNOT_APPROVE"]]},
+        {"call": "connector_rest", "input": {}, "expect": [["httpStatus", "=", 401]]},
+        {"call": "connector_approve", "input": {"asConnector": false}, "expect": [["httpStatus", "=", 200], ["state", "=", "ACCEPTED"]]}
+      ]
     }
   ],
   "decisions": {
@@ -1452,6 +1491,7 @@
     "Signing and audit steps (AC50-AC55): verify_offer_jws ({offer:i}) and verify_receipt_jws check a door JWS with only /.well-known/jwks.json; place_order_with_jws ({offer:i, tamper?:\"price\"}) sends the offer JWS back, optionally with a changed price; audit_verify checks /v1/audit/verify and its signed head; all_events reads every buyer's events with the admin key; tamper_and_verify calls /admin/tamper then verify; reset_and_verify resets with the case state and verifies the fresh chain.",
     "AC61-AC62: admin_try ({enabled}) switches Try it with the admin key; an example sentence comes from recorded readings (draft.cached).",
     "Try it steps (AC56-AC60): try ({text} for a new request with the case's visitor, or {answer}); try_other_visitor opens a second sandbox; try_raw posts the body as given; try_decision ({decision, visitor?: \"other\"}) uses the first visitor's approval token; try_decision_as_agent sends the agent key. All Try it calls are keyless; each case resets, which clears the Try it rate counters.",
+    "Feature steps (AC64-AC66, each needs its flag on): peppol_export reads the latest order as Peppol XML ({httpStatus, contentType, text}); try_voice posts fixtures/<clip> (or text) with the given Content-Type to /v1/try/voice; connector_connect runs register, consent (as the person) and the PKCE code exchange; connector_tools, connector_order ({draft}) call /mcp with the connector token; connector_kitchen reads the kitchen link; connector_approve ({asConnector}) posts the held approval with or without the token; connector_rest calls /v1 with it.",
     "A case whose steps call `interpret` needs a live model: when GET /health reports models.gemini = false, the runner marks it BLOCKED_ON_GEMINI instead of running it."
   ]
 }

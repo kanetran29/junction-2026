@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { helsinkiIso, normaliseClock, now, setClock } from '../clock';
+import { FEATURES, helsinkiIso, normaliseClock, now, setClock } from '../clock';
 import { DEFAULT_MANDATE_EXP } from '../domain/constants';
 import type { Env } from '../env';
 import { EVENT_LOCK, logEvent } from '../events/log';
@@ -26,7 +26,7 @@ const ResetBody = z.object({
 });
 
 /** A random API key with a readable prefix (`ld_` agent, `ap_` approver, `jd_` judge); only its sha256 is stored. */
-function newKey(prefix: string): string {
+export function newKey(prefix: string): string {
   return `${prefix}_${[...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
@@ -87,7 +87,7 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
     await ensureSchema(env);
     const s = db(env);
     // the event lock too, so an event being appended right now cannot land on top of the wiped chain
-    await s.batch([s.prepare(`SELECT pg_advisory_xact_lock(${EVENT_LOCK})`), ...['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'try_visitors', 'mandates', 'buyer_keys'].map((t) => s.prepare(`DELETE FROM ${t}`)), s.prepare("DELETE FROM api_keys WHERE role <> 'judge'")]);
+    await s.batch([s.prepare(`SELECT pg_advisory_xact_lock(${EVENT_LOCK})`), ...['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'oauth_tokens', 'oauth_codes', 'oauth_requests', 'try_visitors', 'mandates', 'buyer_keys'].map((t) => s.prepare(`DELETE FROM ${t}`)), s.prepare("DELETE FROM api_keys WHERE role <> 'judge'")]);
     await setClock(env, b.clock ?? null);
     await setSetting(env, 'replay', b.replay ? '1' : null);
     await setSetting(env, 'recording', b.replay ?? null);
@@ -136,6 +136,22 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
       .first<{ id: number }>();
     if (!row) throw new HttpError(404, 'EVENT_NOT_FOUND', 'no such event');
     return c.json({ tampered: row.id });
+  });
+
+  /** Switches one feature (`connector`, `voice`, `peppol`) on or off; features default off and stay as set across resets. */
+  admin.post('/admin/feature', async (c) => {
+    const parsed = z.object({ name: z.enum(FEATURES), enabled: z.boolean() }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) throw parsed.error;
+    await setSetting(c.env, `feature_${parsed.data.name}`, parsed.data.enabled ? '1' : null);
+    return c.json({ [parsed.data.name]: parsed.data.enabled });
+  });
+
+  /** Opens `/demo` before its open time (or hides it again until then); kept across resets. */
+  admin.post('/admin/demo-open', async (c) => {
+    const parsed = z.object({ open: z.boolean() }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) throw parsed.error;
+    await setSetting(c.env, 'demo_open', parsed.data.open ? '1' : null);
+    return c.json({ demoOpen: parsed.data.open });
   });
 
   /** Switches Try it on or off at once (off: both Try it routes answer 404, so the demo page hides the panel); a reset switches it on. */

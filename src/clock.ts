@@ -11,6 +11,15 @@ export async function getSetting(env: Env, key: string): Promise<string | null> 
   return row?.value ?? null;
 }
 
+/** The features that ship switched off and are switched on with the admin key once verified live. */
+export const FEATURES = ['connector', 'voice', 'peppol'] as const;
+export type Feature = (typeof FEATURES)[number];
+
+/** True when a feature was switched on with `/admin/feature` (settings key `feature_<name>`); every feature defaults off. */
+export async function featureOn(env: Env, name: Feature): Promise<boolean> {
+  return (await getSetting(env, `feature_${name}`)) === '1';
+}
+
 /**
  * The gateway's current time: the stored override when DEMO_MODE is "1" and one is set, else real time.
  * Every cutoff, expiry and replay decision reads this, so demos can run on a scripted clock.

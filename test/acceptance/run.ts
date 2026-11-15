@@ -25,6 +25,11 @@ type Ctx = {
   /** Try it: the last reply of this case's visitor, and of a second visitor. */
   tryReply?: Json;
   otherTry?: Json;
+  /** The connector: its access token, the person's kitchen link, the order placed over /mcp and its approval path. */
+  oauthToken?: string;
+  kitchen?: string;
+  connectorOrder?: string;
+  connectorApproval?: string;
 };
 type Handler = (ctx: Ctx, step: Step, buyer: string, given: Json) => Promise<Json>;
 
@@ -152,6 +157,55 @@ async function approve(ctx: Ctx, buyer: string, asAgent: boolean): Promise<Json>
 function rpcResult(text: string): Json {
   const data = text.trimStart().startsWith('{') ? text : text.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5)).join('');
   return JSON.parse(data).result;
+}
+
+/** Unpadded base64url of bytes (the PKCE verifier and challenge). */
+const b64u = (b: Uint8Array) => Buffer.from(b).toString('base64url');
+
+/**
+ * The connector's OAuth flow as Claude runs it: register a client, open the consent page with PKCE S256, allow it as the
+ * person (cookie and form CSRF), exchange the code. Keeps the access token and the kitchen link; returns statuses only.
+ */
+async function connectorConnect(ctx: Ctx): Promise<Json> {
+  const redirect = 'https://claude.ai/api/mcp/auth_callback';
+  const reg = await http('/oauth/register', { body: { client_name: 'Acceptance (as Claude)', redirect_uris: [redirect] } });
+  const verifier = b64u(webcrypto.getRandomValues(new Uint8Array(32)));
+  const challenge = b64u(new Uint8Array(await webcrypto.subtle.digest('SHA-256', Buffer.from(verifier))));
+  const page = await fetch(`${GATEWAY}/oauth/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.client_id ?? '', redirect_uri: redirect, code_challenge: challenge, code_challenge_method: 'S256', state: 'acc', resource: `${GATEWAY}/mcp` })}`);
+  const html = await page.text();
+  const field = (n: string) => new RegExp(`name="${n}" value="([^"]+)"`).exec(html)?.[1] ?? '';
+  const done = await fetch(`${GATEWAY}/oauth/authorize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Cookie: (page.headers.get('set-cookie') ?? '').split(';')[0] },
+    body: new URLSearchParams({ request: field('request'), csrf: field('csrf'), decision: 'allow' }),
+  });
+  const ready = await done.text();
+  const back = new URL((/href="(https:\/\/claude\.ai[^"]+)"/.exec(ready)?.[1] ?? 'https://x.invalid/').replaceAll('&amp;', '&'));
+  ctx.kitchen = /href="(\/approver\/[^"]+)"/.exec(ready)?.[1];
+  const t = await http('/oauth/token', { body: { grant_type: 'authorization_code', code: back.searchParams.get('code'), redirect_uri: redirect, client_id: reg.client_id, code_verifier: verifier, resource: `${GATEWAY}/mcp` } });
+  ctx.oauthToken = t.access_token;
+  return {
+    registered: reg.httpStatus,
+    consentPage: page.status,
+    consentShowsLimit: html.includes('500 €'),
+    consentNotFramable: (page.headers.get('content-security-policy') ?? '').includes("frame-ancestors 'none'"),
+    allowed: done.status,
+    kitchenLink: Boolean(ctx.kitchen),
+    backState: back.searchParams.get('state'),
+    backIssIsDoor: back.searchParams.get('iss') === GATEWAY,
+    tokenStatus: t.httpStatus,
+    tokenType: t.token_type,
+    expiresIn: t.expires_in,
+    scope: t.scope,
+    refresh: Boolean(t.refresh_token),
+  };
+}
+
+/** One JSON-RPC call to the stateless /mcp with the connector token; the result and the raw reply text. */
+async function connectorRpc(ctx: Ctx, method: string, params?: Json): Promise<{ httpStatus: number; text: string; result?: Json }> {
+  const res = await fetch(`${GATEWAY}/mcp`, { method: 'POST', headers: { ...bearer(ctx.oauthToken), 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
+  const text = await res.text();
+  return { httpStatus: res.status, text, result: res.status < 400 ? rpcResult(text) : undefined };
 }
 
 /** Lists the MCP server's tools over streamable HTTP: initialize, initialized, tools/list. */
@@ -285,6 +339,34 @@ const handlers: Record<string, Handler> = {
     return { ...(await auditVerify()), firstPrevHash: events[0]?.prevHash };
   },
   mcp_list_tools: (ctx, _step, buyer) => mcpTools(ctx, buyer),
+  peppol_export: async (ctx, _step, buyer) => {
+    const res = await fetch(`${GATEWAY}/v1/orders/${ctx.lastOrderId[buyer]}/peppol`, { headers: bearer(ctx.agentKeys[buyer]) });
+    const text = await res.text();
+    return { httpStatus: res.status, contentType: res.headers.get('Content-Type'), text, ...(text.startsWith('{') ? JSON.parse(text) : {}) };
+  },
+  try_voice: async (_ctx, step) => {
+    const res = await fetch(`${GATEWAY}/v1/try/voice`, { method: 'POST', headers: { 'Content-Type': step.input.type }, body: step.input.clip ? readFileSync(join(DIR, step.input.clip)) : (step.input.text ?? '') });
+    return { httpStatus: res.status, ...((await res.json().catch(() => ({}))) as Json) };
+  },
+  connector_connect: (ctx) => connectorConnect(ctx),
+  connector_tools: async (ctx) => {
+    const r = await connectorRpc(ctx, 'tools/list');
+    return { httpStatus: r.httpStatus, tools: r.result?.tools };
+  },
+  connector_order: async (ctx, step) => {
+    const q = (await connectorRpc(ctx, 'tools/call', { name: 'get_quote', arguments: { draft: step.input.draft } })).result?.structuredContent;
+    const r = await connectorRpc(ctx, 'tools/call', { name: 'place_order', arguments: { quoteId: q?.id, offerId: q?.offers?.[0]?.offerId, quoteJws: q?.offers?.[0]?.jws, idempotencyKey: randomUUID(), agentReason: step.input.agentReason } });
+    ctx.connectorOrder = r.result?.structuredContent?.orderId;
+    return { httpStatus: r.httpStatus, ...r.result?.structuredContent, carriesApprovalLink: /approve\/|approval_token|"token"/.test(r.text) };
+  },
+  connector_kitchen: async (ctx) => {
+    const inbox = await http(ctx.kitchen ?? '/approver/none', { headers: { Accept: 'application/json' } });
+    const hit = (inbox.pending ?? []).find((p: Json) => p.orderId === ctx.connectorOrder);
+    ctx.connectorApproval = hit ? new URL(hit.url).pathname : undefined;
+    return { httpStatus: inbox.httpStatus, approver: inbox.approver, listsTheOrder: Boolean(hit) };
+  },
+  connector_approve: (ctx, step) => http(ctx.connectorApproval ?? '/approve/none', { method: 'POST', headers: { Accept: 'application/json', ...(step.input.asConnector ? bearer(ctx.oauthToken) : {}) } }),
+  connector_rest: (ctx) => http(`/v1/orders/${ctx.connectorOrder}`, { key: ctx.oauthToken }),
 };
 
 /** The reset body for a case: `defaults` plus the case `given`, only the fields `/admin/reset` reads. */
