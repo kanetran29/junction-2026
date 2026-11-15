@@ -21,9 +21,10 @@ function runCase(run, id) {
 
 /**
  * Whether case `id` passed in `run`: from its per-case results when the run lists them (an array of { id, ok|pass|passed }
- * or an { id: boolean } map), else true for every case when the whole run passed; null when unknown.
+ * or an { id: boolean } map), else true for every case when the whole run covered all `count` cases and passed; null when
+ * unknown.
  */
-function passedIn(run, id) {
+function passedIn(run, id, count) {
   if (!run) return null;
   const results = run.results ?? run.cases;
   if (Array.isArray(results)) {
@@ -32,14 +33,14 @@ function passedIn(run, id) {
     return typeof v === "boolean" ? v : null;
   }
   if (results && typeof results === "object" && typeof results[id] === "boolean") return results[id];
-  return Number.isFinite(run.passed) && Number.isFinite(run.total) && run.passed === run.total ? true : null;
+  return Number.isFinite(run.passed) && run.total === count && run.passed === run.total ? true : null;
 }
 
 /** The public summary of the acceptance cases in `source` (cases.json), with the run's numbers when `run` is given. */
 export function buildAcceptance(source, run = null) {
   const cases = source.cases.map((c) => {
     const steps = c.steps ?? [];
-    const pass = passedIn(run, c.id);
+    const pass = passedIn(run, c.id, source.cases.length);
     return {
       id: c.id,
       title: c.title,

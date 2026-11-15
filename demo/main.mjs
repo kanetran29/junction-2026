@@ -6,7 +6,8 @@ import { STORY, DURATION, VOICE, SFX, stateAt } from "./story.mjs";
 const CLIPS = [...VOICE, ...SFX].sort((a, b) => a.at - b.at);
 import { connectLive, readBacklog } from "./live.mjs";
 import { buildScene } from "./scene.mjs";
-import { STRENGTHS, PAGE_ONLY, GROUPS, COMPARE_NOTE, CONNECT_LINE } from "./compare.mjs";
+import { STRENGTHS, PAGE_ONLY, FEATURE_ROWS, GROUPS, COMPARE_NOTE, CONNECT_LINE } from "./compare.mjs";
+import { featuresOn } from "./features.mjs";
 import { ICONS } from "./icons.mjs";
 import { mountInside } from "./inside-view.mjs";
 import { mountDeck } from "./deck-view.mjs";
@@ -52,7 +53,10 @@ function el(tag, cls, text = "") {
   return node;
 }
 
-/** Fills the Story's closing comparison (eight rows, ✕ without the door, ✓ with Lazydoor) and the Compare page's table, whose AC chips link to their case. */
+/**
+ * Fills the Story's closing comparison (eight rows, ✕ without the door, ✓ with Lazydoor) and the Compare page's table, whose
+ * AC chips link to their case; the door's newer ways in join as their own group while the door advertises them.
+ */
 function buildCompare() {
   $("compare-rows").replaceChildren(...STRENGTHS.map((row) => {
     const li = el("li");
@@ -64,10 +68,12 @@ function buildCompare() {
   $("compare-foot").replaceChildren(`${CONNECT_LINE} · `, count, " acceptance cases pass.");
   $("compare-note").textContent = COMPARE_NOTE;
   const rows = [...STRENGTHS, ...PAGE_ONLY];
-  $("compare-groups").replaceChildren(...GROUPS.map((g) => {
+  /** One group of paired rows. */
+  const groupOf = (g, groupRows) => {
     const group = el("section", "pair-group");
+    group.dataset.group = g.id;
     group.append(el("h2", "", g.heading));
-    for (const row of rows.filter((r) => r.group === g.id)) {
+    for (const row of groupRows) {
       const pair = el("article", "pair");
       const without = el("p", "side without");
       without.append(glyph("cross"), el("span", "", row.without));
@@ -81,7 +87,14 @@ function buildCompare() {
       group.append(pair);
     }
     return group;
-  }));
+  };
+  $("compare-groups").replaceChildren(...GROUPS.filter((g) => rows.some((r) => r.group === g.id)).map((g) => groupOf(g, rows.filter((r) => r.group === g.id))));
+  featuresOn(GATEWAY).then((on) => {
+    const live = FEATURE_ROWS.filter((r) => on[r.feature]);
+    if (!live.length) return;
+    $("compare-groups").append(groupOf(GROUPS.find((g) => g.id === "ways"), live));
+    labelAcChips($("compare-page"));
+  });
   document.querySelector("#compare-page .pairs-legend").before(acNote());
   labelAcChips($("compare-page"));
 }

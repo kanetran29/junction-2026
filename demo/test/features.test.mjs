@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { pickMime, voiceViewOf, postVoice, getPeppol, PEPPOL_CAPTION, VOICE_MAX_S, VOICE_MAX_BYTES } from "../try.mjs";
-import { voiceOn, peppolOn, answers } from "../features.mjs";
+import { voiceOn, peppolOn, connectorOn, featuresOn } from "../features.mjs";
+import { FEATURE_ROWS } from "../compare.mjs";
+import { WAYS } from "../ways.mjs";
 
 const SERVER = fileURLToPath(new URL("../dev/fake-gateway.mjs", import.meta.url));
 const PORT = 8764;
@@ -48,20 +50,22 @@ test("voice, Peppol and the feature checks follow the door's contract", async ()
   assert.equal(PEPPOL_CAPTION, "Peppol BIS Order 3.0 (UBL 2.1). Export only; nothing is sent.");
 
   const json = (status, body) => async () => new Response(JSON.stringify(body), { status });
-  assert.equal(await voiceOn("http://on", json(200, { tryIt: { voice: "/v1/try/voice" } })), true);
-  assert.equal(await voiceOn("http://off", json(200, { tryIt: {} })), false);
-  assert.equal(await peppolOn("http://p-off", json(404, { error: "NOT_FOUND" })), false, "flag off: the route is absent");
-  assert.equal(await peppolOn("http://p-on", json(404, { error: "ORDER_NOT_FOUND" })), true);
-  assert.equal(await peppolOn("http://p-auth", json(401, { error: "UNAUTHORIZED" })), true);
-  assert.equal(await answers("http://c", "/.well-known/oauth-authorization-server", json(404, {})), false);
+  const all = { tryIt: { voice: "https://door/v1/try/voice" }, peppol: { export: "GET /v1/orders/{id}/peppol" }, mcp: { url: "https://door/mcp", oauth: { authorizationServer: "https://door/.well-known/oauth-authorization-server" } } };
+  assert.deepEqual(await featuresOn("http://all", json(200, all)), { voice: true, peppol: true, connector: true });
+  assert.deepEqual(await featuresOn("http://none", json(200, { tryIt: {}, mcp: { url: "https://door/mcp" } })), { voice: false, peppol: false, connector: false }, "flags off: the door does not advertise them");
+  assert.deepEqual(await featuresOn("http://down", json(500, {})), { voice: false, peppol: false, connector: false });
+  assert.deepEqual([await voiceOn("http://all"), await peppolOn("http://all"), await connectorOn("http://all")], [true, true, true], "read once per page");
+  assert.deepEqual(FEATURE_ROWS.map((r) => r.feature).sort(), ["connector", "peppol", "voice"]);
+  assert.deepEqual(WAYS.map((w) => w.feature), ["connector", "voice", "peppol"]);
+  assert.ok(FEATURE_ROWS.every((r) => !/[\u2013\u2014]/.test(r.without + r.with)), "no dashes");
 });
 
-/** A fake door in the browser: which flags are on, and what the voice and Peppol routes answer. */
+/** A fake door in the browser: which features its discovery document advertises, and what their routes answer. */
 function door(page, { voice = true, peppol = true, peppolStatus = 200, oauth = true } = {}) {
   const state = { voiceReplies: [], voiceReply: { status: 200, body: { transcript: "20 kg of chicken breast fillet by Monday" } }, voicePosts: [], peppolCalls: [] };
   const json = (route, status, body) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-  page.route("**/.well-known/agent-gateway.json", (route) => json(route, 200, { tryIt: voice ? { voice: "/v1/try/voice" } : {} }));
-  page.route("**/.well-known/oauth-authorization-server", (route) => (oauth ? json(route, 200, { issuer: "https://door" }) : json(route, 404, { error: "NOT_FOUND" })));
+  const doc = { tryIt: voice ? { voice: "/v1/try/voice" } : {}, ...(peppol ? { peppol: { export: "GET /v1/orders/{id}/peppol" } } : {}), mcp: { url: "https://lazydoor.lazydoor.workers.dev/mcp", ...(oauth ? { oauth: { authorizationServer: "/.well-known/oauth-authorization-server" } } : {}) } };
+  page.route("**/.well-known/agent-gateway.json", (route) => json(route, 200, doc));
   page.route("**/v1/try/voice", (route) => {
     const h = route.request().headers();
     state.voicePosts.push({ type: h["content-type"] ?? "", token: h["x-visitor-token"] });
@@ -71,10 +75,8 @@ function door(page, { voice = true, peppol = true, peppolStatus = 200, oauth = t
   page.route("**/v1/try", (route) => json(route, 200, { visitor: "v-test", buyerId: "visitor-0000feed", step: "decided", draft: { id: "d1" }, order: { orderId: "o-1", state: "ACCEPTED", netCents: 15400, grossCents: 17400, reasons: [] } }));
   page.route("**/v1/orders/*/peppol", (route) => {
     const h = route.request().headers();
-    const probe = route.request().url().includes("peppol-probe");
-    if (!probe) state.peppolCalls.push({ token: h["x-visitor-token"], authorization: h.authorization });
+    state.peppolCalls.push({ token: h["x-visitor-token"], authorization: h.authorization });
     if (!peppol) return json(route, 404, { error: "NOT_FOUND", detail: "no such route" });
-    if (probe) return json(route, 404, { error: "ORDER_NOT_FOUND", detail: "no such order" });
     if (peppolStatus !== 200) return json(route, peppolStatus, { error: "ORDER_NOT_ACCEPTED", detail: "not accepted" });
     return route.fulfill({ status: 200, contentType: "application/xml", headers: { "Content-Disposition": 'attachment; filename="lazydoor-order-o-1.xml"' }, body: "<Order/>" });
   });
@@ -183,7 +185,7 @@ test("voice in Try it: a blocked microphone says so; no recorder or no voice rou
   assert.equal(await noRoute.isHidden("#try-panel .try-mic"), true, "no /v1/try/voice: no button");
 });
 
-test("Peppol on an accepted order with the visitor's token, only when the door answers 200; Connect Claude stays off", { skip }, async (t) => {
+test("each new strength shows only while the door advertises it: Peppol link, Connect Claude, Inside's ways, Compare's rows, the Deck note", { skip }, async (t) => {
   const { browser, url } = await setup(t, PORT + 2);
   const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
   const state = door(page);
@@ -196,20 +198,36 @@ test("Peppol on an accepted order with the visitor's token, only when the door a
   assert.match(await link.getAttribute("href"), /^blob:/, "saved through a Blob URL");
   assert.equal((await page.textContent("#try-panel .try-peppol-note")).trim(), "Peppol BIS Order 3.0 (UBL 2.1). Export only; nothing is sent.");
   assert.deepEqual(state.peppolCalls, [{ token: "v-test", authorization: undefined }]);
-  await page.waitForTimeout(400);
-  assert.equal(await page.isHidden("#connect-panel"), true, "the connector waits for the confirmed flow, even with OAuth metadata");
-  const width = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
-  assert.ok(width[0] <= width[1], `page is ${width[0]} px wide in ${width[1]} px`);
+  await page.waitForSelector("#connect-panel:not([hidden])");
+  assert.equal((await page.textContent("#connect-panel h2")).trim(), "Connect Claude");
+  assert.equal((await page.textContent("#connect-panel code")).trim(), "https://lazydoor.lazydoor.workers.dev/mcp");
+  const steps = await page.$$eval("#connect-panel .connect-steps > li", (lis) => lis.map((li) => li.textContent));
+  assert.equal(steps.length, 5);
+  assert.match(steps[1], /up to 500\s€ an order and 1,500\s€ a day go through on their own.*Click Allow\.$/);
+  assert.match(steps[3], /refused \(403\) on every approval\.$/);
+  assert.match(await page.textContent("#connect-panel .connect-note"), /^The kitchen ends after 20 idle minutes/);
+  const width = async (p) => p.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+  let w = await width(page);
+  assert.ok(w[0] <= w[1], `Live is ${w[0]} px wide in ${w[1]} px`);
 
   await page.goto(`${url}?mode=inside`);
-  await page.waitForSelector(".peppol-line:not([hidden])");
-  assert.equal((await page.textContent(".peppol-line")).trim(), "Peppol export: Peppol BIS Order 3.0 (UBL 2.1). Export only; nothing is sent.");
-  assert.equal(await page.isHidden('[data-section="connect"]'), true);
-  await page.goto(`${url}?mode=deck`);
-  await page.waitForSelector("#deck-page[data-loaded]");
-  assert.equal(await page.locator(".deck-connect").count(), 0);
+  await page.waitForSelector('[data-section="ways"]:not([hidden])');
+  const ways = await page.$$eval('[data-section="ways"] .way', (as) => as.map((a) => [a.dataset.feature, a.querySelector("h3").textContent, a.querySelector("img")?.complete ?? null]));
+  assert.deepEqual(ways.map((x) => x.slice(0, 2)), [["connector", "From Claude"], ["voice", "By voice"], ["peppol", "Into your ordering system"]]);
+  assert.equal(await page.textContent('[data-section="ways"] h2'), "Use it your way");
+  w = await width(page);
+  assert.ok(w[0] <= w[1], `Inside is ${w[0]} px wide in ${w[1]} px`);
+  await page.click('[data-section="ways"] .way[data-feature="voice"] button');
+  await page.waitForSelector("#try-panel:not([hidden])");
 
-  for (const [opts, why] of [[{ peppolStatus: 409 }, "409 ORDER_NOT_ACCEPTED"], [{ peppol: false }, "flag off: 404 NOT_FOUND"]]) {
+  await page.goto(`${url}?mode=compare`);
+  await page.waitForSelector('#compare-groups .pair-group[data-group="ways"]');
+  assert.deepEqual(await page.$$eval('#compare-groups .pair-group[data-group="ways"] h3', (hs) => hs.map((h) => h.textContent)), ["Bring your own AI", "Orders your systems can read", "Speak the order"]);
+  await page.goto(`${url}?mode=deck`);
+  await page.waitForSelector(".deck-connect", { state: "attached" });
+  assert.equal(await page.$$eval(".deck-slide", (lis) => lis.findIndex((li) => li.querySelector(".deck-connect"))), 5, "on the demo slide's notes");
+
+  for (const [opts, why] of [[{ peppolStatus: 409 }, "409 ORDER_NOT_ACCEPTED"], [{ peppol: false }, "not advertised: 404 NOT_FOUND"]]) {
     const other = await browser.newPage();
     door(other, opts);
     await other.goto(`${url}?mode=live`);
@@ -219,10 +237,18 @@ test("Peppol on an accepted order with the visitor's token, only when the door a
     await other.waitForTimeout(400);
     assert.equal(await other.locator("#try-panel .try-peppol").count(), 0, `${why}: no link`);
   }
-  const off = await browser.newPage();
-  door(off, { peppol: false });
-  await off.goto(`${url}?mode=inside`);
-  await off.waitForSelector('[data-section="acceptance"][data-loaded]');
-  await off.waitForTimeout(300);
-  assert.equal(await off.isHidden(".peppol-line"), true);
+
+  const bare = await browser.newPage();
+  door(bare, { voice: false, peppol: false, oauth: false });
+  await bare.goto(`${url}?mode=inside`);
+  await bare.waitForSelector('[data-section="acceptance"][data-loaded]');
+  await bare.waitForTimeout(300);
+  assert.equal(await bare.isHidden('[data-section="ways"]'), true, "nothing advertised: no section");
+  await bare.goto(`${url}?mode=compare`);
+  await bare.waitForTimeout(500);
+  assert.equal(await bare.locator('#compare-groups .pair-group[data-group="ways"]').count(), 0);
+  await bare.goto(`${url}?mode=live`);
+  await bare.waitForSelector("#try-panel .try-chip");
+  await bare.waitForTimeout(400);
+  assert.deepEqual([await bare.isHidden("#connect-panel"), await bare.isHidden("#try-panel .try-mic")], [true, true]);
 });

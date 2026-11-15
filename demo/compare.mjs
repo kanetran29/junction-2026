@@ -22,12 +22,23 @@ export const PAGE_ONLY = [
   { topic: "Published rules", group: "open", without: "Rules live inside each agent", with: "Every decision is a published rule with a reason code", evidence: ["/v1/rules", "/v1/reason-codes"] },
 ];
 
-/** The Compare page's groups, in order. */
+/**
+ * Rows for the door's newer ways in, each shown only while the door advertises its feature (features.mjs). "No
+ * equivalent" where neither the webshop nor a direct API call offers one.
+ */
+export const FEATURE_ROWS = [
+  { topic: "Bring your own AI", group: "ways", feature: "connector", without: "Each agent wires Valio's API itself", with: "One URL in Claude; your kitchen's limits still apply", evidence: ["AC66", "OAuth 2.1", "/mcp"] },
+  { topic: "Orders your systems can read", group: "ways", feature: "peppol", without: "No equivalent", with: "Peppol BIS Order 3.0 export", evidence: ["AC64", "/v1/orders/{id}/peppol"] },
+  { topic: "Speak the order", group: "ways", feature: "voice", without: "No equivalent", with: "Say it; the same two readers and rules apply", evidence: ["AC65", "/v1/try/voice"] },
+];
+
+/** The Compare page's groups, in order; a group shows only when it has rows. */
 export const GROUPS = [
   { id: "data", heading: "Valio's data, read right" },
   { id: "money", heading: "The kitchen's money" },
   { id: "safety", heading: "Safety and fair play" },
   { id: "open", heading: "Open to check" },
+  { id: "ways", heading: "Use it your way" },
 ];
 
 /** The sentence under the Compare page's title, in place of a webshop column we could only fill with guesses. */

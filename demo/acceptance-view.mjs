@@ -12,6 +12,7 @@ export const RUBRICS = [
   ["controls", "Controls"],
   ["exceptions", "Exceptions"],
   ["openness", "Openness"],
+  ["trust", "Trust"],
 ];
 
 const loaded = {};
@@ -74,8 +75,9 @@ function caseItem(c) {
 /** The section's content: what a case is, the last run, one closed group per rubric with its count, and the source. */
 export function acceptanceNodes(data) {
   const run = data.run;
+  const newer = run ? data.cases.filter((c) => c.pass === undefined).length : 0;
   const runLine = run
-    ? `Last run: ${run.passed}/${run.total} passed${run.date ? ` on ${run.date}` : ""}${run.version ? `, door version ${String(run.version).slice(0, 8)}` : ""}.`
+    ? `Last run: ${run.passed}/${run.total} passed${run.date ? ` on ${run.date}` : ""}${run.version ? `, door version ${String(run.version).slice(0, 8)}` : ""}.${newer ? ` ${newer} newer ${newer === 1 ? "case is" : "cases are"} not in that run yet.` : ""}`
     : "Last run: not yet measured.";
   const groups = el("div", "ac-groups");
   for (const [key, heading] of RUBRICS) {

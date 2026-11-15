@@ -15,7 +15,7 @@ const withoutPass = (cases) => cases.map(({ pass, checks, ...c }) => c);
 
 test("acceptance.json matches research/acceptance/cases.json (run node demo/dev/acceptance.mjs after editing the cases) and carries no inputs", () => {
   assert.deepEqual(withoutPass(buildAcceptance(source).cases), withoutPass(published.cases));
-  assert.equal(published.cases.length, 66);
+  assert.equal(published.cases.length, source.cases.length);
   const keys = new Set(RUBRICS.map(([k]) => k));
   for (const c of published.cases) {
     assert.match(c.id, /^AC\d{2,}$/);
@@ -26,9 +26,12 @@ test("acceptance.json matches research/acceptance/cases.json (run node demo/dev/
 });
 
 test("buildAcceptance: the run's numbers, and pass marks only when the run says them", () => {
-  const all = buildAcceptance(source, { passed: 63, total: 63, version: "32795cea-9fb8", date: "2026-11-15", extra: "not copied" });
-  assert.deepEqual(all.run, { passed: 63, total: 63, version: "32795cea-9fb8", date: "2026-11-15" });
+  const n = source.cases.length;
+  const all = buildAcceptance(source, { passed: n, total: n, version: "32795cea-9fb8", date: "2026-11-15", extra: "not copied" });
+  assert.deepEqual(all.run, { passed: n, total: n, version: "32795cea-9fb8", date: "2026-11-15" });
   assert.ok(all.cases.every((c) => c.pass === true));
+  const older = buildAcceptance(source, { passed: n - 3, total: n - 3 });
+  assert.ok(older.cases.every((c) => !("pass" in c)), "a run of fewer cases marks none without its per-case list");
   const some = buildAcceptance(source, { passed: 62, total: 63, results: [{ id: "AC05", ok: false }, { id: "AC01", ok: true }] });
   assert.deepEqual(some.cases.filter((c) => "pass" in c).map((c) => [c.id, c.pass]), [["AC01", true], ["AC05", false]]);
   const counted = buildAcceptance(source, { passed: 63, total: 63, cases: [{ id: "AC01", passed: true, checks: 22 }] });
@@ -39,7 +42,7 @@ test("buildAcceptance: the run's numbers, and pass marks only when the run says 
   assert.ok(none.cases.every((c) => !("pass" in c)), "not yet measured: no pass marks");
 });
 
-test("acceptance on the site: every AC chip names and links its case; Inside groups the 63 cases; an anchor opens the right group", { skip: !pw && "playwright-core not installed (set PLAYWRIGHT_CORE)" }, async (t) => {
+test("acceptance on the site: every AC chip names and links its case; Inside groups every case; an anchor opens the right group", { skip: !pw && "playwright-core not installed (set PLAYWRIGHT_CORE)" }, async (t) => {
   const child = spawn(process.execPath, [SERVER, "--port", String(PORT)], { stdio: ["ignore", "pipe", "inherit"] });
   t.after(() => child.kill());
   await new Promise((resolve) => child.stdout.once("data", resolve));
@@ -73,8 +76,8 @@ test("acceptance on the site: every AC chip names and links its case; Inside gro
   checkChips(await chipsIn("#inside-page .is-guardrails"));
   assert.equal(await noteFirst("#inside-page"), true);
   const groups = await page.$$eval(".ac-group", (gs) => gs.map((g) => [g.dataset.rubric, g.querySelectorAll(".ac-case").length, g.open]));
-  assert.equal(groups.reduce((n, g) => n + g[1], 0), 63);
-  assert.deepEqual(groups.map((g) => g[0]), ["e2e", "need", "controls", "exceptions", "openness"]);
+  assert.equal(groups.reduce((n, g) => n + g[1], 0), published.cases.length);
+  assert.deepEqual(groups.map((g) => g[0]), RUBRICS.map(([k]) => k).filter((k) => published.cases.some((c) => c.rubric[0] === k)));
   assert.ok(groups.every((g) => g[2] === false), "the groups start closed");
 
   await page.click('#inside-page .is-guardrails a[data-ac="AC05"]');
