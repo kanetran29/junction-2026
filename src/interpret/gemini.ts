@@ -68,7 +68,7 @@ export interface Raw {
 }
 
 const UNITS = ['l', 'kg', 'pcs'];
-const FIELDS = ['category', 'subtype', 'claims', 'quantity', 'deliverBy', 'brand', 'packLitres'];
+export const FIELDS = ['category', 'subtype', 'claims', 'quantity', 'deliverBy', 'brand', 'packLitres'];
 const str = { type: 'STRING', nullable: true };
 const strList = { type: 'ARRAY', items: { type: 'STRING' } };
 
@@ -121,7 +121,7 @@ export function clearListsCache(): void {
  * Reads the reference lists the prompt and the validation share: category codes with names, and the claim ids in the index.
  * The catalogue is static per deploy, so they are read once per isolate (a failed read is not kept).
  */
-function lists(env: Env): Promise<Lists> {
+export function lists(env: Env): Promise<Lists> {
   listsCache ??= (async () => {
     const cats = await env.DB.prepare('SELECT category, names FROM category_names ORDER BY category').all<{ category: string; names: string }>();
     const claims = await env.DB.prepare("SELECT DISTINCT value AS id FROM products, json_each(products.claims) WHERE products.claims IS NOT NULL ORDER BY 1").all<{ id: string }>();
@@ -137,7 +137,7 @@ function lists(env: Env): Promise<Lists> {
  * Applies the rules to model (or buyer-filled) fields: unknown category, unknown claims, a unit outside l/kg/pcs, a bad or
  * past date and a non-positive quantity are dropped and named in `unclear`. Unknown fields are ignored.
  */
-function validate(raw: Raw, today: string, categories: Set<string>, claimIds: Set<string>) {
+export function validate(raw: Raw, today: string, categories: Set<string>, claimIds: Set<string>) {
   const unclear: string[] = [];
   const out: Pick<InterpretedDraft, 'category' | 'subtype' | 'claims' | 'quantity' | 'deliverBy' | 'brand' | 'packLitres'> = { claims: [] };
   if (raw.category != null) {
@@ -191,7 +191,7 @@ export async function retryAfterOf(res: Response): Promise<number> {
  * Asks one model (Gemini, or Gemma as the second reader) for the structured draft with the same prompt and schema; any
  * transport, status or parse failure is MODEL_UNAVAILABLE.
  */
-async function askModel(env: Env, model: string, text: string, today: string, ref: Awaited<ReturnType<typeof lists>>, fetchFn: typeof fetch, signal?: AbortSignal): Promise<Raw> {
+export async function askModel(env: Env, model: string, text: string, today: string, ref: Awaited<ReturnType<typeof lists>>, fetchFn: typeof fetch, signal?: AbortSignal): Promise<Raw> {
   if (!env.GEMINI_API_KEY) throw new InterpretError('MODEL_UNAVAILABLE', 503, 'no Gemini key');
   const system = [
     `You turn one buyer sentence into a typed draft for a food wholesaler. Today is ${today}. Resolve weekdays and relative dates to ISO dates on or after today.`,
@@ -241,7 +241,7 @@ function comparable(field: string, v: unknown): string {
 }
 
 /** The draft fields the two validated readings set differently. */
-function differing(a: Fields, b: Fields): string[] {
+export function differing(a: Fields, b: Fields): string[] {
   return FIELDS.filter((f) => comparable(f, a[f as keyof Fields]) !== comparable(f, b[f as keyof Fields]));
 }
 
