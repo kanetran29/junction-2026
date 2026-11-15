@@ -6,7 +6,7 @@ import { STORY, DURATION, VOICE, SFX, stateAt } from "./story.mjs";
 const CLIPS = [...VOICE, ...SFX].sort((a, b) => a.at - b.at);
 import { connectLive, readBacklog } from "./live.mjs";
 import { buildScene } from "./scene.mjs";
-import { STRENGTHS, PAGE_ONLY, FEATURE_ROWS, GROUPS, COMPARE_NOTE, CONNECT_LINE } from "./compare.mjs";
+import { STRENGTHS, PAGE_ONLY, FEATURE_ROWS, GROUPS, COMPARE_NOTE, CONNECT_LINE, VALIO_FACTS, VALIO_FACTS_SOURCE } from "./compare.mjs";
 import { featuresOn } from "./features.mjs";
 import { ICONS } from "./icons.mjs";
 import { mountInside } from "./inside-view.mjs";
@@ -67,6 +67,18 @@ function buildCompare() {
   count.dataset.proof = "acceptance";
   $("compare-foot").replaceChildren(`${CONNECT_LINE} · `, count, " acceptance cases pass.");
   $("compare-note").textContent = COMPARE_NOTE;
+  $("compare-data").replaceChildren(
+    ...VALIO_FACTS.map((f) => {
+      const div = document.createElement("div");
+      const dt = document.createElement("dt");
+      const dd = document.createElement("dd");
+      dt.textContent = f.n;
+      dd.textContent = f.text;
+      div.append(dt, dd);
+      return div;
+    }),
+  );
+  $("compare-data-source").textContent = VALIO_FACTS_SOURCE;
   const rows = [...STRENGTHS, ...PAGE_ONLY];
   /** One group of paired rows. */
   const groupOf = (g, groupRows) => {

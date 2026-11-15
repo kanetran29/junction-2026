@@ -18,7 +18,7 @@ export const PAGE_ONLY = [
   { topic: "Who checks the cut-off", group: "data", without: "Nobody: the agent reads 999999 and orders", with: "The door, on every quote", evidence: ["closingTime", "CUTOFF_PASSED"] },
   { topic: "Quotes", group: "data", without: "Price can change in transit", with: "Signed quote and receipt; check them against the published key", evidence: ["AC51", "QUOTE_SIGNATURE_INVALID", "/.well-known/jwks.json"] },
   { topic: "Audit trail", group: "open", without: "Only what the agent itself logs", with: "Every step hash-chained; verify it yourself", evidence: ["/v1/audit/verify", "/v1/events"] },
-  { topic: "Works with any agent", group: "open", without: "Each agent wires Valio's API itself", with: "HTTP and MCP from one schema", evidence: ["/openapi.json", "/mcp (9 tools)"] },
+  { topic: "Works with any agent", group: "open", without: "Each agent wires Valio's API itself", with: "HTTP and MCP from one schema", evidence: ["/openapi.json", "/mcp (10 tools)"] },
   { topic: "Published rules", group: "open", without: "Rules live inside each agent", with: "Every decision is a published rule with a reason code", evidence: ["/v1/rules", "/v1/reason-codes"] },
 ];
 
@@ -43,7 +43,16 @@ export const GROUPS = [
 ];
 
 /** The sentence under the Compare page's title, in place of a webshop column we could only fill with guesses. */
+/** Aggregates from Valio's own data (539 recorded availability replies, 250 substitution pairs, 17,546 products); no product data. */
+export const VALIO_FACTS = [
+  { n: "58%", text: "of stock figures are 999999, a placeholder" },
+  { n: "40%", text: "of lines past the cut-off still show a delivery date" },
+  { n: "29 of 250", text: "substitutes add an allergen the original lacks" },
+  { n: "46%", text: "of 17,546 products declare no allergen info" },
+];
+export const VALIO_FACTS_SOURCE = "In Valio's own data: 539 recorded availability replies, 250 substitution pairs, the full catalogue.";
+
 export const COMPARE_NOTE = "A person ordering in the webshop catches what they notice. An agent calling Valio's API directly catches only what it was built to check.";
 
 /** The closing line under the Story's comparison. */
-export const CONNECT_LINE = "Any agent connects: HTTP API · /openapi.json   MCP · /mcp (9 tools)";
+export const CONNECT_LINE = "Any agent connects: HTTP API · /openapi.json   MCP · /mcp (10 tools)";

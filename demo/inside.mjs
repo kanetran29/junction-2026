@@ -78,7 +78,7 @@ export const BUILT_WITH = [
     group: "Runtime and interfaces",
     parts: [
       { name: "Cloudflare Workers and Hyperdrive", marks: [{ icon: "cloudflare" }], line: "Run the door and pool its connections to Postgres." },
-      { name: "OpenAPI and MCP", marks: [{ icon: "openapiinitiative" }, { icon: "modelcontextprotocol" }], line: "One schema for an HTTP API and an MCP server with 9 tools." },
+      { name: "OpenAPI and MCP", marks: [{ icon: "openapiinitiative" }, { icon: "modelcontextprotocol" }], line: "One schema for an HTTP API and an MCP server with 10 tools." },
     ],
   },
 ];

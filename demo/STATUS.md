@@ -337,6 +337,8 @@ Vấn đề tìm thấy:
 - Compare: không thêm dòng; dòng "Meaning" (hai model đọc, lệch thì hỏi) đã nói ý này.
 - Check it yourself: link "API catalog (RFC 9727)" và "llms.txt" chỉ hiện khi door trả 200; dòng CORS chỉ hiện khi `/.well-known/jwks.json` trả 200 kèm `Access-Control-Allow-Origin`. Lúc 06:55Z cả hai route còn 404.
 - Huỷ đơn có ký (958fc30 của build session): `features.mjs` thêm `cancel` = discovery có `cancellation`. Khi bật: Inside "Use it your way" thêm "Change your mind" (huỷ trước cut-off, stock về lại, door ký bản huỷ; route và tool MCP), Compare thêm dòng "Changing your mind" (AC67, AC68). Try it không có nút huỷ: route cần Bearer key, không nhận `X-Visitor-Token`. `acceptance.json` tạo lại: 69 case, lần chạy 66/66, AC67 đến AC69 ghi "not in that run yet".
+- MCP giờ có 10 tool: sửa "9 tools" thành 10 ở Live (`index.html`), Compare, Inside "Built with" và deck slide 7.
+- Số liệu Valio (chỉ số tổng hợp, peer tính lại từ `.data/valio`): đầu Compare có 4 con số (58% stock là 999999; 40% dòng đã qua cut-off vẫn hiện ngày giao; 29 trên 250 cặp thay thế thêm allergen; 46% của 17.546 sản phẩm không khai allergen) và dòng nguồn. Deck slide 2 thêm một dòng "Not rare: …" (field `fact` trong `pitch.json`) và câu tương ứng trong notes. Render lại `pitch/out` (9 slide, `deck.pdf`) và tab Deck.
 - Test: fixture `demo/test/models.fixture.json` (cùng shape với eval, ghi rõ "Fixture only"); test đơn vị và Playwright ở 375 px và 1280 px.
 
 ## Còn lại / cần làm sau
