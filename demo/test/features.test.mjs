@@ -51,20 +51,20 @@ test("voice, Peppol and the feature checks follow the door's contract", async ()
 
   const json = (status, body) => async () => new Response(JSON.stringify(body), { status });
   const all = { tryIt: { voice: "https://door/v1/try/voice" }, peppol: { export: "GET /v1/orders/{id}/peppol" }, mcp: { url: "https://door/mcp", oauth: { authorizationServer: "https://door/.well-known/oauth-authorization-server" } } };
-  assert.deepEqual(await featuresOn("http://all", json(200, all)), { voice: true, peppol: true, connector: true });
-  assert.deepEqual(await featuresOn("http://none", json(200, { tryIt: {}, mcp: { url: "https://door/mcp" } })), { voice: false, peppol: false, connector: false }, "flags off: the door does not advertise them");
-  assert.deepEqual(await featuresOn("http://down", json(500, {})), { voice: false, peppol: false, connector: false });
+  assert.deepEqual(await featuresOn("http://all", json(200, { ...all, cancellation: { http: "POST /v1/orders/{id}/cancel" } })), { voice: true, peppol: true, connector: true, cancel: true });
+  assert.deepEqual(await featuresOn("http://none", json(200, { tryIt: {}, mcp: { url: "https://door/mcp" } })), { voice: false, peppol: false, connector: false, cancel: false }, "flags off: the door does not advertise them");
+  assert.deepEqual(await featuresOn("http://down", json(500, {})), { voice: false, peppol: false, connector: false, cancel: false });
   assert.deepEqual([await voiceOn("http://all"), await peppolOn("http://all"), await connectorOn("http://all")], [true, true, true], "read once per page");
-  assert.deepEqual(FEATURE_ROWS.map((r) => r.feature).sort(), ["connector", "peppol", "voice"]);
-  assert.deepEqual(WAYS.map((w) => w.feature), ["connector", "voice", "peppol"]);
+  assert.deepEqual(FEATURE_ROWS.map((r) => r.feature).sort(), ["cancel", "connector", "peppol", "voice"]);
+  assert.deepEqual(WAYS.map((w) => w.feature), ["connector", "voice", "peppol", "cancel"]);
   assert.ok(FEATURE_ROWS.every((r) => !/[\u2013\u2014]/.test(r.without + r.with)), "no dashes");
 });
 
 /** A fake door in the browser: which features its discovery document advertises, and what their routes answer. */
-function door(page, { voice = true, peppol = true, peppolStatus = 200, oauth = true } = {}) {
+function door(page, { voice = true, peppol = true, peppolStatus = 200, oauth = true, cancel = voice && peppol && oauth } = {}) {
   const state = { voiceReplies: [], voiceReply: { status: 200, body: { transcript: "20 kg of chicken breast fillet by Monday" } }, voicePosts: [], peppolCalls: [] };
   const json = (route, status, body) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-  const doc = { tryIt: voice ? { voice: "/v1/try/voice" } : {}, ...(peppol ? { peppol: { export: "GET /v1/orders/{id}/peppol" } } : {}), mcp: { url: "https://lazydoor.lazydoor.workers.dev/mcp", ...(oauth ? { oauth: { authorizationServer: "/.well-known/oauth-authorization-server" } } : {}) } };
+  const doc = { tryIt: voice ? { voice: "/v1/try/voice" } : {}, ...(peppol ? { peppol: { export: "GET /v1/orders/{id}/peppol" } } : {}), mcp: { url: "https://lazydoor.lazydoor.workers.dev/mcp", ...(oauth ? { oauth: { authorizationServer: "/.well-known/oauth-authorization-server" } } : {}) }, ...(cancel ? { cancellation: { http: "POST /v1/orders/{id}/cancel" } } : {}) };
   page.route("**/.well-known/agent-gateway.json", (route) => json(route, 200, doc));
   page.route("**/v1/try/voice", (route) => {
     const h = route.request().headers();
@@ -213,7 +213,7 @@ test("each new strength shows only while the door advertises it: Peppol link, Co
   await page.goto(`${url}?mode=inside`);
   await page.waitForSelector('[data-section="ways"]:not([hidden])');
   const ways = await page.$$eval('[data-section="ways"] .way', (as) => as.map((a) => [a.dataset.feature, a.querySelector("h3").textContent, a.querySelector("img")?.complete ?? null]));
-  assert.deepEqual(ways.map((x) => x.slice(0, 2)), [["connector", "From Claude"], ["voice", "By voice"], ["peppol", "Into your ordering system"]]);
+  assert.deepEqual(ways.map((x) => x.slice(0, 2)), [["connector", "From Claude"], ["voice", "By voice"], ["peppol", "Into your ordering system"], ["cancel", "Change your mind"]]);
   assert.equal(await page.textContent('[data-section="ways"] h2'), "Use it your way");
   w = await width(page);
   assert.ok(w[0] <= w[1], `Inside is ${w[0]} px wide in ${w[1]} px`);
@@ -222,7 +222,7 @@ test("each new strength shows only while the door advertises it: Peppol link, Co
 
   await page.goto(`${url}?mode=compare`);
   await page.waitForSelector('#compare-groups .pair-group[data-group="ways"]');
-  assert.deepEqual(await page.$$eval('#compare-groups .pair-group[data-group="ways"] h3', (hs) => hs.map((h) => h.textContent)), ["Bring your own AI", "Orders your systems can read", "Speak the order"]);
+  assert.deepEqual(await page.$$eval('#compare-groups .pair-group[data-group="ways"] h3', (hs) => hs.map((h) => h.textContent)), ["Bring your own AI", "Orders your systems can read", "Changing your mind", "Speak the order"]);
   await page.goto(`${url}?mode=deck`);
   await page.waitForSelector(".deck-connect", { state: "attached" });
   assert.equal(await page.$$eval(".deck-slide", (lis) => lis.findIndex((li) => li.querySelector(".deck-connect"))), 5, "on the demo slide's notes");

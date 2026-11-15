@@ -1,5 +1,5 @@
 // Which of the door's newer features are live, from what the door itself advertises in its discovery document
-// (/.well-known/agent-gateway.json): tryIt.voice, peppol, and mcp.oauth for the Claude connector. Each appears there only
+// (/.well-known/agent-gateway.json): tryIt.voice, peppol, mcp.oauth for the Claude connector, and cancellation. Each appears there only
 // while its flag is on, so nothing half-built shows on the page. Read once per page; never throws.
 
 const seen = {};
@@ -11,10 +11,10 @@ export const discovery = (base, fetchImpl = fetch) =>
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null));
 
-/** The live features: { voice, peppol, connector }, each true only while the door advertises it. */
+/** The live features: { voice, peppol, connector, cancel }, each true only while the door advertises it. */
 export async function featuresOn(base, fetchImpl = fetch) {
   const d = await discovery(base, fetchImpl);
-  return { voice: Boolean(d?.tryIt?.voice), peppol: Boolean(d?.peppol), connector: Boolean(d?.mcp?.oauth) };
+  return { voice: Boolean(d?.tryIt?.voice), peppol: Boolean(d?.peppol), connector: Boolean(d?.mcp?.oauth), cancel: Boolean(d?.cancellation) };
 }
 
 export const voiceOn = async (base, fetchImpl = fetch) => (await featuresOn(base, fetchImpl)).voice;

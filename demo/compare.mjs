@@ -29,6 +29,7 @@ export const PAGE_ONLY = [
 export const FEATURE_ROWS = [
   { topic: "Bring your own AI", group: "ways", feature: "connector", without: "Each agent wires Valio's API itself", with: "One URL in Claude; your kitchen's limits still apply", evidence: ["AC66", "OAuth 2.1", "/mcp"] },
   { topic: "Orders your systems can read", group: "ways", feature: "peppol", without: "No equivalent", with: "Peppol BIS Order 3.0 export", evidence: ["AC64", "/v1/orders/{id}/peppol"] },
+  { topic: "Changing your mind", group: "ways", feature: "cancel", without: "A cancellation is an email nobody can check", with: "Cancel until the cut-off: stock back on sale, a signed record", evidence: ["AC67", "AC68", "/v1/orders/{id}/cancel"] },
   { topic: "Speak the order", group: "ways", feature: "voice", without: "No equivalent", with: "Say it; the same two readers and rules apply", evidence: ["AC65", "/v1/try/voice"] },
 ];
 
