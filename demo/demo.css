@@ -658,6 +658,8 @@ body.kiosk .connect-panel { display: none; }
 /* Deck: the slides in one column, each with its speaker notes folded under it, and the PDF at the top. */
 .deck-page { color: var(--ink); max-width: 1200px; }
 .deck-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 24px 0 28px; }
+.deck-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.controls .watch-yt { margin-left: auto; }
 .deck-head h1 { margin: 0; font: 800 clamp(30px, 3.6vw, 44px)/1.1 var(--sans); letter-spacing: -.03em; color: #fff; }
 .deck-slides { list-style: none; margin: 0; padding: 0 0 48px; display: grid; gap: 40px; }
 .deck-slide img { display: block; width: 100%; height: auto; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface-2); }
