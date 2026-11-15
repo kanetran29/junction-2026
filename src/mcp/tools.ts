@@ -10,8 +10,8 @@ import { createBasket, getOrder, placeOrder } from '../orders/store';
 import { createQuote, type QuoteInput } from '../quote/store';
 import { SANDBOX_BUYER_PREFIX } from '../domain/constants';
 import { HttpError, countUse, identify, rateLimit } from '../http/auth';
-import { MCP_PER_TOKEN_PER_MINUTE, challenge, connectorOn, oauthCaller } from '../oauth/server';
-import { limitFreeText } from '../try/sandbox';
+import { CONNECTOR_ALL_PER_MINUTE, MCP_PER_TOKEN_PER_MINUTE, challenge, connectorOn, oauthCaller } from '../oauth/server';
+import { limit, limitFreeText } from '../try/sandbox';
 import { INTERPRET_PER_MINUTE, errorBody, searchReply } from '../http/routes';
 import * as S from '../http/schemas';
 
@@ -139,7 +139,8 @@ export async function handleMcp(req: Request, who: { env: Env; buyerId: string; 
 
 /**
  * The `/mcp` route (POST only; stateless, so no event stream), answered by `handleMcp`: the same bearer API key as `/v1`, or
- * (demo door, feature `connector`) a connector access token, which acts for its own sandbox kitchen only, at most 60 calls a minute.
+ * (demo door, feature `connector`) a connector access token, which acts for its own sandbox kitchen only, at most 60 calls a minute
+ * per token and 240 a minute over all of them.
  * With the connector on, a missing or dead token is 401 with a WWW-Authenticate challenge pointing to the OAuth metadata.
  */
 export function mcpRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }> {
@@ -153,6 +154,7 @@ export function mcpRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }
     const oauth = connector ? await oauthCaller(c.env, header) : null;
     if (oauth) {
       if ((await countUse(c.env, `oauth-mcp:${oauth.tokenHash}`)) > MCP_PER_TOKEN_PER_MINUTE) throw new HttpError(429, 'RATE_LIMITED', `at most ${MCP_PER_TOKEN_PER_MINUTE} MCP calls a minute for this token`);
+      await limit(c.env, 'connector-all', CONNECTOR_ALL_PER_MINUTE, `the connector is busy: at most ${CONNECTOR_ALL_PER_MINUTE} MCP calls a minute over every connector token`);
       return handleMcp(c.req.raw, { env: c.env, buyerId: oauth.buyerId, fetchFn });
     }
     const detail = { error: 'UNAUTHORIZED', detail: 'a valid Bearer API key is required' };

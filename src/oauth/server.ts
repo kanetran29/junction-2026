@@ -21,8 +21,16 @@ export const ACCESS_TTL_S = 3600;
 export const REFRESH_TTL_MS = 24 * 3600_000;
 /** How long a consent page and an authorization code stay usable. */
 export const STEP_TTL_MS = 10 * 60_000;
-/** Registrations and consent pages a minute from one client address. */
+/** Registrations, consent pages and consent answers a minute from one client address. */
 const OAUTH_PER_ADDRESS_PER_MINUTE = 30;
+/** Token requests a minute from one address: looser, since a hosted client (Claude) exchanges every user's codes from shared addresses. */
+const TOKEN_PER_ADDRESS_PER_MINUTE = 120;
+/** Client registrations a minute for everyone. */
+const REGISTER_ALL_PER_MINUTE = 60;
+/** Registered clients kept; past it the oldest registrations are dropped (a client with a metadata document needs none). */
+const MAX_CLIENTS = 2000;
+/** MCP calls a minute over every connector token together, so many tokens cannot flood the door or the shared stock. */
+export const CONNECTOR_ALL_PER_MINUTE = 240;
 /** The largest client ID metadata document the door reads. */
 const CIMD_MAX_BYTES = 5000;
 /** The consent cookie: the double-submit CSRF value, sent back only from the door's own pages (SameSite=Strict). */
@@ -59,7 +67,17 @@ export function redirectAllowed(uri: unknown): uri is string {
     return false;
   }
   if (u.username || u.password) return false;
-  return u.protocol === 'https:' || (u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname));
+  return u.protocol === 'https:' || (u.protocol === 'http:' && LOOPBACK.includes(u.hostname));
+}
+
+/** The hosts a native client's loopback redirect may use. */
+const LOOPBACK = ['localhost', '127.0.0.1', '[::1]'];
+
+/** True when a requested redirect URI matches a registered one: exactly, or a loopback http one on any port (RFC 8252 §7.3). */
+function redirectMatches(registered: string, requested: string): boolean {
+  if (registered === requested) return true;
+  const [a, b] = [new URL(registered), new URL(requested)];
+  return a.protocol === 'http:' && b.protocol === 'http:' && LOOPBACK.includes(a.hostname) && a.hostname === b.hostname && a.pathname === b.pathname && a.search === b.search;
 }
 
 /** True when a resource indicator (RFC 8707) names this door's MCP endpoint or the door itself. */
@@ -93,17 +111,18 @@ export async function oauthCaller(env: Env, header: string | undefined): Promise
 }
 
 /**
- * Reads a client ID metadata document: an https URL with a path, fetched without redirects, at most 5 KB and 3 s. Its
- * `client_id` must equal the URL exactly; only its https and loopback redirect URIs count. Anything else is null.
+ * Reads a client ID metadata document: an https URL with a path on another host than the door, fetched without redirects, at
+ * most 5 KB and 3 s. Its `client_id` must equal the URL exactly; only its https and loopback redirect URIs count. Anything
+ * else is null.
  */
-async function metadataDocument(url: string, fetchFn: typeof fetch): Promise<Client | null> {
+async function metadataDocument(url: string, ownHost: string, fetchFn: typeof fetch): Promise<Client | null> {
   let u: URL;
   try {
     u = new URL(url);
   } catch {
     return null;
   }
-  if (u.protocol !== 'https:' || u.hash || u.username || u.password || u.pathname === '/') return null;
+  if (u.protocol !== 'https:' || u.hash || u.username || u.password || u.pathname === '/' || u.host === ownHost) return null;
   try {
     const res = await fetchFn(url, { headers: { Accept: 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(3000) });
     if (res.status !== 200 || !res.body) return null;
@@ -130,22 +149,25 @@ async function metadataDocument(url: string, fetchFn: typeof fetch): Promise<Cli
 }
 
 /** The client behind a client_id: an https one by its metadata document, any other from the registrations; null when unknown. */
-async function clientOf(env: Env, clientId: string, fetchFn: typeof fetch): Promise<Client | null> {
-  if (clientId.startsWith('https://')) return metadataDocument(clientId, fetchFn);
+async function clientOf(env: Env, clientId: string, ownHost: string, fetchFn: typeof fetch): Promise<Client | null> {
+  if (clientId.startsWith('https://')) return metadataDocument(clientId, ownHost, fetchFn);
   const row = await db(env).prepare('SELECT client_name, redirect_uris FROM oauth_clients WHERE client_id = ?').bind(clientId).first<{ client_name: string; redirect_uris: string }>();
   return row ? { clientId, name: row.client_name, redirectUris: JSON.parse(row.redirect_uris) as string[] } : null;
 }
 
-/** An HTML reply that no other site may frame, no cache keeps and no Referer carries away; `formTo` adds a form-action origin. */
-function secureHtml(c: Context, html: string, status: 200 | 400 | 403, formTo?: string) {
-  c.header('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'${formTo ? ` ${formTo}` : ''}`);
+/**
+ * An HTML reply that no other site may frame, no cache keeps and no Referer carries away. `formAction` is the form-action
+ * source list (default the door only); an empty one leaves the directive out.
+ */
+function secureHtml(c: Context, html: string, status: 200 | 400 | 403, formAction = "'self'") {
+  c.header('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; base-uri 'none'; frame-ancestors 'none'${formAction ? `; form-action ${formAction}` : ''}`);
   c.header('X-Frame-Options', 'DENY');
   c.header('Cache-Control', 'no-store');
   c.header('Referrer-Policy', 'no-referrer');
   return c.html(html, status);
 }
 
-/** A refusal page; it never redirects, so a bad client or redirect URI never receives anything. */
+/** A refusal page; it never redirects, so a bad request never sends the browser anywhere. */
 const refusal = (c: Context, status: 400 | 403, title: string, text: string) => secureHtml(c, page(`Lazydoor – ${title}`, `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(text)}</p>`), status);
 
 /** Whole euros from cents, with thousands separators. */
@@ -192,6 +214,12 @@ async function issue(c: Context<{ Bindings: Env }>, clientId: string, buyerId: s
     s.prepare(insert).bind(await sha256Hex(refresh), 'refresh', clientId, buyerId, Date.now() + REFRESH_TTL_MS),
   ]);
   return c.json({ access_token: access, token_type: 'Bearer', expires_in: ACCESS_TTL_S, refresh_token: refresh, scope: SCOPE }, 200, NO_STORE);
+}
+
+/** When `find` names a used code or refresh token, revokes every token of that grant (its sandbox's buyer id). */
+async function revokeReused(env: Env, find: string, hash: string): Promise<void> {
+  const used = await db(env).prepare(find).bind(hash).first<{ buyer_id: string }>();
+  if (used) await db(env).prepare('DELETE FROM oauth_tokens WHERE buyer_id = ?').bind(used.buyer_id).run();
 }
 
 /** The token request's fields: a form (the standard) or JSON, as strings; anything else is dropped. */
@@ -248,6 +276,7 @@ export function oauthRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env
   /** Dynamic client registration: public clients only (no secret), https or loopback redirect URIs, at most 5. */
   app.post('/oauth/register', small, async (c) => {
     await perAddress(c);
+    await limit(c.env, 'oauth-register-all', REGISTER_ALL_PER_MINUTE, `at most ${REGISTER_ALL_PER_MINUTE} client registrations a minute for everyone`);
     const b = (await c.req.json().catch(() => null)) as { client_name?: unknown; redirect_uris?: unknown } | null;
     const uris = b?.redirect_uris;
     if (!Array.isArray(uris) || uris.length === 0 || uris.length > 5 || !uris.every(redirectAllowed)) {
@@ -256,33 +285,41 @@ export function oauthRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env
     const name = typeof b?.client_name === 'string' && b.client_name.trim() ? b.client_name.trim().slice(0, 100) : 'MCP client';
     const clientId = `lzc_${b64u(crypto.getRandomValues(new Uint8Array(16)))}`;
     const issuedAt = Math.floor(Date.now() / 1000);
-    await db(c.env).prepare('INSERT INTO oauth_clients(client_id, client_name, redirect_uris, created_at) VALUES (?,?,?,?)').bind(clientId, name, JSON.stringify(uris), new Date().toISOString()).run();
+    const s = db(c.env);
+    await s.batch([
+      s.prepare('INSERT INTO oauth_clients(client_id, client_name, redirect_uris, created_at) VALUES (?,?,?,?)').bind(clientId, name, JSON.stringify(uris), new Date().toISOString()),
+      s.prepare(`DELETE FROM oauth_clients WHERE client_id IN (SELECT client_id FROM oauth_clients ORDER BY created_at DESC, client_id OFFSET ${MAX_CLIENTS})`),
+    ]);
     return c.json({ client_id: clientId, client_id_issued_at: issuedAt, client_name: name, redirect_uris: uris, token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], scope: SCOPE }, 201);
   });
 
   /**
-   * The authorization request. A bad client or redirect URI gets a plain 400 page and no redirect; with both good, every
-   * other error goes back to the redirect URI (with state and iss). A good request is stored for 10 minutes and shown as
-   * the consent page, with its CSRF value both in the form and in an HttpOnly SameSite=Strict cookie.
+   * The authorization request. Every error is a plain 400 page and never a redirect, since anyone can register a client with
+   * their own redirect URI (RFC 9700 §4.11.2); the browser leaves the door only after the person answers the consent page. A
+   * good request is stored for 10 minutes (expired ones are swept) and shown as the consent page, with its CSRF value both in
+   * the form and in an HttpOnly SameSite=Strict cookie.
    */
   app.get('/oauth/authorize', async (c) => {
     await perAddress(c);
     const q = c.req.query();
     const origin = new URL(c.req.url).origin;
-    const client = q.client_id ? await clientOf(c.env, q.client_id, fetchFn) : null;
+    const client = q.client_id ? await clientOf(c.env, q.client_id, new URL(c.req.url).host, fetchFn) : null;
     if (!client) return refusal(c, 400, 'Unknown app', 'This app is not registered with the door. Start again from the app.');
-    if (!redirectAllowed(q.redirect_uri) || !client.redirectUris.includes(q.redirect_uri)) return refusal(c, 400, 'Wrong return address', 'This return address is not registered for this app.');
-    const back = (error: string) => c.redirect(withParams(q.redirect_uri, { error, ...(q.state ? { state: q.state } : {}), iss: origin }), 302);
-    if (q.response_type !== 'code') return back('unsupported_response_type');
-    if (q.code_challenge_method !== 'S256' || !/^[A-Za-z0-9_-]{43}$/.test(q.code_challenge ?? '') || (q.state ?? '').length > 500) return back('invalid_request');
-    if (q.resource && !ourResource(origin, q.resource)) return back('invalid_target');
+    if (!redirectAllowed(q.redirect_uri) || !client.redirectUris.some((r) => redirectMatches(r, q.redirect_uri))) return refusal(c, 400, 'Wrong return address', 'This return address is not registered for this app.');
+    if (q.response_type !== 'code') return refusal(c, 400, 'Unsupported request', 'This door supports only the authorization code flow (response_type=code).');
+    if (q.code_challenge_method !== 'S256' || !/^[A-Za-z0-9_-]{43}$/.test(q.code_challenge ?? '') || (q.state ?? '').length > 500) return refusal(c, 400, 'PKCE required', 'This door needs PKCE with S256 (code_challenge and code_challenge_method=S256).');
+    if (q.resource && !ourResource(origin, q.resource)) return refusal(c, 400, 'Wrong resource', "The resource is not this door's MCP endpoint.");
     const [request, csrf] = [secret(), secret()];
-    await db(c.env)
-      .prepare('INSERT INTO oauth_requests(id_hash, csrf_hash, client_id, client_name, redirect_uri, code_challenge, state, expires_ms) VALUES (?1::text, ?2::text, ?3::text, ?4::text, ?5::text, ?6::text, ?7::text, ?8::bigint)')
-      .bind(await sha256Hex(request), await sha256Hex(csrf), client.clientId, client.name, q.redirect_uri, q.code_challenge, q.state ?? null, Date.now() + STEP_TTL_MS)
-      .run();
+    const s = db(c.env);
+    await s.batch([
+      s.prepare('DELETE FROM oauth_requests WHERE expires_ms < ?::bigint').bind(Date.now()),
+      s.prepare('INSERT INTO oauth_requests(id_hash, csrf_hash, client_id, client_name, redirect_uri, code_challenge, state, expires_ms) VALUES (?1::text, ?2::text, ?3::text, ?4::text, ?5::text, ?6::text, ?7::text, ?8::bigint)')
+        .bind(await sha256Hex(request), await sha256Hex(csrf), client.clientId, client.name, q.redirect_uri, q.code_challenge, q.state ?? null, Date.now() + STEP_TTL_MS),
+    ]);
     c.header('Set-Cookie', `${CSRF_COOKIE}=${csrf}; Path=/oauth; HttpOnly; Secure; SameSite=Strict; Max-Age=${STEP_TTL_MS / 1000}`);
-    return secureHtml(c, consentPage(client, q.redirect_uri, request, csrf), 200, new URL(q.redirect_uri).origin);
+    // a CSP host-source cannot name an IPv6 literal, so such a client's Cancel goes without the form-action directive
+    const to = new URL(q.redirect_uri);
+    return secureHtml(c, consentPage(client, q.redirect_uri, request, csrf), 200, /^[a-z0-9.-]+$/i.test(to.hostname) ? `'self' ${to.origin}` : '');
   });
 
   /**
@@ -292,6 +329,7 @@ export function oauthRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env
    * (on this page only) beside the link back to the client.
    */
   app.post('/oauth/authorize', small, async (c) => {
+    await perAddress(c);
     const form = await c.req.parseBody().catch(() => ({}) as Record<string, unknown>);
     const [request, csrf, decision] = ['request', 'csrf', 'decision'].map((k) => (typeof form[k] === 'string' ? (form[k] as string) : ''));
     const cookie = getCookie(c, CSRF_COOKIE) ?? '';
@@ -310,6 +348,7 @@ export function oauthRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env
     const [kitchen, code] = [newKey('ap'), secret()];
     const s = db(c.env);
     await s.batch([
+      s.prepare('DELETE FROM oauth_codes WHERE expires_ms < ?::bigint').bind(Date.now()),
       s.prepare('INSERT INTO approver_keys(key_hash, buyer_id, approver) VALUES (?,?,?)').bind(await sha256Hex(kitchen), buyerId, TRY_APPROVER),
       s.prepare('INSERT INTO oauth_codes(code_hash, client_id, redirect_uri, code_challenge, buyer_id, expires_ms) VALUES (?1::text, ?2::text, ?3::text, ?4::text, ?5::text, ?6::bigint)')
         .bind(await sha256Hex(code), row.client_id, row.redirect_uri, row.code_challenge, buyerId, Date.now() + STEP_TTL_MS),
@@ -318,19 +357,24 @@ export function oauthRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env
   });
 
   /**
-   * The token endpoint (public clients). An authorization code is deleted on its first use, whatever follows, then must be
-   * unexpired and match the client, the redirect URI and the PKCE verifier; a refresh token rotates (the old one is deleted).
+   * The token endpoint (public clients). An authorization code is marked used on its first use, whatever follows, then must
+   * be unexpired and match the client, the redirect URI and the PKCE verifier; a refresh token rotates (the old one is marked
+   * used). A used code or refresh token presented again revokes every token of its grant (OAuth 2.1 §4.1.3, §4.3.1): one
+   * consent is one sandbox, so the grant is the sandbox's buyer id.
    */
   app.post('/oauth/token', small, async (c) => {
+    await limit(c.env, `oauth-token:${addressBucket(addressOf(c))}`, TOKEN_PER_ADDRESS_PER_MINUTE, `at most ${TOKEN_PER_ADDRESS_PER_MINUTE} token requests a minute from one address`);
     const f = await fieldsOf(c);
     const fail = (error: string, description: string) => c.json({ error, error_description: description }, 400, NO_STORE);
     const s = db(c.env);
     if (f.grant_type === 'authorization_code') {
       if (!f.code || !f.client_id || !f.redirect_uri || !f.code_verifier) return fail('invalid_request', 'code, client_id, redirect_uri and code_verifier are required');
+      const codeHash = await sha256Hex(f.code);
       const row = await s
-        .prepare('DELETE FROM oauth_codes WHERE code_hash = ?1::text RETURNING client_id, redirect_uri, code_challenge, buyer_id, expires_ms')
-        .bind(await sha256Hex(f.code))
+        .prepare('UPDATE oauth_codes SET used = TRUE WHERE code_hash = ?1::text AND NOT used RETURNING client_id, redirect_uri, code_challenge, buyer_id, expires_ms')
+        .bind(codeHash)
         .first<{ client_id: string; redirect_uri: string; code_challenge: string; buyer_id: string; expires_ms: number }>();
+      if (!row) await revokeReused(c.env, 'SELECT buyer_id FROM oauth_codes WHERE code_hash = ?1::text AND used', codeHash);
       const verifierOk = /^[A-Za-z0-9._~-]{43,128}$/.test(f.code_verifier) && row !== null && (await sameSecret(await s256(f.code_verifier), row.code_challenge));
       if (!row || row.expires_ms <= Date.now() || row.client_id !== f.client_id || row.redirect_uri !== f.redirect_uri || !verifierOk) return fail('invalid_grant', 'the code is unknown, used, expired, or not for this client, redirect URI or verifier');
       if (f.resource && !ourResource(new URL(c.req.url).origin, f.resource)) return fail('invalid_target', 'the resource is not this door');
@@ -338,10 +382,12 @@ export function oauthRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env
     }
     if (f.grant_type === 'refresh_token') {
       if (!f.refresh_token || !f.client_id) return fail('invalid_request', 'refresh_token and client_id are required');
+      const refreshHash = await sha256Hex(f.refresh_token);
       const row = await s
-        .prepare("DELETE FROM oauth_tokens WHERE token_hash = ?1::text AND kind = 'refresh' RETURNING client_id, buyer_id, expires_ms")
-        .bind(await sha256Hex(f.refresh_token))
+        .prepare("UPDATE oauth_tokens SET kind = 'used' WHERE token_hash = ?1::text AND kind = 'refresh' RETURNING client_id, buyer_id, expires_ms")
+        .bind(refreshHash)
         .first<{ client_id: string; buyer_id: string; expires_ms: number }>();
+      if (!row) await revokeReused(c.env, "SELECT buyer_id FROM oauth_tokens WHERE token_hash = ?1::text AND kind = 'used'", refreshHash);
       if (!row || row.expires_ms <= Date.now() || row.client_id !== f.client_id) return fail('invalid_grant', 'the refresh token is unknown, used, expired or not for this client');
       return issue(c, row.client_id, row.buyer_id);
     }

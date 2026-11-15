@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS oauth_requests (id_hash TEXT PRIMARY KEY, csrf_hash T
 CREATE TABLE IF NOT EXISTS oauth_codes (code_hash TEXT PRIMARY KEY, client_id TEXT NOT NULL, redirect_uri TEXT NOT NULL, code_challenge TEXT NOT NULL, buyer_id TEXT NOT NULL, expires_ms BIGINT NOT NULL);
 CREATE TABLE IF NOT EXISTS oauth_tokens (token_hash TEXT PRIMARY KEY, kind TEXT NOT NULL, client_id TEXT NOT NULL, buyer_id TEXT NOT NULL, expires_ms BIGINT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_oauth_tokens_buyer ON oauth_tokens(buyer_id);
+ALTER TABLE oauth_codes ADD COLUMN IF NOT EXISTS used BOOLEAN NOT NULL DEFAULT FALSE;
 `;
 
 /** Every table in SCHEMA, in an order that deletes children first. */

@@ -182,10 +182,14 @@ describe('the whole flow, as Claude does it', () => {
     const t = await connect();
     const r1 = await json(await token({ grant_type: 'refresh_token', refresh_token: t.refresh_token, client_id: t.client }));
     expect(r1).toMatchObject({ access_token: expect.any(String), refresh_token: expect.any(String) });
-    expect((await token({ grant_type: 'refresh_token', refresh_token: t.refresh_token, client_id: t.client })).status).toBe(400);
     expect((await rpc(r1.access_token, 'tools/list')).status).toBe(200);
     await db(e).prepare("DELETE FROM try_visitors WHERE buyer_id LIKE 'visitor-%'").run();
     expect((await rpc(r1.access_token, 'tools/list')).status).toBe(401);
+    const t3 = await connect();
+    const r3 = await json(await token({ grant_type: 'refresh_token', refresh_token: t3.refresh_token, client_id: t3.client }));
+    expect((await rpc(r3.access_token, 'tools/list')).status).toBe(200);
+    expect((await token({ grant_type: 'refresh_token', refresh_token: t3.refresh_token, client_id: t3.client })).status).toBe(400);
+    expect((await rpc(r3.access_token, 'tools/list')).status, 'a reused refresh token revokes the whole grant').toBe(401);
     const t2 = await connect();
     await app.request('/admin/reset', { method: 'POST', headers: { Authorization: 'Bearer adm', 'Content-Type': 'application/json' }, body: JSON.stringify({ clock: '2026-11-13T21:10:00+02:00' }) }, e);
     await setFlag(true);
@@ -216,21 +220,29 @@ describe('authorization request checks', () => {
     }
   });
 
-  it('requires PKCE with S256 and a resource on this door, answering at the redirect URI', async () => {
-    const client = await register();
+  it('requires PKCE with S256 and a resource on this door, refusing on a page and never redirecting before consent', async () => {
+    const client = await register('https://evil.example/cb');
     const p = await pkce();
-    const base = { response_type: 'code', client_id: client, redirect_uri: CLAUDE, state: 's9' };
-    for (const [params, error] of [
-      [{ ...base }, 'invalid_request'],
-      [{ ...base, code_challenge: p.challenge, code_challenge_method: 'plain' }, 'invalid_request'],
-      [{ ...base, code_challenge: p.challenge, code_challenge_method: 'S256', response_type: 'token' }, 'unsupported_response_type'],
-      [{ ...base, code_challenge: p.challenge, code_challenge_method: 'S256', resource: 'https://other.example/mcp' }, 'invalid_target'],
-    ] as const) {
+    const base = { response_type: 'code', client_id: client, redirect_uri: 'https://evil.example/cb', state: 's9' };
+    for (const params of [
+      { ...base },
+      { ...base, code_challenge: p.challenge, code_challenge_method: 'plain' },
+      { ...base, code_challenge: p.challenge, code_challenge_method: 'S256', response_type: 'token' },
+      { ...base, code_challenge: p.challenge, code_challenge_method: 'S256', resource: 'https://other.example/mcp' },
+    ]) {
       const r = await req(`/oauth/authorize?${new URLSearchParams(params as Record<string, string>)}`);
-      expect(r.status, error).toBe(302);
-      const to = new URL(r.headers.get('Location')!);
-      expect([to.origin + to.pathname, to.searchParams.get('error'), to.searchParams.get('state')]).toEqual([CLAUDE, error, 's9']);
+      expect(r.status, JSON.stringify(params)).toBe(400);
+      expect(r.headers.get('Location')).toBeNull();
     }
+  });
+
+  it('matches a loopback redirect on any port, and limits the consent form to the client origin', async () => {
+    const client = await register('http://127.0.0.1:6274/callback');
+    const p = await pkce();
+    const a = await authorize({ response_type: 'code', client_id: client, redirect_uri: 'http://127.0.0.1:51123/callback', code_challenge: p.challenge, code_challenge_method: 'S256' });
+    expect(a.r.status).toBe(200);
+    expect(a.r.headers.get('Content-Security-Policy')).toContain("form-action 'self' http://127.0.0.1:51123");
+    expect((await req(`/oauth/authorize?${new URLSearchParams({ response_type: 'code', client_id: client, redirect_uri: 'http://127.0.0.1:51123/other', code_challenge: p.challenge, code_challenge_method: 'S256' })}`)).status).toBe(400);
   });
 
   it('refuses a consent without its cookie, with a wrong csrf value, twice, or after a cancel', async () => {
@@ -257,7 +269,13 @@ describe('authorization request checks', () => {
     expect((await json(await token({ grant_type: 'authorization_code', code: c2.code!, redirect_uri: 'https://claude.ai/other', client_id: a, code_verifier: p.verifier }))).error).toBe('invalid_grant');
     const c3 = await consent(await authorize({ response_type: 'code', client_id: a, redirect_uri: CLAUDE, code_challenge: p.challenge, code_challenge_method: 'S256' }));
     expect((await token({ grant_type: 'authorization_code', code: c3.code!, redirect_uri: CLAUDE, client_id: a, code_verifier: p.verifier })).status).toBe(200);
-    expect((await json(await token({ grant_type: 'authorization_code', code: c3.code!, redirect_uri: CLAUDE, client_id: a, code_verifier: p.verifier }))).error).toBe('invalid_grant');
+    const issued = await json(await token({ grant_type: 'authorization_code', code: c3.code!, redirect_uri: CLAUDE, client_id: a, code_verifier: p.verifier }));
+    expect(issued.error).toBe('invalid_grant');
+    const c4 = await consent(await authorize({ response_type: 'code', client_id: a, redirect_uri: CLAUDE, code_challenge: p.challenge, code_challenge_method: 'S256' }));
+    const t4 = await json(await token({ grant_type: 'authorization_code', code: c4.code!, redirect_uri: CLAUDE, client_id: a, code_verifier: p.verifier }));
+    expect((await rpc(t4.access_token, 'tools/list')).status).toBe(200);
+    await token({ grant_type: 'authorization_code', code: c4.code!, redirect_uri: CLAUDE, client_id: a, code_verifier: p.verifier });
+    expect((await rpc(t4.access_token, 'tools/list')).status, 'a reused code revokes the tokens it issued').toBe(401);
     expect((await json(await token({ grant_type: 'password', username: 'x' }))).error).toBe('unsupported_grant_type');
   });
 });
@@ -273,5 +291,8 @@ describe('client ID metadata documents', () => {
     const p = await pkce();
     expect((await req(`/oauth/authorize?${new URLSearchParams({ response_type: 'code', client_id: bad, redirect_uri: CLAUDE, code_challenge: p.challenge, code_challenge_method: 'S256' })}`)).status).toBe(400);
     expect((await req(`/oauth/authorize?${new URLSearchParams({ response_type: 'code', client_id: id, redirect_uri: 'https://claude.ai/elsewhere', code_challenge: p.challenge, code_challenge_method: 'S256' })}`)).status).toBe(400);
+    const self = `${ORIGIN}/oauth/client.json`;
+    documents.set(self, { client_id: self, client_name: 'Loop', redirect_uris: [CLAUDE] });
+    expect((await req(`/oauth/authorize?${new URLSearchParams({ response_type: 'code', client_id: self, redirect_uri: CLAUDE, code_challenge: p.challenge, code_challenge_method: 'S256' })}`)).status, 'never fetches its own origin').toBe(400);
   });
 });
