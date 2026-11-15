@@ -1,9 +1,10 @@
-// "Connect Claude": how to add Lazydoor to Claude as a custom connector and what happens next. It shows only on a door
-// that publishes its OAuth metadata (the sign-in the connector needs); every word is here, to follow the confirmed flow.
+// "Connect Claude": how to add Lazydoor to Claude as a custom connector and what happens next. Off until the connector
+// flow is confirmed (`enabled`); then it shows only on a door that publishes its OAuth metadata. Every word is here.
 import { DOOR_URL } from "./inside.mjs";
 import { answers } from "./features.mjs";
 
 export const CONNECT = {
+  enabled: false,
   heading: "Connect Claude",
   lede: "Let your own Claude order through the door.",
   mcpUrl: `${DOOR_URL}/mcp`,
@@ -20,8 +21,8 @@ export const CONNECT = {
 };
 
 const checked = {};
-/** True when the door at `base` publishes its OAuth metadata (checked once per page). */
-export const connectReady = (base, fetchImpl = fetch) => (checked[base] ??= answers(base, CONNECT.metadata, fetchImpl));
+/** True when the section is switched on and the door at `base` publishes its OAuth metadata (checked once per page). */
+export const connectReady = (base, fetchImpl = fetch) => (CONNECT.enabled ? (checked[base] ??= answers(base, CONNECT.metadata, fetchImpl)) : Promise.resolve(false));
 
 /** An element with a class and text. */
 function el(tag, cls = "", text = "") {

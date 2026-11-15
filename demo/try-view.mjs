@@ -1,7 +1,7 @@
 // The "Try it: you are the chef" panel under Live: input, example chips, Send, and one result area that shows the door's
 // question, offer refusal, decision or the manager's phone card. Built with DOM calls only (text, never markup).
-import { EXAMPLES, MAX_TEXT, CACHED_NOTE, PROGRESS, SLOW, stepAt, postTry, viewOf, VOICE_MAX_S, pickMime, postVoice, voiceViewOf, getPeppol, PEPPOL_LABEL, PEPPOL_CAPTION } from "./try.mjs";
-import { hasRoute } from "./features.mjs";
+import { EXAMPLES, MAX_TEXT, CACHED_NOTE, PROGRESS, SLOW, stepAt, postTry, viewOf, VOICE_MAX_S, VOICE_MAX_BYTES, pickMime, postVoice, voiceViewOf, getPeppol, PEPPOL_LABEL, PEPPOL_CAPTION } from "./try.mjs";
+import { voiceOn } from "./features.mjs";
 import { ICONS } from "./icons.mjs";
 
 const STORE_KEY = "lazydoor.try";
@@ -202,15 +202,15 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
   };
 
   /**
-   * Under an accepted order: the Peppol export of it, fetched with the visitor's token, as a download link and one line;
-   * nothing shows when the door has no Peppol route (404) or the order has no id.
+   * Under an accepted order: its Peppol export, fetched with the visitor's token (a plain link cannot send the header),
+   * saved through a Blob URL, with one line. Nothing shows unless the door answers 200 (flag off, not accepted, unknown).
    */
-  const attachPeppol = async (box, orderId) => {
-    if (!box || !orderId || !sandbox?.visitor) return;
-    const res = await getPeppol(base, orderId, sandbox.visitor, fetchImpl);
+  const attachPeppol = async (box, { orderId, approvalToken }) => {
+    if (!box || !(orderId || approvalToken) || !sandbox?.visitor) return;
+    const res = await getPeppol(base, { orderId, approvalToken }, sandbox.visitor, fetchImpl);
     if (res.status !== 200 || !res.blob) return;
     const a = el("a", "try-peppol", PEPPOL_LABEL);
-    Object.assign(a, { href: URL.createObjectURL(res.blob), download: `lazydoor-order-${orderId}.xml` });
+    Object.assign(a, { href: URL.createObjectURL(res.blob), download: `lazydoor-order-${orderId ?? "approved"}.xml` });
     box.append(a, el("p", "try-peppol-note", PEPPOL_CAPTION));
   };
 
@@ -291,7 +291,7 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
       asking(null);
     }
     const box = show(view);
-    if (view.kind === "accepted") attachPeppol(box, res.body?.order?.orderId);
+    if (view.kind === "accepted") attachPeppol(box, { orderId: res.body?.order?.orderId });
     if (pending) input.focus();
   };
 
@@ -305,7 +305,7 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
     const view = viewOf(res, codes, true);
     if (view.kind === "error") box.querySelectorAll("button").forEach((b) => (b.disabled = false));
     const shown = show(view);
-    if (view.kind === "accepted") attachPeppol(shown, res.body?.order?.orderId);
+    if (view.kind === "accepted") attachPeppol(shown, { orderId: res.body?.order?.orderId, approvalToken: token });
   };
 
   let rec = null;
@@ -367,6 +367,10 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
       show({ kind: "error", tone: "reject", title: "Nothing was recorded. Try again, or type your request.", lines: [] });
       return;
     }
+    if (blob.size > VOICE_MAX_BYTES) {
+      show({ kind: "error", tone: "reject", title: `Too long: keep a voice request under ${VOICE_MAX_S} s.`, lines: [] });
+      return;
+    }
     busy = true;
     send.disabled = true;
     mic.disabled = true;
@@ -375,7 +379,13 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
     result.setAttribute("aria-busy", "true");
     status.replaceChildren(loading);
     empty.hidden = true;
-    const res = await postVoice(base, blob, sandbox?.visitor, fetchImpl);
+    let res = await postVoice(base, blob, sandbox?.visitor, fetchImpl);
+    // The door forgot this visitor's sandbox (evicted): forget the token and send the clip once more without it.
+    if (voiceViewOf(res).kind === "stale-visitor") {
+      sandbox = null;
+      saveSandbox(null);
+      res = await postVoice(base, blob, null, fetchImpl);
+    }
     busy = false;
     send.disabled = false;
     mic.disabled = false;
@@ -402,8 +412,8 @@ export function mountTry({ root, base, follow, started = () => {}, fetchImpl = f
 
   mic.addEventListener("click", () => (rec ? stopVoice() : startVoice()));
   micState(false);
-  // Voice needs a recorder in this browser and a door that lists /v1/try/voice.
-  if (typeof MediaRecorder !== "undefined" && navigator.mediaDevices?.getUserMedia) hasRoute(base, "/v1/try/voice", fetchImpl).then((ok) => (mic.hidden = !ok));
+  // Voice needs a recorder in this browser and a door whose discovery document lists tryIt.voice.
+  if (typeof MediaRecorder !== "undefined" && navigator.mediaDevices?.getUserMedia) voiceOn(base, fetchImpl).then((ok) => (mic.hidden = !ok));
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();

@@ -5,8 +5,8 @@ import { HERO, FLOW, FLOW_NOTE, FLOW_STILL, GUARDRAILS, GUARD_STILL, BUILT_WITH,
 import { ICONS } from "./icons.mjs";
 import { AC_ID, acChip, acNote, labelAcChips, fillAcceptance, openCase } from "./acceptance-view.mjs";
 import { mountConnect } from "./connect.mjs";
-import { hasRoute } from "./features.mjs";
-import { PEPPOL_ROUTE, PEPPOL_CAPTION } from "./try.mjs";
+import { peppolOn } from "./features.mjs";
+import { PEPPOL_CAPTION } from "./try.mjs";
 
 /** An element with a class and text. */
 function el(tag, cls = "", text = "") {
@@ -259,7 +259,7 @@ export async function mountInside(root, base, go, proofUrl = "proof.json") {
   connectSlot.hidden = true;
   root.replaceChildren(hero(go), flow(), guardrails(), live.s, proofSlot, acSlot, builtWith(), connectSlot, production(go));
   mountConnect(connectSlot, base);
-  hasRoute(base, PEPPOL_ROUTE).then((ok) => {
+  peppolOn(base).then((ok) => {
     const line = root.querySelector(".peppol-line");
     if (!ok || !line) return;
     line.append(el("b", "", "Peppol export: "), PEPPOL_CAPTION);
