@@ -4,7 +4,7 @@ import { getProducts } from '../catalog/search';
 import { now } from '../clock';
 import { REASONS } from '../domain/reasons';
 import type { Env } from '../env';
-import { identify } from '../http/auth';
+import { isAgentCaller } from '../http/auth';
 import { OrderError, approve, approverInbox, freeStock, getOrder, limitKey, reject, type ApproveReply, type OrderView } from '../orders/store';
 import type { Draft, OfferLine } from '../quote/build';
 import { getQuote } from '../quote/store';
@@ -28,7 +28,7 @@ form{display:inline}button{font:inherit;font-size:1.05rem;border:0;border-radius
 button.no{background:#a33}.state{font-weight:600}.qr svg{width:160px;height:160px}a{color:#1d6b3a}`;
 
 /** Wraps a body in the phone-first page shell: viewport, Google Fonts (the only external asset) and the shared style. */
-function page(title: string, body: string): string {
+export function page(title: string, body: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(title)}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
 <style>${CSS}</style></head><body><main>${body}</main></body></html>`;
@@ -174,8 +174,7 @@ export function uiRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }>
 
   for (const [verb, act] of [['approve', (e: Env, t: string, role: 'approver' | 'agent') => approve(e, t, { callerRole: role }, fetchFn)], ['reject', (e: Env, t: string, role: 'approver' | 'agent') => reject(e, t, { callerRole: role })]] as const) {
     ui.post(`/${verb}/:token`, async (c) => {
-      const who = await identify(c.env, c.req.header('Authorization'));
-      const r = await act(c.env, c.req.param('token'), who?.role === 'agent' || who?.role === 'judge' ? 'agent' : 'approver');
+      const r = await act(c.env, c.req.param('token'), (await isAgentCaller(c.env, c.req.header('Authorization'))) ? 'agent' : 'approver');
       return wantsJson(c.req.header('Accept')) || !c.req.header('Accept')?.includes('text/html') ? c.json(r) : c.html(resultPage(r));
     });
   }

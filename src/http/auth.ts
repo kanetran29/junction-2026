@@ -49,6 +49,17 @@ export async function identify(env: Env, header: string | undefined): Promise<Ca
   return row ? { role: row.role, buyerId: row.buyer_id } : null;
 }
 
+/**
+ * True when the Authorization header carries an agent or judge key, or any connector (OAuth) token, live or not: such a caller
+ * orders but can never approve or reject.
+ */
+export async function isAgentCaller(env: Env, header: string | undefined): Promise<boolean> {
+  const who = await identify(env, header);
+  if (who) return who.role === 'agent' || who.role === 'judge';
+  const token = bearerOf(header);
+  return Boolean(token && (await db(env).prepare('SELECT 1 AS one FROM oauth_tokens WHERE token_hash = ?').bind(await sha256Hex(token)).first()));
+}
+
 /** The context key under which `authenticate` stores the resolved caller. */
 const CALLER = 'caller';
 

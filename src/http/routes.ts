@@ -27,6 +27,7 @@ import { AUD, jwks, signJws } from '../sign/door';
 import { tryDecision, tryIt } from '../try/sandbox';
 import { VOICE_MAX_BYTES, VOICE_TYPES, audioType, transcribe } from '../try/voice';
 import { VERSION, discovery } from './discovery';
+import { oauthRoutes } from '../oauth/server';
 
 export const INTERPRET_PER_MINUTE = 20;
 /** `/v1/audit/verify` recomputes the whole chain, so anonymous callers get at most this many a minute per client address. */
@@ -339,7 +340,7 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
   app.get('/.well-known/jwks.json', async (c) => c.json(await jwks(c.env), 200, { 'Cache-Control': 'public, max-age=300' }));
 
   /** What any agent fetches first: where the API, MCP, rules, events, audit, keys and demo are. */
-  app.get('/.well-known/agent-gateway.json', async (c) => c.json(discovery(new URL(c.req.url).origin, c.env.DEMO_MODE === '1', await featureOn(c.env, 'voice'))));
+  app.get('/.well-known/agent-gateway.json', async (c) => c.json(discovery(new URL(c.req.url).origin, c.env.DEMO_MODE === '1', { voice: await featureOn(c.env, 'voice'), connector: await featureOn(c.env, 'connector'), peppol: await featureOn(c.env, 'peppol') })));
 
   app.doc('/openapi.json', (c) => {
     const discoveryUrl = `${new URL(c.req.url).origin}/.well-known/agent-gateway.json`;
@@ -352,6 +353,7 @@ export function createApp(fetchFn: typeof fetch = fetch): OpenAPIHono<{ Bindings
 
   app.route('/', adminRoutes());
   app.route('/', uiRoutes(fetchFn));
+  app.route('/', oauthRoutes(fetchFn));
   return app;
 }
 

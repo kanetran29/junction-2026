@@ -1,7 +1,7 @@
 import type { Env } from '../env';
 import { HttpError } from '../http/auth';
 import { retryAfterOf } from '../interpret/gemini';
-import { TRY_FREE_TEXT_PER_MINUTE, limit, limitAddress, limitVisitor, sandboxOf } from './sandbox';
+import { limitAddress, limitFreeText, limitVisitor, sandboxOf } from './sandbox';
 
 /** The largest clip the door reads, in bytes (the page's recorder stops at 30 s; the door enforces size only). */
 export const VOICE_MAX_BYTES = 1_000_000;
@@ -52,7 +52,7 @@ export async function transcribe(env: Env, clip: Uint8Array, mimeType: string, a
   await limitAddress(env, address);
   if (visitor) await limitVisitor(env, visitor);
   if (visitor) await sandboxOf(env, visitor);
-  await limit(env, 'try-free-text', TRY_FREE_TEXT_PER_MINUTE, `the models are shared: at most ${TRY_FREE_TEXT_PER_MINUTE} free-text tries a minute for everyone; pick one of the example sentences, they need no model call`);
+  await limitFreeText(env);
   if (!env.GEMINI_API_KEY) throw new HttpError(503, 'MODEL_UNAVAILABLE', 'no Gemini key');
   let res: Response;
   try {

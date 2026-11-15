@@ -8,7 +8,11 @@ import type { Env } from '../env';
 import { confirmDraft, interpret } from '../interpret/gemini';
 import { createBasket, getOrder, placeOrder } from '../orders/store';
 import { createQuote, type QuoteInput } from '../quote/store';
-import { HttpError, rateLimit, requireBuyer } from '../http/auth';
+import { featureOn } from '../clock';
+import { SANDBOX_BUYER_PREFIX } from '../domain/constants';
+import { HttpError, countUse, identify, rateLimit } from '../http/auth';
+import { MCP_PER_TOKEN_PER_MINUTE, challenge, oauthCaller } from '../oauth/server';
+import { limitFreeText } from '../try/sandbox';
 import { INTERPRET_PER_MINUTE, errorBody, searchReply } from '../http/routes';
 import * as S from '../http/schemas';
 
@@ -32,6 +36,7 @@ const tools: Tool[] = [
     output: S.InterpretReply,
     run: async (a, { env, buyerId, auth, fetchFn }) => {
       await rateLimit(env, auth, INTERPRET_PER_MINUTE);
+      if (buyerId.startsWith(SANDBOX_BUYER_PREFIX)) await limitFreeText(env);
       return { draft: await interpret(env, { buyerId, text: a.text }, { fetch: fetchFn }), valioCalls: 0 };
     },
   },
@@ -133,12 +138,27 @@ export async function handleMcp(req: Request, who: { env: Env; buyerId: string; 
   return transport.handleRequest(req);
 }
 
-/** The `/mcp` route (POST only; stateless, so no event stream): the same bearer key as `/v1`, answered by `handleMcp`. */
+/**
+ * The `/mcp` route (POST only; stateless, so no event stream), answered by `handleMcp`: the same bearer API key as `/v1`, or
+ * (feature `connector`) a connector access token, which acts for its own sandbox kitchen only, at most 60 calls a minute.
+ * With the connector on, a missing or dead token is 401 with a WWW-Authenticate challenge pointing to the OAuth metadata.
+ */
 export function mcpRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }> {
   const app = new Hono<{ Bindings: Env }>();
   app.post('/mcp', async (c) => {
-    const { buyerId } = await requireBuyer(c);
-    return handleMcp(c.req.raw, { env: c.env, buyerId, fetchFn });
+    const header = c.req.header('Authorization');
+    const key = await identify(c.env, header);
+    if (key?.buyerId) return handleMcp(c.req.raw, { env: c.env, buyerId: key.buyerId, fetchFn });
+    if (key) throw new HttpError(403, 'FORBIDDEN', 'the admin key has no buyer; use an agent or judge key');
+    const connector = await featureOn(c.env, 'connector');
+    const oauth = connector ? await oauthCaller(c.env, header) : null;
+    if (oauth) {
+      if ((await countUse(c.env, `oauth-mcp:${oauth.tokenHash}`)) > MCP_PER_TOKEN_PER_MINUTE) throw new HttpError(429, 'RATE_LIMITED', `at most ${MCP_PER_TOKEN_PER_MINUTE} MCP calls a minute for this token`);
+      return handleMcp(c.req.raw, { env: c.env, buyerId: oauth.buyerId, fetchFn });
+    }
+    const detail = { error: 'UNAUTHORIZED', detail: 'a valid Bearer API key is required' };
+    if (connector) return c.json(detail, 401, { 'WWW-Authenticate': challenge(new URL(c.req.url).origin, header !== undefined) });
+    return c.json(detail, 401);
   });
   app.all('/mcp', (c) => c.json({ error: 'METHOD_NOT_ALLOWED', detail: 'POST JSON-RPC to /mcp' }, 405, { Allow: 'POST' }));
   return app;

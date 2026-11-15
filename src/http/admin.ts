@@ -26,7 +26,7 @@ const ResetBody = z.object({
 });
 
 /** A random API key with a readable prefix (`ld_` agent, `ap_` approver, `jd_` judge); only its sha256 is stored. */
-function newKey(prefix: string): string {
+export function newKey(prefix: string): string {
   return `${prefix}_${[...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
@@ -87,7 +87,7 @@ export function adminRoutes(): Hono<{ Bindings: Env }> {
     await ensureSchema(env);
     const s = db(env);
     // the event lock too, so an event being appended right now cannot land on top of the wiped chain
-    await s.batch([s.prepare(`SELECT pg_advisory_xact_lock(${EVENT_LOCK})`), ...['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'try_visitors', 'mandates', 'buyer_keys'].map((t) => s.prepare(`DELETE FROM ${t}`)), s.prepare("DELETE FROM api_keys WHERE role <> 'judge'")]);
+    await s.batch([s.prepare(`SELECT pg_advisory_xact_lock(${EVENT_LOCK})`), ...['order_lines', 'orders', 'quotes', 'baskets', 'drafts', 'events', 'approver_keys', 'rate_limits', 'oauth_tokens', 'oauth_codes', 'oauth_requests', 'try_visitors', 'mandates', 'buyer_keys'].map((t) => s.prepare(`DELETE FROM ${t}`)), s.prepare("DELETE FROM api_keys WHERE role <> 'judge'")]);
     await setClock(env, b.clock ?? null);
     await setSetting(env, 'replay', b.replay ? '1' : null);
     await setSetting(env, 'recording', b.replay ?? null);
