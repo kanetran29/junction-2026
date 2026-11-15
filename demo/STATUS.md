@@ -331,6 +331,13 @@ Vấn đề tìm thấy:
 - Deck: slide 6 có ảnh ghi âm thật và bullet về giọng nói và Claude; slide 7 sơ đồ thêm "Any agent, or Claude" (OAuth), "Voice to text" và hộp Peppol BIS Order 3.0; bullet và notes trong `pitch.json` cập nhật (bỏ chữ "live" trong notes vì deck là ảnh tĩnh). Render lại `pitch/out` và tab Deck; vẫn 9 slide.
 - Test: 77 pass với Playwright; `label overlaps: 0`; 375 px không cuộn ngang (Live, Inside). Story không đổi.
 
+### 45. "Same sentence, several models"; api-catalog, llms.txt, CORS khi door có
+- Inside: mục mới sau "How an order flows" (`demo/models-view.mjs`), đọc `models.json` (eval trên `main`); không có file thì mục ẩn. Lede: model chỉ đọc chữ; giá, giới hạn, cut-off và duyệt là code của door; reader và Gemma lệch nhau thì door hỏi bếp. Bảng điểm theo model (đọc đúng cả câu, số field đúng, sai nhưng thành câu hỏi, sai mà lọt qua, thời gian trung vị; reader của door có vạch hồng; second reader ghi "n/a") và lưới câu × model (✓ hoặc tên field đọc sai, hoặc "error"). 375 px: bảng điểm thành thẻ, lưới cuộn ngang trong khung riêng, trang không cuộn ngang.
+- Proof: thêm một dòng dưới các con số khi `models.json` có, ví dụ với dữ liệu eval thật: "5 models read the same 14 sentences: the door's reader read 12 exactly, asked the kitchen on 3 and let 0 wrong readings through." Đã render thử `models.json` thật (5 model × 14 câu) ở 375 và 1280 px: không cuộn ngang.
+- Compare: không thêm dòng; dòng "Meaning" (hai model đọc, lệch thì hỏi) đã nói ý này.
+- Check it yourself: link "API catalog (RFC 9727)" và "llms.txt" chỉ hiện khi door trả 200; dòng CORS chỉ hiện khi `/.well-known/jwks.json` trả 200 kèm `Access-Control-Allow-Origin`. Lúc 06:55Z cả hai route còn 404.
+- Test: fixture `demo/test/models.fixture.json` (cùng shape với eval, ghi rõ "Fixture only"); test đơn vị và Playwright ở 375 px và 1280 px.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

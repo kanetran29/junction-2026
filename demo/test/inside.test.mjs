@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { HERO, FLOW, GUARDRAILS, BUILT_WITH, CHECKS, COMMANDS, summarize, runCheck } from "../inside.mjs";
+import { scoreOf, readingText, modelsReady } from "../models-view.mjs";
 
 const SERVER = fileURLToPath(new URL("../dev/fake-gateway.mjs", import.meta.url));
 const PORT = 8796;
@@ -75,8 +76,13 @@ test("inside page: renders every section, loads proof.json, shows each live chec
     marksLoaded: [...document.querySelectorAll(".stack-group .mark-img")].every((img) => img.complete && img.naturalWidth > 0),
     scroll: document.documentElement.scrollWidth,
     client: document.documentElement.clientWidth,
+    modelsHidden: document.querySelector('.inside-section[data-section="models"]').hidden,
+    optional: [...document.querySelectorAll(".check-links a")].map((a) => a.textContent),
+    cors: document.querySelectorAll(".check-cors").length,
   }));
-  assert.deepEqual(out.sections, ["hero", "flow", "guardrails", "ways", "checks", "proof", "acceptance", "stack", "production"]);
+  assert.equal(out.modelsHidden, true, "no models.json: the models section stays hidden");
+  assert.deepEqual([out.optional, out.cors], [["OpenAPI document", "Discovery document"], 0], "api-catalog, llms.txt and CORS show only once the door answers them");
+  assert.deepEqual(out.sections, ["hero", "flow", "models", "guardrails", "ways", "checks", "proof", "acceptance", "stack", "production"]);
   assert.equal(out.h1, "Lazy at the order, strict at the border.");
   assert.ok(out.h1Lines <= 2, `the punchline takes ${out.h1Lines} lines at 375 px`);
   assert.equal(out.stills.length, 4);
@@ -87,4 +93,49 @@ test("inside page: renders every section, loads proof.json, shows each live chec
   assert.deepEqual(out.marks, [["assets/logos/aiven-logo-white.svg"], ["cloudflare"], ["googlegemini"], ["assets/logos/gemma-mark-dark.svg"], ["cloudflare"], ["openapiinitiative", "modelcontextprotocol"]]);
   assert.ok(out.marksLoaded, "the official logos load");
   assert.ok(out.scroll <= out.client, `page is ${out.scroll} px wide in a ${out.client} px viewport`);
+});
+
+test("models: scores and readings read the eval's shape; the second reader has no asked or unflagged count", () => {
+  const data = JSON.parse(readFileSync(new URL("./models.fixture.json", import.meta.url), "utf8"));
+  assert.ok(modelsReady(data));
+  assert.equal(modelsReady({ models: [], rows: [] }), false);
+  assert.deepEqual(scoreOf(data.models[0], 3), { exact: "2/3", fields: "17/18 fields", asked: "1", unflagged: "0", risky: false, ms: "1,240 ms", role: "Door's reader" });
+  assert.deepEqual([scoreOf(data.models[1], 3).asked, scoreOf(data.models[1], 3).role], ["n/a", "Second reader"]);
+  assert.equal(scoreOf(data.models[2], 3).risky, true);
+  assert.deepEqual(data.rows.map((r) => readingText(r.readings["fixture-small"])), ["✓", "deliveryDate, unit", "error"]);
+});
+
+test("models page: the section, the grid and the Proof line show from models.json, no horizontal page scroll at 375 px", { skip: !pw && "playwright-core not installed (set PLAYWRIGHT_CORE)" }, async (t) => {
+  const child = spawn(process.execPath, [SERVER, "--port", String(PORT + 1)], { stdio: ["ignore", "pipe", "inherit"] });
+  t.after(() => child.kill());
+  await new Promise((resolve) => child.stdout.once("data", resolve));
+  const chromium = pw.chromium ?? pw.default.chromium;
+  const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, headless: true });
+  t.after(() => browser.close());
+  const fixture = readFileSync(new URL("./models.fixture.json", import.meta.url), "utf8");
+  for (const width of [375, 1280]) {
+    const page = await browser.newPage({ viewport: { width, height: 900 } });
+    await page.route("**/models.json", (r) => r.fulfill({ status: 200, contentType: "application/json", body: fixture }));
+    await page.goto(`http://localhost:${PORT + 1}/?mode=inside`);
+    await page.waitForSelector('.inside-section[data-section="models"][data-loaded]');
+    await page.waitForSelector(".proof-models");
+    const out = await page.evaluate(() => ({
+      h2: document.querySelector(".is-models h2").textContent,
+      rows: [...document.querySelectorAll(".models-score tbody tr")].map((tr) => [...tr.children].map((c) => c.textContent)),
+      door: document.querySelector(".models-score tr[data-door]")?.dataset.model,
+      grid: [...document.querySelectorAll(".models-grid tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map((c) => c.textContent)),
+      proof: document.querySelector(".proof-models").textContent,
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }));
+    assert.equal(out.h2, "Same sentence, several models");
+    assert.deepEqual(out.rows[1], ["Gemma 4 31BSecond reader", "2/316/18 fields", "n/a", "n/a", "2,310 ms"]);
+    assert.equal(out.door, "gemini-3.8-flash");
+    assert.deepEqual(out.grid, [["✓", "✓", "✓"], ["✓", "deliveryDate", "deliveryDate, unit"], ["qty", "✓", "error"]]);
+    assert.equal(out.proof, "3 models read the same 3 sentences: the door's reader read 2 exactly, asked the kitchen on 1 and let 0 wrong readings through.");
+    assert.ok(out.scroll <= out.client, `page is ${out.scroll} px wide in a ${out.client} px viewport`);
+    if (width === 375) await page.locator(".is-models").screenshot({ path: fileURLToPath(new URL("../shots/models-375.png", import.meta.url)) });
+    else await page.locator(".is-models").screenshot({ path: fileURLToPath(new URL("../shots/models-desktop.png", import.meta.url)) });
+    await page.close();
+  }
 });
