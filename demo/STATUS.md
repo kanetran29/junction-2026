@@ -322,6 +322,15 @@ Vấn đề tìm thấy:
 - Connect Claude: `CONNECT.enabled = false` nên luôn ẩn, kể cả khi door có OAuth metadata, tới khi build session xác nhận luồng.
 - Test: 77 pass với Playwright; `label overlaps: 0`.
 
+### 44. Trang khoe ba thế mạnh mới (Kane: "xong nhớ test và update lại trang để showcase thế mạnh")
+- Nhánh đã theo `main` (fast-forward tới 7ee1832): `cases.json` 66 case. `acceptance.json` tạo lại: 66 case, lần chạy 63/63 phủ 63 case, AC64 tới AC66 chưa có trong lần chạy đó (trang nói rõ); thêm nhóm rubric "Trust". Dấu pass "cả lần chạy đạt" chỉ áp dụng khi lần chạy phủ hết các case.
+- Mọi tính năng mới đọc một lần từ `/.well-known/agent-gateway.json`: `tryIt.voice`, `peppol`, `mcp.oauth`. Tính năng nào door chưa quảng bá thì không hiện gì.
+- Inside: một mục mới "Use it your way" sau Guardrails, ba lối vào, mỗi lối một câu và một hành động: From Claude (URL connector + Copy), By voice (nút sang Try it, ảnh chụp thật lúc đang ghi âm), Into your ordering system (ảnh chụp thật XML Peppol do chính `buildPeppolOrder` của door dựng cho đơn sữa 1.010,00 € của Story, mở trong trình xem XML của Chrome). Mục Connect riêng và dòng Peppol cũ trong Inside bỏ, gộp vào đây.
+- Compare: nhóm "Use it your way" với 3 dòng (Bring your own AI, Orders your systems can read, Speak the order), mỗi dòng chỉ hiện khi tính năng bật; cột "without" ghi "No equivalent" thay cho dấu gạch dài; chip AC66, AC64, AC65.
+- Connect Claude (Live, Inside, ghi chú Deck): đúng luồng build session xác nhận trên door 751c00be: năm bước, giới hạn 500 €/1.500 €, chờ duyệt, từ chối trên 5.000 €/10.000 €, tab "Open your kitchen", Claude bị từ chối 403 khi duyệt, kitchen hết sau 20 phút không dùng.
+- Deck: slide 6 có ảnh ghi âm thật và bullet về giọng nói và Claude; slide 7 sơ đồ thêm "Any agent, or Claude" (OAuth), "Voice to text" và hộp Peppol BIS Order 3.0; bullet và notes trong `pitch.json` cập nhật (bỏ chữ "live" trong notes vì deck là ảnh tĩnh). Render lại `pitch/out` và tab Deck; vẫn 9 slide.
+- Test: 77 pass với Playwright; `label overlaps: 0`; 375 px không cuộn ngang (Live, Inside). Story không đổi.
+
 ## Còn lại / cần làm sau
 - Live: khi biết `buyerId` agent tham chiếu dùng (mặc định `hotel-a`, đổi bằng `?buyer=`), kiểm lại trên door thật lúc agent chạy. Bảng luật của bếp trong Live ghi 500 € một đơn / 1.500 € một ngày (mandate của chuỗi v2.1); nếu door chạy mandate khác thì chữ này sai.
 - Gắn `demo/` vào Worker tại `/demo` (mục 5).

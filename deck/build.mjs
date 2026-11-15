@@ -65,22 +65,23 @@ const LAYOUTS = {
     <div class="evidence">${slide.guardrails.bullets.map((b, i) => `<div><p>${point(b)}</p>${shot(`shots/compare-${["self-approval", "splitting", "allergens", "stock"][i]}.webp`, "The Compare page row for this guardrail, with its acceptance case and reason code.")}</div>`).join("")}</div>`,
   demo: () => `
     ${h1("demo")}
-    <div class="split demo">${shot("shots/live-stage.webp", "Live: the scene animates the deployed door's event log; the audit chain check is green.")}
-      <div>${shot("shots/try-phone.webp", "Try it: the door held the visitor's 1,010.00 € order and asks them to decide as the kitchen manager.")}${points(slide.demo.bullets)}</div></div>`,
+    <div class="split demo"><div>${shot("shots/live-stage.webp", "Live: the scene animates the deployed door's event log; the audit chain check is green.", "stage")}${points(slide.demo.bullets)}</div>
+      <div>${shot("shots/try-voice.webp", "Try it recording a spoken request: the timer reads 0:04 of 0:30 and Send waits.", "strip")}${shot("shots/try-phone.webp", "Try it: the door held the visitor's 1,010.00 € order and asks them to decide as the kitchen manager.")}</div></div>`,
   built: () => `
     ${h1("built")}
     <div class="arch">
-      <div class="box agent"><span class="marks">${logo("openapiinitiative")}${logo("modelcontextprotocol")}</span><b>Any agent</b><span>HTTP API or MCP</span></div>
+      <div class="box agent"><span class="marks">${logo("openapiinitiative")}${logo("modelcontextprotocol")}</span><b>Any agent, or Claude</b><span>HTTP API, MCP, OAuth</span></div>
       <div class="box door">${logo("cloudflare")}<b>Lazydoor</b><span>Cloudflare Workers</span><span>Rules, quotes, receipts</span></div>
       <div class="deps">
         <div class="box"><i></i><div><b>Valio API</b><span>Availability and price</span></div></div>
-        <div class="box"><span class="marks">${logo("googlegemini")}${mark("gemma-mark-dark.svg")}</span><div><b>Gemini 3.8 Flash, Gemma 4 31B</b><span>A draft, then a second reading</span></div></div>
+        <div class="box"><span class="marks">${logo("googlegemini")}${mark("gemma-mark-dark.svg")}</span><div><b>Gemini 3.8 Flash, Gemma 4 31B</b><span>Voice to text, a draft, a second reading</span></div></div>
         <div class="box"><span class="marks">${logo("cloudflare")}</span><div><b>Cloudflare D1</b><span>Catalogue of 17,546 products</span></div></div>
         <div class="box"><span class="marks">${mark("aiven-logo-white.svg", "mark wide")}</span><div><b>Aiven for PostgreSQL</b><span>Every write, via Hyperdrive</span></div></div>
+        <div class="box"><i></i><div><b>Peppol BIS Order 3.0</b><span>Each accepted order, UBL 2.1, export only</span></div></div>
       </div>
       <svg class="wires" viewBox="0 0 1728 500" aria-hidden="true">
         <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0L10 5L0 10z"/></marker></defs>
-        <path d="M300 250H396" marker-end="url(#tip)"/>${[55, 185, 315, 445].map((y) => `<path d="M840 ${y}H956" marker-end="url(#tip)"/>`).join("")}
+        <path d="M300 250H396" marker-end="url(#tip)"/>${[45, 147, 249, 351, 453].map((y) => `<path d="M840 ${y}H956" marker-end="url(#tip)"/>`).join("")}
       </svg>
     </div>
     ${points(slide.built.bullets, "grid2")}`,

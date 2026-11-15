@@ -36,13 +36,13 @@
       "id": "demo",
       "src": "assets/deck/06.webp",
       "heading": "Try it: type a request, decide as the manager",
-      "notes": "DEMO, about two minutes. Open the demo page on the deployed door. Show the Story from the door going up to the held order and the manager's phone. Then Live: hand the laptop to the reviewer and let them type a request in Try it, or click a chip. If the door holds it, they approve as the kitchen manager. End on Inside: the audit chain is valid, checked live."
+      "notes": "DEMO, about two minutes. Open the demo page on the deployed door. Show the Story from the door going up to the held order and the manager's phone. Then Live: hand the laptop to the reviewer and let them type a request in Try it, or click a chip. If the door holds it, they approve as the kitchen manager. End on Inside: the audit chain is valid, checked live. Two more ways in: say the order with the mic, or connect your own Claude with one URL; the same rules apply, and Claude can never approve."
     },
     {
       "id": "built",
       "src": "assets/deck/07.webp",
       "heading": "Built to be trusted",
-      "notes": "Every write lives in Aiven PostgreSQL through Hyperdrive. Each order commits in one transaction under an advisory lock, so the stock ledger never oversells, and every step is an event in a hash-chained log. Quotes and receipts are signed with the door's Ed25519 key, published at /.well-known/jwks.json. Gemini drafts, Gemma double-checks. Any agent connects through the typed HTTP API or the MCP server."
+      "notes": "Every write lives in Aiven PostgreSQL through Hyperdrive. Each order commits in one transaction under an advisory lock, so the stock ledger never oversells, and every step is an event in a hash-chained log. Quotes and receipts are signed with the door's Ed25519 key, published at /.well-known/jwks.json. Gemini drafts, Gemma double-checks. Any agent connects through the typed HTTP API or the MCP server. Every accepted order also exports as a Peppol BIS Order 3.0 document (UBL 2.1), export only, and Claude connects over OAuth 2.1 to a sandbox kitchen of its own."
     },
     {
       "id": "proof",

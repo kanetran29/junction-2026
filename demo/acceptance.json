@@ -870,6 +870,49 @@
       ],
       "checks": 7,
       "pass": true
+    },
+    {
+      "id": "AC64",
+      "title": "Peppol BIS Order 3.0 export of an accepted order; a held one is refused",
+      "rubric": [
+        "trust",
+        "e2e"
+      ],
+      "calls": [
+        "quote",
+        "place_order",
+        "peppol_export"
+      ],
+      "checks": 11
+    },
+    {
+      "id": "AC65",
+      "title": "Voice in Try it: a spoken request comes back as text only; a non-audio body is refused",
+      "rubric": [
+        "need",
+        "e2e"
+      ],
+      "calls": [
+        "try_voice"
+      ],
+      "checks": 5
+    },
+    {
+      "id": "AC66",
+      "title": "Claude connector: OAuth 2.1 with PKCE opens a sandbox kitchen; the agent orders over /mcp and can never approve",
+      "rubric": [
+        "trust",
+        "e2e"
+      ],
+      "calls": [
+        "connector_connect",
+        "connector_tools",
+        "connector_order",
+        "connector_kitchen",
+        "connector_approve",
+        "connector_rest"
+      ],
+      "checks": 26
     }
   ]
 }
