@@ -5,6 +5,7 @@ import { HERO, FLOW, FLOW_NOTE, FLOW_STILL, GUARDRAILS, GUARD_STILL, BUILT_WITH,
 import { ICONS } from "./icons.mjs";
 import { AC_ID, acChip, acNote, labelAcChips, fillAcceptance, openCase } from "./acceptance-view.mjs";
 import { mountWays } from "./ways.mjs";
+import { mountModels } from "./models-view.mjs";
 
 /** An element with a class and text. */
 function el(tag, cls = "", text = "") {
@@ -134,6 +135,15 @@ function checks(base) {
   links.append(link(`${DOOR_URL}/openapi.json`, "OpenAPI document"), link(`${DOOR_URL}/.well-known/agent-gateway.json`, "Discovery document"));
   const s = section("checks", "Check it yourself, live", bento, commands, links);
 
+  /** Adds the API catalog and llms.txt links, and the CORS line, once the door answers them. */
+  const extras = async () => {
+    const door = String(base).replace(/\/+$/, "");
+    const answers = await Promise.all(OPTIONAL_LINKS.map((l) => fetch(`${door}${l.path}`).then((r) => r.ok, () => false)));
+    OPTIONAL_LINKS.forEach((l, i) => answers[i] && links.append(link(`${DOOR_URL}${l.path}`, l.label)));
+    const cors = await fetch(`${door}/.well-known/jwks.json`).then((r) => r.ok && r.headers.get("access-control-allow-origin"), () => null);
+    if (cors) s.append(el("p", "check-cors", "Public GETs answer pages on any origin (CORS), so a check like these runs from your own page too."));
+  };
+
   /** Puts one result into a tile. */
   const fill = ({ t, value, text }, out) => {
     t.dataset.state = out.state;
@@ -151,6 +161,7 @@ function checks(base) {
     const c = results.codes;
     fill(tiles.rules, r.state === "ok" && c.state === "ok" ? { state: "ok", value: `${r.value}, ${c.value}`, text: r.text } : r.state === "ok" ? r : c);
     fill(tiles.discovery, results.discovery);
+    await extras();
     if (results.discovery.list) {
       const details = el("details", "endpoints");
       const ul = el("ul");
@@ -161,6 +172,12 @@ function checks(base) {
   };
   return { s, run };
 }
+
+/** Discovery documents the door may serve; each link shows only once it answers 200. */
+const OPTIONAL_LINKS = [
+  { path: "/.well-known/api-catalog", label: "API catalog (RFC 9727)" },
+  { path: "/llms.txt", label: "llms.txt" },
+];
 
 /** Proof: display numerals from proof.json, the agent-run video with its poster, and the pitch link when there is one. */
 function proof(data) {
@@ -247,13 +264,16 @@ function production(go) {
  * for the hero's two actions. A #ac-AC05 hash opens that acceptance case. Resolves once proof.json, the live checks and
  * acceptance.json have answered.
  */
-export async function mountInside(root, base, go, proofUrl = "proof.json") {
+export async function mountInside(root, base, go, proofUrl = "proof.json", modelsUrl = "models.json") {
   const live = checks(base);
   const proofSlot = section("proof", "Proof", el("p", "muted", "Loading the proof numbers."));
   const acSlot = section("acceptance", "Acceptance cases", el("p", "muted", "Loading the acceptance cases."));
   const waysSlot = section("ways", null);
   waysSlot.hidden = true;
-  root.replaceChildren(hero(go), flow(), guardrails(), waysSlot, live.s, proofSlot, acSlot, builtWith(), production(go));
+  const modelsSlot = section("models", null);
+  modelsSlot.hidden = true;
+  root.replaceChildren(hero(go), flow(), modelsSlot, guardrails(), waysSlot, live.s, proofSlot, acSlot, builtWith(), production(go));
+  const modelsLoad = mountModels(modelsSlot, modelsUrl);
   mountWays(waysSlot, base, go);
   labelAcChips(root);
   const smooth = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -263,5 +283,8 @@ export async function mountInside(root, base, go, proofUrl = "proof.json") {
     .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
     .then((data) => proofSlot.replaceWith(proof(data)))
     .catch(() => proofSlot.replaceChildren(el("h2", "", "Proof"), el("p", "muted", "The proof numbers could not be loaded.")));
-  await Promise.all([proofLoad, live.run(), acLoad]);
+  const modelsLine = Promise.all([modelsLoad, proofLoad]).then(([data]) => {
+    if (data?.summary) root.querySelector('[data-section="proof"] .numerals')?.after(el("p", "proof-models", `Same sentence, ${data.models.length} models: ${data.summary}`));
+  });
+  await Promise.all([proofLoad, live.run(), acLoad, modelsLine]);
 }

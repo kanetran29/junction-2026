@@ -456,6 +456,42 @@ body.kiosk .stage { width: min(100vw, 177.78vh); margin: 0 auto; border-radius: 
 .commands { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 10px; }
 .commands li { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 12px 10px 16px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--line); }
 .commands code { font: 13px var(--anatomy-mono); color: var(--ink); overflow-wrap: anywhere; min-width: 0; }
+.check-cors { margin: 12px 0 0; font-size: 14px; color: var(--ink-dim); }
+.models-lede { margin: 0 0 24px; max-width: 70ch; font-size: 16px; line-height: 1.55; }
+.is-models { min-width: 0; }
+.models-scroll { overflow-x: auto; max-width: 100%; contain: inline-size; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.models-scroll:focus-visible { outline: 2px solid var(--brand-soft); outline-offset: 2px; }
+.is-models h3 { margin: 32px 0 14px; }
+.models-score, .models-grid { width: 100%; border-collapse: collapse; font-size: 14px; }
+.models-score th, .models-score td, .models-grid th, .models-grid td { padding: 12px 16px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.models-score tbody tr:last-child > *, .models-grid tbody tr:last-child > * { border-bottom: 0; }
+.models-score thead th, .models-grid thead th { font: 600 12px/1.35 var(--sans); color: var(--ink-dim); white-space: normal; min-width: 96px; }
+.models-score tbody th { color: #fff; font-weight: 700; min-width: 160px; }
+.models-score tr[data-door] > th { box-shadow: inset 3px 0 0 var(--brand); }
+.models-score td { font: 600 15px/1.4 var(--anatomy-mono); color: var(--ink); white-space: nowrap; }
+.models-score td b { display: block; font: 800 20px/1.2 var(--sans); color: #fff; }
+.models-role, .models-sub { display: block; font: 500 12px/1.45 var(--sans); color: var(--ink-dim); margin-top: 3px; white-space: normal; }
+.models-risky { color: var(--bad) !important; }
+.models-grid tbody th { font-weight: 500; color: var(--ink); min-width: 220px; max-width: 360px; }
+.models-text { display: block; }
+.models-grid td { font: 600 13px/1.45 var(--anatomy-mono); min-width: 96px; }
+.models-exact { color: var(--ok); }
+.models-wrong { color: var(--muted-bad); }
+.models-error { color: var(--ink-dim); }
+.models-summary { margin: 20px 0 0; font: 700 clamp(17px, 1.6vw, 20px)/1.4 var(--sans); color: #fff; max-width: 62ch; }
+.models-meta { margin: 8px 0 0; font-size: 13px; color: var(--ink-dim); }
+@media (max-width: 640px) {
+  .models-score thead { display: none; }
+  .models-score tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--line); padding: 4px 0; }
+  .models-score tbody tr:last-child { border-bottom: 0; }
+  .models-score tbody th { grid-column: 1 / -1; min-width: 0; }
+  .models-score th, .models-score td { border-bottom: 0; padding: 8px 16px; white-space: normal; }
+  .models-score td::before { content: attr(data-label); display: block; font: 500 12px/1.35 var(--sans); color: var(--ink-dim); margin-bottom: 2px; }
+  .models-score { font-size: 13px; }
+  .models-scroll:has(.models-score) { contain: none; overflow: visible; }
+  .models-grid tbody th { min-width: 170px; }
+}
+.proof-models { margin: -12px 0 32px; font-size: 15px; color: var(--ink); max-width: 70ch; }
 .check-links { display: flex; flex-wrap: wrap; gap: 20px; margin: 18px 0 0; font-size: 14px; }
 .inside-page a:not(.btn), .compare-page a:not(.btn) { color: var(--brand-soft); }
 .numerals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin: 0 0 36px; }

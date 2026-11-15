@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2026-11-15T06:00:00Z",
+  "today": "2026-11-13",
+  "secondReader": "gemma-4-31b-it",
+  "sentences": 3,
+  "models": [
+    { "model": "gemini-3.8-flash", "label": "Gemini 3.8 Flash", "isDoorReader": true, "fieldsRight": 17, "fieldsTotal": 18, "sentencesExact": 2, "asked": 1, "wrongUnflagged": 0, "errors": 0, "msMedian": 1240 },
+    { "model": "gemma-4-31b-it", "label": "Gemma 4 31B", "isDoorReader": false, "fieldsRight": 16, "fieldsTotal": 18, "sentencesExact": 2, "asked": null, "wrongUnflagged": null, "errors": 0, "msMedian": 2310 },
+    { "model": "fixture-small", "label": "A small model", "isDoorReader": false, "fieldsRight": 12, "fieldsTotal": 18, "sentencesExact": 1, "asked": 1, "wrongUnflagged": 1, "errors": 1, "msMedian": 640 }
+  ],
+  "rows": [
+    { "text": "1,000 litres of lactose-free milk by Monday", "note": "the story's order", "expected": { "qty": 1000, "unit": "l" },
+      "readings": { "gemini-3.8-flash": { "exact": true, "wrongFields": [], "error": null }, "gemma-4-31b-it": { "exact": true, "wrongFields": [], "error": null }, "fixture-small": { "exact": true, "wrongFields": [], "error": null } } },
+    { "text": "20 kg chicken for Friday", "note": "which Friday", "expected": { "qty": 20, "unit": "kg" },
+      "readings": { "gemini-3.8-flash": { "exact": true, "wrongFields": [], "error": null }, "gemma-4-31b-it": { "exact": false, "wrongFields": ["deliveryDate"], "error": null }, "fixture-small": { "exact": false, "wrongFields": ["deliveryDate", "unit"], "error": null } } },
+    { "text": "the usual butter, double it", "note": "no amount", "expected": { "qty": null },
+      "readings": { "gemini-3.8-flash": { "exact": false, "wrongFields": ["qty"], "error": null }, "gemma-4-31b-it": { "exact": true, "wrongFields": [], "error": null }, "fixture-small": { "exact": false, "wrongFields": [], "error": "timeout" } } }
+  ],
+  "summary": "Fixture only: every wrong reading by the door's reader was caught as a question."
+}
