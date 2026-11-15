@@ -15,7 +15,7 @@ const withoutPass = (cases) => cases.map(({ pass, checks, ...c }) => c);
 
 test("acceptance.json matches research/acceptance/cases.json (run node demo/dev/acceptance.mjs after editing the cases) and carries no inputs", () => {
   assert.deepEqual(withoutPass(buildAcceptance(source).cases), withoutPass(published.cases));
-  assert.equal(published.cases.length, 63);
+  assert.equal(published.cases.length, 66);
   const keys = new Set(RUBRICS.map(([k]) => k));
   for (const c of published.cases) {
     assert.match(c.id, /^AC\d{2,}$/);

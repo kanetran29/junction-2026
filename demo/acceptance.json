@@ -1,9 +1,9 @@
 {
   "source": "research/acceptance/cases.json",
   "run": {
-    "passed": 63,
-    "total": 63,
-    "version": "e48a8c55-f64f-471f-a52f-4681cd8973e4",
+    "passed": 66,
+    "total": 66,
+    "version": "751c00be-64e9-4100-bc9d-cf2b9f64a5a9",
     "date": "2026-11-15"
   },
   "cases": [
@@ -869,6 +869,53 @@
         "try"
       ],
       "checks": 7,
+      "pass": true
+    },
+    {
+      "id": "AC64",
+      "title": "Peppol BIS Order 3.0 export of an accepted order; a held one is refused",
+      "rubric": [
+        "openness",
+        "e2e"
+      ],
+      "calls": [
+        "quote",
+        "place_order",
+        "peppol_export"
+      ],
+      "checks": 11,
+      "pass": true
+    },
+    {
+      "id": "AC65",
+      "title": "Voice in Try it: a spoken request comes back as text only; a non-audio body is refused",
+      "rubric": [
+        "need",
+        "e2e"
+      ],
+      "calls": [
+        "try_voice"
+      ],
+      "checks": 5,
+      "pass": true
+    },
+    {
+      "id": "AC66",
+      "title": "Claude connector: OAuth 2.1 with PKCE opens a sandbox kitchen; the agent orders over /mcp and can never approve",
+      "rubric": [
+        "controls",
+        "openness",
+        "e2e"
+      ],
+      "calls": [
+        "connector_connect",
+        "connector_tools",
+        "connector_order",
+        "connector_kitchen",
+        "connector_approve",
+        "connector_rest"
+      ],
+      "checks": 26,
       "pass": true
     }
   ]

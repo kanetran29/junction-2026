@@ -1443,7 +1443,7 @@
       "id": "AC64",
       "tier": 1,
       "title": "Peppol BIS Order 3.0 export of an accepted order; a held one is refused",
-      "rubric": ["trust 20", "e2e 30"],
+      "rubric": ["openness 15", "e2e 30"],
       "steps": [
         {"call": "quote", "input": {"draft": {"category": "10400", "claims": ["FREE_FROM_LACTOSE"], "quantity": {"value": 20, "unit": "l"}, "deliverBy": "2026-11-16"}}, "expect": [["offers[0].lines[0].productId", "=", "464306"]]},
         {"call": "place_order", "input": {"offer": 0, "agentReason": "Cheapest lactose-free milk by Monday."}, "expect": [["state", "=", "ACCEPTED"]]},
@@ -1467,7 +1467,7 @@
       "id": "AC66",
       "tier": 1,
       "title": "Claude connector: OAuth 2.1 with PKCE opens a sandbox kitchen; the agent orders over /mcp and can never approve",
-      "rubric": ["trust 20", "e2e 30"],
+      "rubric": ["controls 20", "openness 15", "e2e 30"],
       "steps": [
         {"call": "connector_connect", "input": {}, "expect": [["registered", "=", 201], ["consentPage", "=", 200], ["consentShowsLimit", "=", true], ["consentNotFramable", "=", true], ["allowed", "=", 200], ["kitchenLink", "=", true], ["backState", "=", "acc"], ["backIssIsDoor", "=", true], ["tokenStatus", "=", 200], ["tokenType", "=", "Bearer"], ["expiresIn", "=", 3600], ["scope", "=", "agent"], ["refresh", "=", true]]},
         {"call": "connector_tools", "input": {}, "expect": [["httpStatus", "=", 200], ["tools[*].name", "contains", "place_order"]]},
