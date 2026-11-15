@@ -52,6 +52,7 @@ const LAYOUTS = {
   problem: () => `
     ${h1("problem")}
     ${points(slide.problem.bullets, "timeline")}
+    ${slide.problem.fact ? `<p class="fact">${point(slide.problem.fact)}</p>` : ""}
     ${shot(`${STILL}/nomilk.webp`, "Monday 07:00: the kitchen calendar is stamped NO MILK.", "band")}`,
   solution: () => `
     ${h1("solution")}

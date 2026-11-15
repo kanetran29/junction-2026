@@ -39,6 +39,7 @@ footer .junction { height: 52px; width: auto; margin: -15px -14px; }
 /* Problem: four beats on a line, then Monday. */
 .timeline { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 36px; font: 400 30px/1.3 var(--sans); }
 .timeline li { padding-top: 20px; border-top: 3px solid var(--brand); }
+.fact { margin: 0; font: 600 26px/1.35 var(--sans); color: var(--ink-dim); }
 .band { flex: 1; min-height: 0; }
 .band img { object-position: center 40%; }
 

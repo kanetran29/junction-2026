@@ -12,7 +12,7 @@
       "id": "problem",
       "src": "assets/deck/02.webp",
       "heading": "Friday 16:30: an agent orders milk for Monday",
-      "notes": "Hotel Aurora's chef needs 1,000 litres of lactose-free milk by Monday. The agent calls Valio's API, sees 999999 and Monday, orders 50 cases of 10-litre boxes. But 999999 means stock unknown, and that box closed on Thursday at 15:00. Nobody checked, nobody approved. Monday morning, there is no milk."
+      "notes": "Hotel Aurora's chef needs 1,000 litres of lactose-free milk by Monday. The agent calls Valio's API, sees 999999 and Monday, orders 50 cases of 10-litre boxes. But 999999 means stock unknown, and that box closed on Thursday at 15:00. Nobody checked, nobody approved. Monday morning, there is no milk. And this is not a corner case: in 539 recorded availability replies, 58% of stock figures are the 999999 placeholder and 40% of lines past their cut-off still show a delivery date; 29 of Valio's 250 substitution pairs add an allergen."
     },
     {
       "id": "solution",
@@ -48,7 +48,7 @@
       "id": "proof",
       "src": "assets/deck/08.webp",
       "heading": "It works, and you can check it",
-      "notes": "This is not a mock-up. 66 acceptance cases and 11 scenarios pass on the deployed door. A real Gemini agent ordered milk: held, approved by the manager, accepted at 1,010 euros. And you don't have to trust us: /v1/audit/verify recomputes the hash chain and signs the result, and our verify script checks it from outside. Change one byte of a quote and the door refuses it."
+      "notes": "This is not a mock-up. 63 acceptance cases and 11 scenarios pass on the deployed door. A real Gemini agent ordered milk: held, approved by the manager, accepted at 1,010 euros. And you don't have to trust us: /v1/audit/verify recomputes the hash chain and signs the result, and our verify script checks it from outside. Change one byte of a quote and the door refuses it."
     },
     {
       "id": "next",
