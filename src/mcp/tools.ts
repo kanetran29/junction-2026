@@ -8,10 +8,9 @@ import type { Env } from '../env';
 import { confirmDraft, interpret } from '../interpret/gemini';
 import { createBasket, getOrder, placeOrder } from '../orders/store';
 import { createQuote, type QuoteInput } from '../quote/store';
-import { featureOn } from '../clock';
 import { SANDBOX_BUYER_PREFIX } from '../domain/constants';
 import { HttpError, countUse, identify, rateLimit } from '../http/auth';
-import { MCP_PER_TOKEN_PER_MINUTE, challenge, oauthCaller } from '../oauth/server';
+import { MCP_PER_TOKEN_PER_MINUTE, challenge, connectorOn, oauthCaller } from '../oauth/server';
 import { limitFreeText } from '../try/sandbox';
 import { INTERPRET_PER_MINUTE, errorBody, searchReply } from '../http/routes';
 import * as S from '../http/schemas';
@@ -140,7 +139,7 @@ export async function handleMcp(req: Request, who: { env: Env; buyerId: string; 
 
 /**
  * The `/mcp` route (POST only; stateless, so no event stream), answered by `handleMcp`: the same bearer API key as `/v1`, or
- * (feature `connector`) a connector access token, which acts for its own sandbox kitchen only, at most 60 calls a minute.
+ * (demo door, feature `connector`) a connector access token, which acts for its own sandbox kitchen only, at most 60 calls a minute.
  * With the connector on, a missing or dead token is 401 with a WWW-Authenticate challenge pointing to the OAuth metadata.
  */
 export function mcpRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }> {
@@ -150,7 +149,7 @@ export function mcpRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }
     const key = await identify(c.env, header);
     if (key?.buyerId) return handleMcp(c.req.raw, { env: c.env, buyerId: key.buyerId, fetchFn });
     if (key) throw new HttpError(403, 'FORBIDDEN', 'the admin key has no buyer; use an agent or judge key');
-    const connector = await featureOn(c.env, 'connector');
+    const connector = await connectorOn(c.env);
     const oauth = connector ? await oauthCaller(c.env, header) : null;
     if (oauth) {
       if ((await countUse(c.env, `oauth-mcp:${oauth.tokenHash}`)) > MCP_PER_TOKEN_PER_MINUTE) throw new HttpError(429, 'RATE_LIMITED', `at most ${MCP_PER_TOKEN_PER_MINUTE} MCP calls a minute for this token`);

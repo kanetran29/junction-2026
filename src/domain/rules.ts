@@ -4,6 +4,7 @@ import { REASONS } from './reasons';
 import { AUD } from '../sign/door';
 import { MAX_SANDBOXES, SANDBOXES_PER_ADDRESS, SANDBOX_IDLE_MS, TRY_AGENT_REASON, TRY_ALL_PER_MINUTE, TRY_APPROVER, TRY_FREE_TEXT_PER_MINUTE, TRY_PER_ADDRESS_PER_MINUTE, TRY_PER_VISITOR_PER_MINUTE } from '../try/sandbox';
 import { TRANSCRIPT_MAX, VOICE_MAX_BYTES } from '../try/voice';
+import { ACCESS_TTL_S, MCP_PER_TOKEN_PER_MINUTE, REFRESH_TTL_MS, SCOPE, STEP_TTL_MS } from '../oauth/server';
 
 export interface Decision {
   id: string;
@@ -49,6 +50,10 @@ export function decisionRegister(demo = true): Decision[] {
       'tryIt',
       'Demo door only: a visitor orders as the chef of a sandbox kitchen with no key. The door interprets the text (Gemini, read again by Gemma), fills only the reference agent\'s profile default, asks the visitor about any open field, then quotes and places the cheapest covering offer exactly as an agent would; the sandbox mandate decides, and a held order is approved or rejected by the visitor as that kitchen\'s manager through the normal approval path. A sandbox never sees or decides another buyer\'s orders and orders from its own stock world, so it never takes the stock real buyers are checked against; the page\'s example sentences use recorded Gemini and Gemma readings (marked cached) so they need no model call; a sandbox idle for 20 minutes is removed with its orders, past 500 the least recently used is recycled, and all end at a demo reset.',
       { perVisitorPerMinute: TRY_PER_VISITOR_PER_MINUTE, perAddressPerMinute: TRY_PER_ADDRESS_PER_MINUTE, freeTextPerMinute: TRY_FREE_TEXT_PER_MINUTE, allCallsPerMinute: TRY_ALL_PER_MINUTE, maxSandboxes: MAX_SANDBOXES, sandboxesPerAddress: SANDBOXES_PER_ADDRESS, voiceMaxBytes: VOICE_MAX_BYTES, transcriptMaxChars: TRANSCRIPT_MAX, idleMinutes: SANDBOX_IDLE_MS / 60_000, recordedExamples: true, approver: TRY_APPROVER, agentReason: TRY_AGENT_REASON, mandate: { perOrderAutoEur: 500, perDayAutoEur: 1500, perOrderHardEur: 5000, perDayHardEur: 10000 } },
+    ), seller(
+      'connector',
+      "Demo door, feature `connector` (off by default): an MCP client such as Claude connects with OAuth 2.1 (authorization code with PKCE S256 only; dynamic client registration or a client ID metadata document; https or loopback redirect URIs, matched exactly). The consent page opens a new sandbox kitchen with the Try it mandate and the person as its approver, and shows the kitchen link there only. The token is an agent of that kitchen on /mcp only: never on /v1, never an approver (403), never shown an approval link; it ends with its kitchen (20 idle minutes, recycling or a reset). Codes and tokens are stored as sha256; codes work once and refresh tokens rotate.",
+      { scope: SCOPE, pkce: 'S256', codeMinutes: STEP_TTL_MS / 60_000, accessTokenSeconds: ACCESS_TTL_S, refreshTokenHours: REFRESH_TTL_MS / 3_600_000, mcpCallsPerTokenPerMinute: MCP_PER_TOKEN_PER_MINUTE, approver: TRY_APPROVER },
     )] : []),
     seller(
       'peppolExport',

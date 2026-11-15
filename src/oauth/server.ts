@@ -16,11 +16,11 @@ export const SCOPE = 'agent';
 /** MCP calls a minute with one connector access token. */
 export const MCP_PER_TOKEN_PER_MINUTE = 60;
 /** How long an access token lives, in seconds. */
-const ACCESS_TTL_S = 3600;
+export const ACCESS_TTL_S = 3600;
 /** How long a refresh token lives (the sandbox behind it usually ends sooner: 20 idle minutes or a demo reset). */
-const REFRESH_TTL_MS = 24 * 3600_000;
+export const REFRESH_TTL_MS = 24 * 3600_000;
 /** How long a consent page and an authorization code stay usable. */
-const STEP_TTL_MS = 10 * 60_000;
+export const STEP_TTL_MS = 10 * 60_000;
 /** Registrations and consent pages a minute from one client address. */
 const OAUTH_PER_ADDRESS_PER_MINUTE = 30;
 /** The largest client ID metadata document the door reads. */
@@ -43,6 +43,11 @@ const secret = () => b64u(crypto.getRandomValues(new Uint8Array(32)));
 const addressOf = (c: Context) => c.req.header('CF-Connecting-IP') ?? 'unknown';
 /** The PKCE S256 challenge of a verifier. */
 const s256 = async (verifier: string) => b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+
+/** The connector exists only on a demo door (its sandbox kitchens are a demo feature) and only while the `connector` flag is on. */
+export async function connectorOn(env: Env): Promise<boolean> {
+  return env.DEMO_MODE === '1' && (await featureOn(env, 'connector'));
+}
 
 /** True for a redirect URI a public client may use: https, or http on a loopback host (native apps); no fragment, no user info. */
 export function redirectAllowed(uri: unknown): uri is string {
@@ -196,15 +201,15 @@ async function fieldsOf(c: Context): Promise<Record<string, string>> {
 }
 
 /**
- * The connector: a small OAuth 2.1 authorization server for MCP clients such as Claude (feature flag `connector`, else every
- * route here is 404). Protected-resource (RFC 9728) and authorization-server (RFC 8414) metadata; dynamic client registration
+ * The connector: a small OAuth 2.1 authorization server for MCP clients such as Claude (demo door and feature flag `connector`,
+ * else every route here is 404). Protected-resource (RFC 9728) and authorization-server (RFC 8414) metadata; dynamic client registration
  * (RFC 7591) and client ID metadata documents; the authorization code flow with PKCE S256 only; a consent page that opens a
  * sandbox kitchen with the Try it mandate and the person as its approver; tokens bound to that sandbox, stored as sha256.
  */
 export function oauthRoutes(fetchFn: typeof fetch = fetch): Hono<{ Bindings: Env }> {
   const app = new Hono<{ Bindings: Env }>();
   const on: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
-    if (!(await featureOn(c.env, 'connector'))) throw new HttpError(404, 'NOT_FOUND', 'no such route');
+    if (!(await connectorOn(c.env))) throw new HttpError(404, 'NOT_FOUND', 'no such route');
     await next();
   };
   for (const path of ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/*', '/.well-known/oauth-authorization-server', '/oauth/*']) app.use(path, on);
